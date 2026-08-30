@@ -11,7 +11,10 @@
 // than count: the committed tool denial it used to pin is retired (see
 // `DENY_ISSUE_LOOKUP` in ../src/index.ts), and a repository policy the agent is
 // never told to read took its place. The fourth case is here because the new
-// lesson has a second silent failure the old one did not — see it below.
+// lesson has a second silent failure the old one did not — see it below. The
+// fifth (F-1784) pins the `## Discrimination` record to the one shape the
+// F-1345 parser reads, because a record in any other shape fails SILENTLY:
+// no gate here went red while `save_task` graded the capstone unmeasured.
 //
 // NOT here, and deliberately: `tools: []` and `settingSources: []` being wired
 // into the `query()` call. Those are the sandbox seal, they are load-bearing for
@@ -76,6 +79,56 @@ describe("support-triage", () => {
   it("keeps the same triage rule in BOTH arms, so the two runs differ in one thing", () => {
     for (const hint of [policyHint(true), policyHint(false)]) {
       expect(buildSystemPrompt(hint)).toContain("search the open issues");
+    }
+  });
+
+  // F-1784. The task's `## Discrimination` record is read by exactly one parser
+  // — pome-cloud `packages/contract/src/task-discrimination.ts` (F-1345), whose
+  // zod schema is `.strict()` on both the record and each trial row. A record
+  // written in any other shape is not a lint warning anywhere: `save_task`
+  // grades it UNREADABLE and the task counts as unmeasured, which is this
+  // suite's silent-wrong-answer class exactly. The shape is restated here
+  // (this repo cannot import that package) and pinned to its source of truth;
+  // if the record grammar ever changes, it changes THERE first.
+  it("carries its ## Discrimination record in the shape the F-1345 parser reads", () => {
+    const task = readFileSync(
+      fileURLToPath(new URL("../tasks/duplicate-issue.md", import.meta.url)),
+      "utf8",
+    );
+
+    // Same section grammar as the parser: a level-2 ATX heading opens the
+    // section, the next one (or EOF) closes it.
+    const headings = [...task.matchAll(/^##[ \t]+(.+?)[ \t]*$/gm)];
+    const openIdx = headings.findIndex((m) => m[1].trim().toLowerCase() === "discrimination");
+    expect(openIdx).toBeGreaterThanOrEqual(0);
+    const open = headings[openIdx];
+    const body = task.slice(
+      open.index! + open[0].length,
+      headings[openIdx + 1]?.index ?? task.length,
+    );
+
+    // Same fence rule as the parser's `unfence`: the FIRST fence in the section
+    // is the record, so a stray earlier fence would be caught here too.
+    const fence = body.match(/```(?:json)?\s*\n([\s\S]*?)\n?```/);
+    expect(fence).not.toBeNull();
+    const record = JSON.parse(fence![1]);
+
+    // `.strict()` — exactly these keys, nothing else.
+    expect(Object.keys(record).sort()).toEqual(["fingerprint", "measured_at", "trials"]);
+    expect(record.fingerprint).toMatch(/^[0-9a-f]{64}$/);
+    expect(record.measured_at).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(Array.isArray(record.trials)).toBe(true);
+    expect(record.trials.length).toBeGreaterThan(0);
+    for (const row of record.trials) {
+      expect(Object.keys(row).sort()).toEqual(["model", "run_id", "score", "verdict"]);
+      expect(typeof row.model).toBe("string");
+      expect(row.model.length).toBeGreaterThan(0);
+      expect(typeof row.run_id).toBe("string");
+      expect(row.run_id.length).toBeGreaterThan(0);
+      expect(typeof row.score).toBe("number");
+      expect(row.score).toBeGreaterThanOrEqual(0);
+      expect(row.score).toBeLessThanOrEqual(100);
+      expect(["pass", "fail"]).toContain(row.verdict);
     }
   });
 

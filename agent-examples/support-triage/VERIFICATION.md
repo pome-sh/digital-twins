@@ -239,11 +239,18 @@ which is what Premise C in `failure-classes.md` §2 says endures.
 
 ### Results — 11 hosted trials, 2026-08-21
 
-All eleven ran against **one** task_hash, `2191ebc53183…`, the sha256 of
-`tasks/duplicate-issue.md` exactly as it ships. Examinee as committed, no planted
-defect, `POME_TRIAGE_POLICY_HINT` unset. Model pinned per arm via
-`ANTHROPIC_MODEL` — verified honoured rather than assumed: the SDK's `init`
-message echoes the requested model back.
+All eleven ran against **one** task_hash, `2191ebc53183…` — the sha256 of
+`tasks/duplicate-issue.md`'s bytes at trial time. task_hash is minted over the
+whole source markdown (pome-cloud `packages/contract/src/run.ts:215`), so unlike
+the exam fingerprint it has no `## Discrimination` exclusion, and the shipped
+file has moved since: #446 appended the discrimination record, F-1784 re-emitted
+that record in the parser's shape. The file as it ships now hashes to
+`8a3dbb25299251b0b21d5793b3f7ed83176d4d83d88ef654b0b53f6184294f0a` (re-derive on
+any edit: `shasum -a 256 tasks/duplicate-issue.md`) — saving it mints that task
+identity, and these eleven runs stay keyed to the old one. Examinee as
+committed, no planted defect, `POME_TRIAGE_POLICY_HINT` unset. Model pinned per
+arm via `ANTHROPIC_MODEL` — verified honoured rather than assumed: the SDK's
+`init` message echoes the requested model back.
 
 | model | n | scores | pass rate | group |
 |---|---|---|---|---|
