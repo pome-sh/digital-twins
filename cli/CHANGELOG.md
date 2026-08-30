@@ -25,6 +25,25 @@ twin's own inventory tiers otherwise. For a twin's real surface, read its
 generated reference page, or `curl <base>/healthz` on a running twin.
 
 
+## Unreleased (patch)
+
+**`pome twin start` fails on a taken port instead of printing a working-looking
+twin** (F-1716). The bind is asynchronous and had no `error` listener, so
+EADDRINUSE wrote the status file and printed the URLs, token and `Ctrl-C to
+stop.` before dying on a stack trace. The bind is awaited now, and a taken port
+is a named error.
+
+**`pome twin status` says whether the twin is actually running.** It used to
+`cat` the status file, so after Ctrl-C or a crash it printed a dead twin's URL
+and token as if they worked. It now probes `/healthz` and requires the response
+to name this twin — 3333/3336/3337 are ordinary dev-server ports, and the next
+thing you start on one is not your twin. An unreadable status file is one named
+error. The file's format is unchanged.
+
+**`pome twin start --help` names linear's port override**, which the `--port`
+text omitted; it is built from the registry now.
+
+
 ## 0.38.0 — 2026-08-30
 
 **`pome compile-seeds --hosted` is gone, along with `--api-url`.** It POSTed a

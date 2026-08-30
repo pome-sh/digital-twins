@@ -80,7 +80,12 @@ import {
   readManifest,
   writeManifest,
 } from "./project-config.js";
-import { createGitHubSmokeApp, TWIN_NAME_LIST } from "../twin/registry.js";
+import {
+  createGitHubSmokeApp,
+  TWIN_NAME_LIST,
+  TWIN_REGISTRY,
+  type TwinName,
+} from "../twin/registry.js";
 import {
   buildFixPrompt,
   buildGroupFixPrompt,
@@ -1351,7 +1356,13 @@ export function createProgram() {
     )
     .option(
       "--port <port>",
-      "Port to bind (default: $PORT, else GMAIL_TWIN_PORT/3336 for gmail, else 3333)",
+      // Built from the registry rather than restated: the per-twin overrides
+      // are the registry's to add, and this text went stale when linear's did.
+      `Port to bind (default: $PORT, else ${TWIN_NAME_LIST.filter(
+        (twin) => TWIN_REGISTRY[twin].portEnvName,
+      )
+        .map((twin) => `${TWIN_REGISTRY[twin].portEnvName}/${TWIN_REGISTRY[twin].defaultPort} for ${twin}`)
+        .join(", ")}, otherwise 3333)`,
     )
     .option(
       "--seed <path>",
@@ -1383,13 +1394,52 @@ export function createProgram() {
 
   twin
     .command("status")
-    .description("Print standalone twin status")
+    .summary("Print the local twin's status")
+    .description(
+      "Say whether the twin `pome twin start` last booted here is still running, and print its paste-able env lines",
+    )
     .action(async () => {
-      if (!existsSync(".pome/twin-status.json")) {
+      const statusPath = ".pome/twin-status.json";
+      if (!existsSync(statusPath)) {
         console.log("No standalone twin status found.");
         return;
       }
-      console.log(await import("node:fs/promises").then((fs) => fs.readFile(".pome/twin-status.json", "utf8")));
+      // `twin start` writes this file non-atomically, so a Ctrl-C or a full disk
+      // mid-write leaves it truncated. Validate every field this command prints
+      // BEFORE printing any of it — one named message, not `Invalid URL` or an
+      // `undefined twin —` line above a TypeError.
+      let status: { name: string; rest_url: string; mcp_url: string; auth_token: string };
+      let origin: string;
+      try {
+        status = JSON.parse(await readFile(statusPath, "utf8"));
+        if (typeof status.name !== "string" || status.name === "") throw new Error("no name");
+        origin = new URL(status.rest_url).origin;
+      } catch {
+        throw new Error(
+          `pome twin status: ${statusPath} is unreadable — start a twin with \`pome twin start <${TWIN_NAME_LIST.join("|")}>\`.`,
+        );
+      }
+      // Nothing deletes the status file, so it outlives Ctrl-C, a SIGKILL and a
+      // failed bind. A 200 alone does not mean the twin is back: 3333/3336/3337
+      // are ordinary dev-server ports, and any other server on one would pass.
+      // `/healthz` names the twin serving it, so that is the discriminator.
+      const running = await fetch(`${origin}/healthz`, {
+        signal: AbortSignal.timeout(1000),
+      }).then(
+        async (res) =>
+          res.ok &&
+          ((await res.json().catch(() => ({}))) as { twin?: string }).twin === status.name,
+        () => false,
+      );
+      console.log(
+        running
+          ? `${status.name} twin — running`
+          : `${status.name} twin — not running (stale ${statusPath})`,
+      );
+      const envName = TWIN_REGISTRY[status.name as TwinName]?.envName ?? status.name.toUpperCase();
+      console.log(`POME_${envName}_REST_URL=${status.rest_url}`);
+      console.log(`POME_${envName}_MCP_URL=${status.mcp_url}`);
+      console.log(`POME_AUTH_TOKEN=${status.auth_token}`);
     });
 
   program
