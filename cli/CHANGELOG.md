@@ -9,6 +9,20 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (patch)
+
+**`pome checks <twin>` names the twin's real version instead of "unknown"**
+(F-1791). The header — the first grading-vocabulary output the docs send a
+newcomer to — printed `(@pome-sh/twin-github unknown)` on every install. The
+version lookup still read the CLI's own `dependencies`, but the twins stopped
+living there when tsup began inlining them: they are devDependency workspace
+links now, so that key could never name them again. The build bakes the
+inlined versions into the bundle (the same mechanism as `pome --version`), a
+source tree resolves the workspace link's own manifest, and when neither
+answers the parenthetical is omitted rather than filled with a placeholder.
+The digest-skew refusal and the offline `checks add` note named the same
+"unknown" pin and are fixed by the same resolution.
+
 ## 0.42.3 — 2026-08-30
 
 **`pome compile-seeds` compiles again.** Every file failed with the Anthropic

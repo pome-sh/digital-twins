@@ -31,13 +31,38 @@
 // asserts every specifier the inlined packages import is declared here.
 import { execSync } from "node:child_process";
 import { chmodSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { defineConfig } from "tsup";
 
 const CLI_ROOT = new URL(".", import.meta.url).pathname;
 const pkg = JSON.parse(readFileSync(resolve(CLI_ROOT, "package.json"), "utf8")) as {
   version: string;
+  devDependencies?: Record<string, string>;
 };
+
+/**
+ * Versions of the `@pome-sh/*` packages this bundle inlines. They are
+ * devDependencies resolved as workspace `"*"` links, so nothing in the
+ * published tarball records which twin vocabulary rode along — except this
+ * map, read by `src/cli/checks.ts`'s `pinnedVersion` for the
+ * `pome checks <twin>` header and the digest-skew refusals (F-1791). Baked at
+ * build time because build time is when the inlining happens.
+ */
+function inlinedPackageVersions(): Record<string, string> {
+  const require = createRequire(resolve(CLI_ROOT, "package.json"));
+  const inlined = Object.keys(pkg.devDependencies ?? {}).filter((dep) =>
+    dep.startsWith("@pome-sh/"),
+  );
+  return Object.fromEntries(
+    inlined.map((dep) => {
+      const manifest = JSON.parse(
+        readFileSync(require.resolve(`${dep}/package.json`), "utf8"),
+      ) as { version: string };
+      return [dep, manifest.version];
+    }),
+  );
+}
 
 const BIN_ENTRY = resolve(CLI_ROOT, "dist/src/cli/main.js");
 
@@ -109,6 +134,9 @@ export default defineConfig({
     // it now. Without the pin an old CLI quietly scaffolds an example written
     // against a newer one.
     PKG_GIT_SHA: JSON.stringify(resolveGitSha()),
+    // Read by src/cli/checks.ts. Double-stringified: define injects raw
+    // source text, and the runtime wants a string literal holding JSON.
+    POME_INLINED_PKG_VERSIONS: JSON.stringify(JSON.stringify(inlinedPackageVersions())),
   },
   async onSuccess() {
     ensureExecutableBin();

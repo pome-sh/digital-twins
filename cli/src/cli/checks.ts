@@ -9,7 +9,7 @@
  * to write a sentence when the two pins disagree.
  */
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { createRequire } from "node:module";
 
 import { checksDigest, templateSlots, type CheckDefinition } from "@pome-sh/sdk/checks";
 import { MOUNTED_TWINS } from "../contract/index.js";
@@ -18,8 +18,6 @@ import { GMAIL_CHECKS } from "@pome-sh/twin-gmail/checks";
 import { LINEAR_CHECKS } from "@pome-sh/twin-linear/checks";
 import { SLACK_CHECKS } from "@pome-sh/twin-slack/checks";
 import { STRIPE_CHECKS } from "@pome-sh/twin-stripe/checks";
-
-import { resolvePackageRoot } from "./resolve-package-root.js";
 
 // Args erased, exactly as pome-cloud's registry does it: the declarations are a
 // heterogeneous tuple that every consumer here handles uniformly.
@@ -107,20 +105,56 @@ export function localDigest(twin: string): string {
   return checksDigest(checksFor(twin));
 }
 
-/** Read the pin from OUR OWN manifest. The twin's exports map sends
- *  `./package.json` through its `"./*"` wildcard and fails to resolve — and the
- *  pin we control is the one that matters anyway. */
-export function pinnedVersion(pkg: string): string {
-  const root = resolvePackageRoot(import.meta.url);
-  if (!root) return "unknown";
+// Baked by tsup (`define: { POME_INLINED_PKG_VERSIONS }`): a JSON map from
+// package name to the version the bundle inlined. Undeclared under
+// `tsx src/cli/main.ts` and vitest, where the workspace fallback below applies
+// — the same split `main.ts` uses for PKG_VERSION.
+declare const POME_INLINED_PKG_VERSIONS: string | undefined;
+
+function bakedVersions(): Record<string, string> {
+  if (typeof POME_INLINED_PKG_VERSIONS !== "string") return {};
   try {
-    const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
-      dependencies?: Record<string, string>;
-    };
-    return manifest.dependencies?.[pkg] ?? "unknown";
+    return JSON.parse(POME_INLINED_PKG_VERSIONS) as Record<string, string>;
   } catch {
-    return "unknown";
+    return {};
   }
+}
+
+/**
+ * The version of an inlined `@pome-sh/*` package, or undefined when nothing
+ * can honestly answer.
+ *
+ * This used to read the CLI's own `dependencies`, which was right when the
+ * twins were real runtime dependencies. tsup's `noExternal` inlines them now,
+ * so they live in `devDependencies` as workspace `"*"` links, and the old
+ * lookup answered "unknown" on every install — including the header of
+ * `pome checks <twin>`, the first grading-vocabulary output the docs point a
+ * newcomer at (F-1791). The version of the code actually in this process is
+ * the one recorded at build time; in the source tree, the workspace link's
+ * own manifest says the same thing.
+ */
+export function pinnedVersion(pkg: string): string | undefined {
+  const baked = bakedVersions()[pkg];
+  if (baked) return baked;
+  try {
+    const require = createRequire(import.meta.url);
+    const manifest = JSON.parse(readFileSync(require.resolve(`${pkg}/package.json`), "utf8")) as {
+      name?: string;
+      version?: string;
+    };
+    if (manifest.name === pkg && typeof manifest.version === "string") return manifest.version;
+  } catch {
+    // Neither baked nor installed: callers omit the version rather than print
+    // a word that reads like a failure.
+  }
+  return undefined;
+}
+
+/** `@pome-sh/twin-github 0.12.0`, or the bare package name when the version
+ *  cannot be resolved. */
+export function pinLabel(pkg: string): string {
+  const version = pinnedVersion(pkg);
+  return version === undefined ? pkg : `${pkg} ${version}`;
 }
 
 export const SUBSTRATE_HELP: Record<string, string> = {
@@ -149,6 +183,14 @@ export function argFlagsFor(def: DeclaredCheck): string {
 
 export interface ChecksCommandOptions {
   json?: boolean;
+}
+
+/** The `pome checks <twin>` header. Version undefined means the parenthetical
+ *  is omitted, not filled with a placeholder (F-1791). Exported for the test
+ *  of that branch, which nothing in a source tree can reach naturally. */
+export function checksHeader(twin: string, count: number, version: string | undefined): string {
+  const label = bold(`${twin} — ${count} declared check${count === 1 ? "" : "s"}`);
+  return version === undefined ? label : `${label} ${dim(`(@pome-sh/twin-${twin} ${version})`)}`;
 }
 
 function jsonView(twin: string) {
@@ -212,10 +254,7 @@ export async function runChecksCommand(
     return;
   }
 
-  console.log(
-    `${bold(`${twin} — ${checks.length} declared check${checks.length === 1 ? "" : "s"}`)} ` +
-      dim(`(@pome-sh/twin-${twin} ${pinnedVersion(`@pome-sh/twin-${twin}`)})`),
-  );
+  console.log(checksHeader(twin, checks.length, pinnedVersion(`@pome-sh/twin-${twin}`)));
   console.log("");
   for (const def of checks) {
     console.log(`  ${bold(def.id)}`);
