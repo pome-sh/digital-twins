@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (minor)
+## 0.41.0 — 2026-08-30
 
 **`pome eval` refuses an `events.jsonl` row with no `kind`** rather than wrapping it
 into a `TwinHttpEvent` nothing recorded; the control plane refuses it with 426 anyway.
