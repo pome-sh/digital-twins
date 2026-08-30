@@ -2,7 +2,7 @@
 //
 // The one seed-file door. Every command that takes a user-authored world reads
 // it through here: `pome twin start --seed`, `pome sandbox create --seed`, and
-// `pome twin seed`'s own round-trip check.
+// `pome twin new-seed`'s own round-trip check.
 //
 // A seed file is JSON or YAML (JSON is a YAML subset, so one parser) in one of
 // two shapes:
@@ -10,7 +10,7 @@
 //   flat      { "repositories": [ … ] }              one twin's seed
 //   envelope  { "github": { "repositories": [ … ] }} twin id → that twin's seed
 //
-// `pome twin seed` generates flat for one twin and the envelope for several, and
+// `pome twin new-seed` generates flat for one twin and the envelope for several, and
 // both shapes are equally first-class here.
 // Flat is also load-bearing because F-1686 shipped it and eight of the twenty
 // `<task>.seed.json` files in agent-examples/ are one; the other twelve are

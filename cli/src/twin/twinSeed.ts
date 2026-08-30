@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// `pome twin seed <name...>` — a starter seed file, generated from the twin.
+// `pome twin new-seed <name...>` — a starter seed file, generated from the twin.
 //
 // THE POINT IS THAT NOBODY TYPES IT. Every hand-written seed example we shipped
 // was correct the day it merged and three of the five stopped parsing against
@@ -105,7 +105,7 @@ export async function runTwinSeedCommand(
     return;
   }
   await writeSeedFile(options.out, text);
-  // stderr, so `pome twin seed github --out seed.json` says what it did without
+  // stderr, so `pome twin new-seed github --out seed.json` says what it did without
   // that line landing in a file when someone also redirects stdout.
   console.error(`Wrote ${options.out} — the ${names.join(" + ")} starting seed.`);
   // All three doors, because this is the one place a reminder lands for free —

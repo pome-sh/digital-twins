@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// `pome twin seed <name...>` — the starter seed file, generated from the twin.
+// `pome twin new-seed <name...>` — the starter seed file, generated from the twin.
 //
 // The property that matters is the round trip, and it is asserted here rather
 // than described: what this command prints, `--seed` accepts, and the twin's own
@@ -60,7 +60,7 @@ async function taskWith(twins: TwinName[], sidecar: string): Promise<string> {
 describe("generateSeedFile", () => {
   it.each(TWIN_NAME_LIST)("%s: what it prints is a seed file --seed accepts", async (twin) => {
     const text = await generateSeedFile([twin]);
-    const file = parseSeedFileText(text, `pome twin seed ${twin}`);
+    const file = parseSeedFileText(text, `pome twin new-seed ${twin}`);
     // Flat: `twin start` was told which twin by its `<name>` argument.
     expect(file.shape).toBe("flat");
     await expect(seedForTwin(file, twin, "generated")).resolves.toBeTypeOf("object");
@@ -133,7 +133,7 @@ describe("generateSeedFile", () => {
     expect(await generateSeedFile([twin])).toBe(await generateSeedFile([twin]));
   });
 
-  it("ends with a newline, so `pome twin seed github > seed.json` is a well-formed file", async () => {
+  it("ends with a newline, so `pome twin new-seed github > seed.json` is a well-formed file", async () => {
     expect(await generateSeedFile(["stripe"])).toMatch(/\n$/);
   });
 

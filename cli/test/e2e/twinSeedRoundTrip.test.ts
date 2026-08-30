@@ -2,7 +2,7 @@
 // Acceptance for the generated starter, all five twins, as real child
 // processes: generate → `--seed` it → the twin SERVES what the file declares.
 //
-//     pome twin seed <twin> --out seed.json
+//     pome twin new-seed <twin> --out seed.json
 //     pome twin start <twin> --seed seed.json   <- name given, because the file is flat
 //     GET /s/standalone/_pome/state             <- read back
 //
@@ -78,14 +78,14 @@ afterEach(() => {
   child = undefined;
 });
 
-describe("pome twin seed → pome twin start --seed (e2e)", () => {
+describe("pome twin new-seed → pome twin start --seed (e2e)", () => {
   it.each(TWIN_NAME_LIST)(
     "%s: the generated seed boots, and the twin serves what it declares",
     async (twin) => {
       const cwd = await mkdtemp(join(tmpdir(), `pome-seed-roundtrip-${twin}-`));
       const seedPath = join(cwd, "seed.json");
 
-      const generated = await runCli(["twin", "seed", twin, "--out", seedPath], cwd);
+      const generated = await runCli(["twin", "new-seed", twin, "--out", seedPath], cwd);
       expect(generated.code, generated.output).toBe(0);
 
       const file = JSON.parse(await readFile(seedPath, "utf8")) as Record<string, unknown>;
@@ -159,9 +159,9 @@ describe("pome twin seed → pome twin start --seed (e2e)", () => {
     async () => {
       const cwd = await mkdtemp(join(tmpdir(), "pome-seed-overwrite-"));
       const seedPath = join(cwd, "seed.json");
-      const first = await runCli(["twin", "seed", "stripe", "--out", seedPath], cwd);
+      const first = await runCli(["twin", "new-seed", "stripe", "--out", seedPath], cwd);
       expect(first.code).toBe(0);
-      const second = await runCli(["twin", "seed", "github", "--out", seedPath], cwd);
+      const second = await runCli(["twin", "new-seed", "github", "--out", seedPath], cwd);
       expect(second.code).not.toBe(0);
       expect(second.output).toContain("already exists");
       // The stripe seed is still there, unedited: `api_keys` is a stripe seed
