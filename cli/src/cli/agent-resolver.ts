@@ -95,7 +95,7 @@ function mapHttpError(status: number, json: unknown): Error {
   if (status === 404) {
     return new HostedOrchError(
       err?.message ??
-        "POST /v1/agents is not available at this API URL. Upgrade pome-cloud or check that --api-url/POME_API_URL points at a version that supports agent registration.",
+        "POST /v1/agents returned 404 — check that --api-url/POME_API_URL points at a Pome control plane.",
     );
   }
   return new HostedOrchError(err?.message ?? `POST /v1/agents → HTTP ${status}`);
