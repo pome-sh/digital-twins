@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { resolve } from "node:path";
 import {
   eventSchema,
   type Event,
@@ -20,18 +20,20 @@ import {
  *   - `kind: "missing"` — `events.jsonl` does not exist (run never produced
  *     trace blobs). Renderer prints a one-line note; no exit-2.
  *
- * A row the union rejects throws out of the zod parse below. There is no
- * tolerant path: the writer upgrades every row to the unified shape before it
- * touches disk, so a row without a `kind` is a corrupt file, not an old one.
+ * There is no tolerant path: every writer emits the unified shape, so a row
+ * the union rejects is a corrupt file and throws.
  */
 export type ReadEventsResult =
   | { kind: "events"; events: Event[] }
   | { kind: "missing" };
 
 export async function readEventsJsonl(runDir: string): Promise<ReadEventsResult> {
+  // Absolute, because it goes into the errors below and `pome inspect` prints
+  // `Directory:` only after this read returns.
+  const file = resolve(runDir, "events.jsonl");
   let raw: string;
   try {
-    raw = await readFile(join(runDir, "events.jsonl"), "utf8");
+    raw = await readFile(file, "utf8");
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
       return { kind: "missing" };
@@ -39,13 +41,27 @@ export async function readEventsJsonl(runDir: string): Promise<ReadEventsResult>
     throw err;
   }
 
-  const rows = raw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as unknown);
-
-  const events = rows.map((row) => eventSchema.parse(row));
+  const events: Event[] = [];
+  const lines = raw.split("\n");
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i]!.trim();
+    if (line.length === 0) continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch (err) {
+      throw new Error(
+        `pome inspect: ${file} line ${i + 1} is not valid JSON — ${err instanceof Error ? err.message : String(err)}. Re-run the task to record the trace again.`,
+      );
+    }
+    const result = eventSchema.safeParse(parsed);
+    if (!result.success) {
+      throw new Error(
+        `pome inspect: ${file} line ${i + 1} is not a recorded event — ${result.error.issues[0]?.message ?? "unrecognized shape"}. Re-run the task to record the trace again.`,
+      );
+    }
+    events.push(result.data);
+  }
   return { kind: "events", events };
 }
 
