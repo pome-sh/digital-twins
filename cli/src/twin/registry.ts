@@ -17,8 +17,8 @@
 //
 // THIS MODULE IS NOT THE WHOLE STORY, and for six releases it was the wrong
 // half of it. Everything above was true here and false in aggregate:
-// `cli/src/task/{parseTask,taskSchema,githubSeedCompat,seed-compiler,
-// seed-compiler-hosted}.ts` top-level-imported twin-github/gmail/linear's
+// `cli/src/task/{parseTask,taskSchema,githubSeedCompat,seed-compiler}.ts`
+// top-level-imported twin-github/gmail/linear's
 // PACKAGE ROOTS to reach a zod seed schema, and a root export carries the domain
 // and the Hono app too — so `pome --version` parsed 698 KB of three twin servers
 // while this file's header said it did not. A twin's laziness is a property of

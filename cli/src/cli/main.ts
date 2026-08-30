@@ -478,28 +478,14 @@ export function createProgram() {
 
   program
     .command("compile-seeds")
-    .summary("Compile a task's seed state to JSON")
+    .summary("Compile prose seed state to JSON via Claude")
     .argument("[target]", "Task .md file or directory (defaults to ./tasks)")
     .option("--force", "Recompile even if the sidecar's source hash matches", false)
-    .option(
-      "--hosted",
-      "Compile via the Pome control plane instead of calling Anthropic directly (uses your Pome API key; no ANTHROPIC_API_KEY needed)",
-      false,
-    )
-    .option(
-      "--api-url <url>",
-      "Control-plane base URL (only relevant with --hosted).",
-      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
-    )
     .description(
-      "Compile prose `## Seed State` sections into sidecar .seed.json files (local: ANTHROPIC_API_KEY; --hosted: routes through Pome cloud)",
+      "Compile prose `## Seed State` sections into sidecar .seed.json files — one Claude call per file, billed to your ANTHROPIC_API_KEY",
     )
-    .action(async (target: string | undefined, opts: { force: boolean; hosted: boolean; apiUrl: string }) => {
-      const code = await runCompileSeeds(target, {
-        force: opts.force,
-        hosted: opts.hosted,
-        apiBaseUrl: opts.apiUrl,
-      });
+    .action(async (target: string | undefined, opts: { force: boolean }) => {
+      const code = await runCompileSeeds(target, { force: opts.force });
       if (code !== 0) process.exitCode = code;
     });
 

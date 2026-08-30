@@ -4,9 +4,6 @@
  * scenario markdown file into a sidecar JSON seed via the Claude API, verify
  * it loads cleanly into the GitHub twin, and write the result next to the
  * scenario.
- *
- * See `docs/agents/scenario-prose-seed.md` for the prose convention and the
- * defense layers (schema validation, twin-load verification, PR review).
  */
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -14,9 +11,7 @@ import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { z } from "zod";
 import { compileSeed, COMPILER_MODEL, type CompileResult } from "../task/seed-compiler.js";
-import { compileSeedHosted } from "../task/seed-compiler-hosted.js";
 import { verifySeedWithTwin } from "../task/seed-verifier.js";
-import { exitCodeFor } from "../hosted/errors.js";
 
 const SIDECAR_META_VERSION = 1;
 
@@ -34,8 +29,6 @@ const HAND_AUTHORED_SOURCE_HASH = `sha256:${HAND_AUTHORED_MARKER}`;
 
 interface CompileOptions {
   force: boolean;
-  hosted: boolean;
-  apiBaseUrl: string;
 }
 
 interface FileResult {
@@ -52,8 +45,6 @@ interface FileResult {
   inputTokens?: number;
   outputTokens?: number;
   durationMs?: number;
-  /** Set on hosted errors so the top-level handler can pick the right exit code. */
-  exitCode?: number;
 }
 
 export async function runCompileSeeds(target: string | undefined, opts: CompileOptions): Promise<number> {
@@ -72,16 +63,15 @@ export async function runCompileSeeds(target: string | undefined, opts: CompileO
     const stamp = statusStamp(r.status);
     const tail = r.message ? ` — ${r.message}` : "";
     const cost = r.inputTokens !== undefined ? ` (${r.inputTokens} in / ${r.outputTokens} out, ${r.durationMs}ms)` : "";
-    console.error(`${stamp} ${r.path}${tail}${cost}`);
+    const line = `${stamp} ${r.path}${tail}${cost}`;
+    if (r.status === "error") console.error(line);
+    else console.log(line);
   }
 
   const errors = results.filter((r) => r.status === "error");
   if (errors.length > 0) {
     console.error(`\n${errors.length} error(s).`);
-    // Propagate the worst hosted exit code (e.g. 3=auth, 4=quota) so CI scripts
-    // can branch on the reason. Falls back to 1 for local-only failures.
-    const worstHosted = errors.reduce((max, r) => Math.max(max, r.exitCode ?? 0), 0);
-    return worstHosted > 0 ? worstHosted : 1;
+    return 1;
   }
   return 0;
 }
@@ -141,10 +131,7 @@ async function compileOne(taskPath: string, opts: CompileOptions): Promise<FileR
     };
   }
 
-  // Cache check only applies to local compile — hosted callers may have
-  // different model versions than the locally-pinned COMPILER_MODEL, and the
-  // cloud has its own edge cache to avoid duplicate work anyway.
-  if (!opts.force && !opts.hosted && existsSync(sidecarPath)) {
+  if (!opts.force && existsSync(sidecarPath)) {
     const cached = await readSidecarMeta(sidecarPath);
     if (cached && cached.source_hash === proseHash && cached.model === COMPILER_MODEL) {
       return { path: taskPath, status: "skipped-cached", message: `up-to-date (${sidecarPath})` };
@@ -153,15 +140,12 @@ async function compileOne(taskPath: string, opts: CompileOptions): Promise<FileR
 
   let result: CompileResult;
   try {
-    result = opts.hosted
-      ? await compileSeedHosted(seedText, { apiBaseUrl: opts.apiBaseUrl, taskPath })
-      : await compileSeed(seedText);
+    result = await compileSeed(seedText);
   } catch (err) {
     return {
       path: taskPath,
       status: "error",
-      message: `compile failed: ${(err as Error).message}`,
-      exitCode: opts.hosted ? exitCodeFor(err) : undefined
+      message: `compile failed: ${(err as Error).message}`
     };
   }
 

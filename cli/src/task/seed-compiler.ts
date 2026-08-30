@@ -4,8 +4,6 @@
  * `seedStateSchema`. Uses the Anthropic Messages API with structured
  * output (`output_config` + `zodOutputFormat`).
  *
- * See `docs/agents/scenario-prose-seed.md` for the prose convention.
- *
  * Why Messages API and not the Agent SDK: this is a pure prose-to-JSON
  * transform with no tools needed during generation, so the agent loop
  * adds only cost and variance. The bundled Claude Code system prompt
