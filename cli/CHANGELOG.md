@@ -9,6 +9,19 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (patch)
+
+**`pome compile-seeds` compiles again.** Every file failed with the Anthropic
+API's 400 "The compiled grammar is too large": the command registered the whole
+GitHub seed schema as a structured-output grammar (`output_config.format`), and
+that schema has outgrown the API's grammar-size limit — a trivial schema
+compiles, the largest single branch compiles, the full schema does not, on the
+pinned model and newer ones alike. The compiler now asks for plain JSON with
+the schema carried in the system prompt, and validates the reply locally
+against the same zod schema every compile already ended on. Sidecar format,
+caching, and the pinned model are unchanged; nothing was billed by the
+failures, since the 400 preceded inference.
+
 ## 0.42.2 — 2026-08-30
 
 **`pome init --example support-triage` no longer forks the capstone reader off
