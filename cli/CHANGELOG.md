@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.36.1 — 2026-08-30
 
 **`pome init minimal-viktor` now copies a sixth test file.** The bundled
 minimal-viktor example gained `test/seed-inline-parity.test.ts`, and the file

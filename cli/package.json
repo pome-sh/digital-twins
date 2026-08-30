@@ -1,6 +1,6 @@
 {
   "name": "@pome-sh/cli",
-  "version": "0.36.0",
+  "version": "0.36.1",
   "description": "Test AI agents against digital twins of real SaaS APIs. Records tool-call traces and scores them on pome.sh.",
   "keywords": [
     "ai",
