@@ -9,6 +9,17 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (minor)
+
+**Machine-readable output is `--json` everywhere.** `pome sandbox create` and
+`pome sandbox list` take `--json` instead of `--format <fmt>`, matching `pome
+checks --json`. `--format env` is gone: it was never an output format, only a
+way to silence the summary while `--secrets-file` did the work. `--secrets-file`
+still writes the shell exports at mode 0600, and now always prints the
+connection summary on stderr — previously `--format env --secrets-file X` was
+silent.
+
+
 ## 0.36.1 — 2026-08-30
 
 **`pome init minimal-viktor` now copies a sixth test file.** The bundled

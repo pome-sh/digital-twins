@@ -118,6 +118,12 @@ it accepts, and `packages/twin-*/route-inputs.json` publishes that set.
 **Criterion markers are `[code]` and `[model]`.** The bracketed `D`/`P` forms
 are retired.
 
+**Machine-readable output is `--json`, boolean.** Never `--format <fmt>`: an
+enum grows a third member, and the third one is always a side effect wearing an
+output mode's clothes (`sandbox create --format env` only silenced the summary
+while `--secrets-file` did the writing). A command gains `--json` when something
+actually parses it, not on the chance that something might.
+
 **No bare `import.meta.main` in an entry guard.** It is `undefined` before Node
 24.2 and `engines` allows `>=24`, so the guard exits 0 having run nothing.
 Compare a realpath'd `process.argv[1]` against `import.meta.url` and throw on a

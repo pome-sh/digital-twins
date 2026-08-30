@@ -113,15 +113,14 @@ describe("`pome sandbox` is the only spelling", () => {
         "github",
         "--twin",
         "gmail",
-        "--format",
-        "json",
+        "--json",
         "--api-url",
         "https://api.example.test",
       ],
       expect: [
         expect.objectContaining({
           twins: ["github", "gmail"],
-          format: "json",
+          json: true,
           apiBaseUrl: "https://api.example.test",
         }),
       ],
@@ -129,8 +128,8 @@ describe("`pome sandbox` is the only spelling", () => {
     {
       name: "list",
       runner: "runSessionList",
-      argv: ["list", "--state", "all", "--limit", "5", "--format", "json"],
-      expect: [expect.objectContaining({ state: "all", limit: 5, format: "json" })],
+      argv: ["list", "--state", "all", "--limit", "5", "--json"],
+      expect: [expect.objectContaining({ state: "all", limit: 5, json: true })],
     },
     {
       name: "stop",

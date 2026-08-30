@@ -91,7 +91,7 @@ describe("pome sandbox create --seed", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github"],
-      format: "text",
+      json: false,
     });
     expect(sentSeed()).toBeUndefined();
   });
@@ -100,7 +100,7 @@ describe("pome sandbox create --seed", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github"],
-      format: "text",
+      json: false,
       seedPath: await seedFile({ github: GITHUB_SEED }),
     });
     expect(sentTwins()).toEqual(["github"]);
@@ -114,7 +114,7 @@ describe("pome sandbox create --seed", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github"],
-      format: "text",
+      json: false,
       seedPath: await seedFile(GITHUB_SEED),
     });
     expect(sentSeed()).toMatchObject({ repositories: [expect.objectContaining({ name: "billing" })] });
@@ -124,7 +124,7 @@ describe("pome sandbox create --seed", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github", "slack"],
-      format: "text",
+      json: false,
       seedPath: await seedFile({ github: GITHUB_SEED, slack: SLACK_SEED }),
     });
     expect(sentTwins()).toEqual(["github", "slack"]);
@@ -137,7 +137,7 @@ describe("pome sandbox create --seed", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: [],
-      format: "text",
+      json: false,
       seedPath: await seedFile({ linear: {} }),
     });
     expect(sentTwins()).toEqual(["linear"]);
@@ -148,7 +148,7 @@ describe("pome sandbox create --seed", () => {
       runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: ["github"],
-        format: "text",
+        json: false,
         seedPath: await seedFile({ github: GITHUB_SEED, slack: SLACK_SEED }),
       }),
     ).rejects.toThrow(/names slack, which this command was not asked for/);
@@ -160,7 +160,7 @@ describe("pome sandbox create --seed", () => {
       runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: ["github", "slack"],
-        format: "text",
+        json: false,
         seedPath: await seedFile(GITHUB_SEED),
       }),
     ).rejects.toThrow(/is a flat seed and this sandbox has 2 twins/);
@@ -172,7 +172,7 @@ describe("pome sandbox create --seed", () => {
       runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: [],
-        format: "text",
+        json: false,
         seedPath: await seedFile(GITHUB_SEED),
       }),
     ).rejects.toThrow(/No twin specified/);
@@ -186,7 +186,7 @@ describe("pome sandbox create --seed", () => {
       runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: ["github"],
-        format: "text",
+        json: false,
         seedPath: await seedFile({ github: { repositories: [{ owner: "acme" }] } }),
       }),
     ).rejects.toThrow(/is not a seed this twin can boot[\s\S]*name/);
@@ -197,7 +197,7 @@ describe("pome sandbox create --seed", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github"],
-      format: "text",
+      json: false,
       seedPath: await seedFile({ _meta: { source_hash: "sha256:abc" }, ...GITHUB_SEED }),
     });
     expect(sentSeed()).not.toHaveProperty("_meta");
