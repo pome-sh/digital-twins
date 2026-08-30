@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.42.3 — 2026-08-30
 
 **`pome compile-seeds` compiles again.** Every file failed with the Anthropic
 API's 400 "The compiled grammar is too large": the command registered the whole
