@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-// `pome twin reset --help` printed its default twice:
+// A declaration that carries a default value AND names that default in its own
+// text renders it twice:
 //
 //   name        Twin name (default: github) (default: "github")
 //
-// once from the `.argument()` default value that Commander renders itself, and
-// once from a description that also named it. Cosmetic, and the kind of thing a
-// reader screenshots.
+// once from the value Commander renders itself, once from the description.
+// Cosmetic, and the kind of thing a reader screenshots.
 //
-// The assertion is tree-wide rather than about `twin reset`, because the defect
-// is a class: any declaration that both carries a default value and names one in
-// its own text renders both. Prose like `twin start --port`'s "(default: $PORT,
-// else 3333)" is fine, since that option has no Commander default to duplicate.
+// The assertion is tree-wide because the defect is a class, not one command's
+// typo. Prose like `twin start --port`'s "(default: $PORT, else 3333)" is fine,
+// since that option has no Commander default to duplicate.
 
 import type { Command } from "commander";
 import { describe, expect, it } from "vitest";

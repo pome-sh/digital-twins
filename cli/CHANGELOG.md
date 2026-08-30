@@ -9,6 +9,22 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (minor)
+
+**`pome twin reset` and `pome endpoints` are gone** (F-1728, F-1721).
+
+`twin reset` was a no-op for four of five twins — the registry boots slack,
+stripe, gmail and linear in `":memory:"`. For github it deleted a path only
+`GITHUB_CLONE_DB` can point at, which `rm` already does. Either way every twin
+re-applies its seed on each boot, so a reset never decided what the next
+`twin start` began from.
+
+`endpoints` printed two hand-typed route arrays, threw for the other three
+twins, and stamped every row `semantic` — wrong for the github routes the
+twin's own inventory tiers otherwise. For a twin's real surface, read its
+generated reference page, or `curl <base>/healthz` on a running twin.
+
+
 ## 0.38.0 — 2026-08-30
 
 **`pome compile-seeds --hosted` is gone, along with `--api-url`.** It POSTed a
