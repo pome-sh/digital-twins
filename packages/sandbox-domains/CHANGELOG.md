@@ -1,5 +1,8 @@
 # @pome-sh/sandbox-domains
 
+## Unreleased (patch)
+
+The bundled `@pome-sh/sdk` exposes `./package.json` in its `exports`, so the CLI can resolve each inlined twin's version for the `pome checks <twin>` header (F-1791). No exported names, types or shapes change.
 
 ## 0.3.0 — 2026-08-29
 
