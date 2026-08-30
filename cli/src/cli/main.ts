@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// file-size: the whole CLI command surface — 29 `.command()` registrations plus their
+// file-size: the whole CLI command surface — 28 `.command()` registrations plus their
 // options, in one file so `pome --help` and this module list the same commands in the
 // same order. Splitting per command moves a registration away from its siblings, which
 // is how two commands end up disagreeing about a shared flag's name or default.
