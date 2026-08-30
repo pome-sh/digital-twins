@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.42.1 — 2026-08-30
 
 **Machine-readable output being `--json` is a gate now** (F-1727). No option may
 be named `--format`, `--output-format` or `--fmt`, and `--json` may not take an
@@ -22,7 +22,6 @@ the topic list and exited non-zero; every twin the CLI ships is now asserted to
 have one. `pome twin status`'s summary says it reports whether the twin is
 running. Correcting 0.37.0: `--secrets-file` does not *always* print the
 connection summary — with `--json` it prints only the line naming the file.
-
 
 ## 0.42.0 — 2026-08-30
 
