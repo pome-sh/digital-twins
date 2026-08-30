@@ -64,8 +64,8 @@ say so.
 ```
 
 Everything below is what you should see. Every output block is verbatim from a
-real run on 2026-08-29, CLI `0.34.2`. Work in one empty directory; every path
-below is relative to it.
+real run on 2026-08-29, CLI `0.34.2`; a 2026-08-30 re-run on CLI `0.42.1`
+reproduced every block. Work in one empty directory; paths are relative to it.
 
 ## The world
 
@@ -424,8 +424,8 @@ showcase is about: what happened, versus what persisted, versus what changed.
 | `github.issue-assignee` (`alice`) | `final` | the assign **persisted** to the end of the run |
 | `github.no-new-issues` | `seed+final` | the run **changed** only what it meant to — this one reads both worlds |
 
-Browse the full set with `npx @pome-sh/cli@latest checks github`, or
-`list_checks` over MCP.
+Browse the full set with `npx @pome-sh/cli@latest checks github` (hosted:
+`list_checks` on the control MCP; the local twin's tool table lacks it).
 
 Two limits are worth stating out loud, because an id existing is not the same
 as an id doing what you assume:
@@ -474,7 +474,7 @@ failure. It exits non-zero if either half stops being true.
 
 ## Next
 
-- The [github quickstart](https://docs.pome.sh/quickstart/twins/github) — the
-  same twin, one write, in five minutes, on the hosted path.
+- [Get started](https://docs.pome.sh/quickstart/twins) — all five twins, each
+  started on your own machine and driven by your own coding agent.
 - [`agent-examples/support-triage`](../../agent-examples/support-triage/) — the
   one graded lesson, where a real agent is scored on a task like this.
