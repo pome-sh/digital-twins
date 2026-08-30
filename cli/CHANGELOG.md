@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (minor)
+## 0.40.0 — 2026-08-30
 
 **`--api-url` and `--artifacts-dir` are program-level flags** (F-1723). Declared
 13 times across 10 commands, now once on the root. They still work where you
@@ -17,7 +17,6 @@ already write them, and `pome <cmd> --help` lists them under `Global Options`.
 
 **`POME_API_BASE` is gone.** An undocumented `pome demo`-only override that
 outranked `POME_API_URL`. Set `POME_API_URL` instead.
-
 
 ## 0.39.1 — 2026-08-30
 
