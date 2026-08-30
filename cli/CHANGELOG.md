@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.39.1 — 2026-08-30
 
 **`pome twin start` fails on a taken port instead of printing a working-looking
 twin** (F-1716). The bind is asynchronous and had no `error` listener, so
@@ -26,7 +26,6 @@ error. The file's format is unchanged.
 
 **`pome twin start --help` names linear's port override**, which the `--port`
 text omitted; it is built from the registry now.
-
 
 ## 0.39.0 — 2026-08-30
 
