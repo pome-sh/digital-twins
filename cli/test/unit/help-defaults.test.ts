@@ -8,7 +8,7 @@
 // Cosmetic, and the kind of thing a reader screenshots.
 //
 // The assertion is tree-wide because the defect is a class, not one command's
-// typo. Prose like `twin start --port`'s "(default: $PORT, else 3333)" is fine,
+// typo. Prose like `twin start --port`'s "(default: $PORT, else …)" is fine,
 // since that option has no Commander default to duplicate.
 
 import type { Command } from "commander";

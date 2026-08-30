@@ -9,6 +9,7 @@
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -234,6 +235,41 @@ describe("pome twin start (e2e)", () => {
     },
     90_000,
   );
+});
+
+describe("pome twin start — port already in use (e2e)", () => {
+  it("fails before writing the status file or printing a banner", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "pome-twin-start-inuse-e2e-"));
+    // Hold the port for the whole run: @hono/node-server binds without an
+    // `error` listener, so the ordering under test is "did anything get
+    // written before the bind was known to have failed?"
+    const holder = createServer();
+    holder.listen(0, "127.0.0.1");
+    await once(holder, "listening");
+    const port = (holder.address() as { port: number }).port;
+    try {
+      child = spawn(TSX_BIN, [MAIN_TS, "twin", "start", "github", "--port", String(port)], {
+        cwd,
+        env: { ...process.env },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let stdout = "";
+      let stderr = "";
+      child.stdout?.on("data", (chunk) => { stdout += chunk; });
+      child.stderr?.on("data", (chunk) => { stderr += chunk; });
+      const code = await new Promise<number | null>((resolve, reject) => {
+        child?.once("error", reject);
+        child?.once("exit", (exitCode) => resolve(exitCode));
+      });
+
+      expect(code).not.toBe(0);
+      expect(stderr).toContain(`port ${port} is already in use`);
+      expect(stdout + stderr).not.toContain("listening at");
+      expect(existsSync(join(cwd, ".pome", "twin-status.json"))).toBe(false);
+    } finally {
+      await new Promise((resolve) => holder.close(resolve));
+    }
+  }, 90_000);
 });
 
 describe("pome twin start — unknown-twin error (e2e)", () => {
