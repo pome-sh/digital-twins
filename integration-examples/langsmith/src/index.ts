@@ -209,14 +209,18 @@ export interface EvalOptions {
 /**
  * How many rows run at once.
  *
- * `maxConcurrency` is the field to set, and the near-miss is silent: `_evaluate`
- * builds its queue only `if (sharedConcurrency > 0)` where
- * `sharedConcurrency = maxConcurrency ?? 0`, and it uses SEPARATE queues only
- * when BOTH `targetConcurrency` and `evaluationConcurrency` are given. So
- * setting `targetConcurrency` alone leaves `maxConcurrency` undefined, no queue
- * is built at all, and every row runs at once — six sandboxes, one per row,
- * straight into `402 quota_exceeded`. Hence the floor below: a cap of 0 or
- * absent does not mean "no limit needed", it means no limit.
+ * `maxConcurrency` is the field to set, and one number is the point: `_evaluate`
+ * feeds it to both legs (`targetConcurrency ?? maxConcurrency ?? 0`, and the
+ * same for evaluation), so it bounds the target and the evaluators together.
+ * Nothing in langsmith@0.9.0 runs rows unbounded — the shared queue is built
+ * only `if (sharedConcurrency > 0)`, but when it is not, `_predict` and `_score`
+ * each fall back to their own
+ * `new PQueue({ concurrency: maxConcurrency === 0 ? 1 : maxConcurrency })`,
+ * "maxConcurrency: 0 means sequential execution (matching Python behavior)" per
+ * the SDK's own comment. So a cap of 0 or absent means one row at a time: the
+ * miss costs wall-clock time, never a stampede of sandboxes. Hence the floor
+ * below — an unset or bad `POME_EVAL_CONCURRENCY` should hold a couple of
+ * sandboxes open, not quietly serialize the run.
  */
 export function evalOptions(env: Env): EvalOptions {
   const requested = Number(env.POME_EVAL_CONCURRENCY);
