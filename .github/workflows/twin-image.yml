@@ -21,7 +21,13 @@ on:
       - 'scripts/ci/wait-for-workflow.sh'
       - 'scripts/ci/wait-for-workflow.test.mjs'
       - 'scripts/ci/sign-image-digests.sh'
-      - '.github/workflows/ci.yml'
+      # `.github/workflows/ci.yml` is deliberately NOT here. It was, because
+      # `wait-gates` below waits for that workflow — but that wait is now
+      # non-PR only, so on a pull request nothing in this file reads ci.yml at
+      # all. Listing it meant every CI-only PR hit `detect-twins`'s
+      # `.github/workflows/*` shared-input case and built + Trivy-scanned all
+      # five images to publish none of them. A ci.yml edit cannot change what
+      # goes into a twin image.
       - '.github/workflows/twin-image.yml'
   workflow_dispatch:
 
