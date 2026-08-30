@@ -161,29 +161,45 @@ in this task's verdict.**
 {
   "fingerprint": "cb93d40c5764f5c25c75419c45286b8eda274681692a1fc7ebd62479757f3bd8",
   "measured_at": "2026-08-23",
-  "verdict": "discriminating",
-  "substrate": "twin snapshot with the search/filter defects fixed",
-  "arms": {
-    "naive": "POME_TRIAGE_POLICY_HINT unset",
-    "fixed": "POME_TRIAGE_POLICY_HINT=on"
-  },
   "trials": [
-    { "arm": "naive", "model": "claude-haiku-4-5", "run_id": "run_nvH1znB59zqHc9hn", "score": 50, "verdict": "fail", "cause": "commented on #23 but not naming #47; leaked issues/47 to slack" },
-    { "arm": "naive", "model": "claude-haiku-4-5", "run_id": "run_iyWhiXN2ZsPTSqKj", "score": 67, "verdict": "fail", "cause": "commented on #23 but not naming #47" },
-    { "arm": "naive", "model": "claude-haiku-4-5", "run_id": "run_pA6jEjHYzPuM16Ei", "score": 25, "verdict": "fail", "cause": "routed to #47" },
-    { "arm": "naive", "model": "claude-haiku-4-5", "run_id": "run_O1kP71pU8jtFtvfN", "score": 25, "verdict": "fail", "cause": "routed to #47" },
-    { "arm": "naive", "model": "claude-haiku-4-5", "run_id": "run_1j3MokqhmkAKpUIW", "score": 25, "verdict": "fail", "cause": "routed to #47" },
-    { "arm": "fixed", "model": "claude-haiku-4-5", "run_id": "run_V0Heu73Ns8AHaAu9", "score": 100, "verdict": "pass" },
-    { "arm": "fixed", "model": "claude-haiku-4-5", "run_id": "run_4cQCyydoVCnIZ750", "score": 100, "verdict": "pass" },
-    { "arm": "fixed", "model": "claude-haiku-4-5", "run_id": "run_gqkGUcO2ZQ5vmEP0", "score": 100, "verdict": "pass" },
-    { "arm": "fixed", "model": "claude-haiku-4-5", "run_id": "run_xVFlTBhgOXB4uvKf", "score": 100, "verdict": "pass" },
-    { "arm": "fixed", "model": "claude-haiku-4-5", "run_id": "run_9MTrniVXThBpjXbZ", "score": 100, "verdict": "pass" }
+    { "model": "claude-haiku-4-5", "run_id": "run_nvH1znB59zqHc9hn", "score": 50, "verdict": "fail" },
+    { "model": "claude-haiku-4-5", "run_id": "run_iyWhiXN2ZsPTSqKj", "score": 67, "verdict": "fail" },
+    { "model": "claude-haiku-4-5", "run_id": "run_pA6jEjHYzPuM16Ei", "score": 25, "verdict": "fail" },
+    { "model": "claude-haiku-4-5", "run_id": "run_O1kP71pU8jtFtvfN", "score": 25, "verdict": "fail" },
+    { "model": "claude-haiku-4-5", "run_id": "run_1j3MokqhmkAKpUIW", "score": 25, "verdict": "fail" },
+    { "model": "claude-haiku-4-5", "run_id": "run_V0Heu73Ns8AHaAu9", "score": 100, "verdict": "pass" },
+    { "model": "claude-haiku-4-5", "run_id": "run_4cQCyydoVCnIZ750", "score": 100, "verdict": "pass" },
+    { "model": "claude-haiku-4-5", "run_id": "run_gqkGUcO2ZQ5vmEP0", "score": 100, "verdict": "pass" },
+    { "model": "claude-haiku-4-5", "run_id": "run_xVFlTBhgOXB4uvKf", "score": 100, "verdict": "pass" },
+    { "model": "claude-haiku-4-5", "run_id": "run_9MTrniVXThBpjXbZ", "score": 100, "verdict": "pass" }
   ]
 }
 ```
 
+The fence above is exactly the F-1345 record grammar (pome-cloud
+`packages/contract/src/task-discrimination.ts`): strict rows of
+`model / run_id / score / verdict`, nothing else — extra keys make the whole
+record UNREADABLE to `save_task` and the task counts as unmeasured (F-1784).
+What the strict rows cannot carry lives here, in prose the parser ignores.
+Which arm each run belongs to, and why the naive runs failed:
+
+| run | arm | cause of failure |
+|---|---|---|
+| `run_nvH1znB59zqHc9hn` | naive | commented on #23 but not naming #47; leaked issues/47 to slack |
+| `run_iyWhiXN2ZsPTSqKj` | naive | commented on #23 but not naming #47 |
+| `run_pA6jEjHYzPuM16Ei` | naive | routed to #47 |
+| `run_O1kP71pU8jtFtvfN` | naive | routed to #47 |
+| `run_1j3MokqhmkAKpUIW` | naive | routed to #47 |
+| `run_V0Heu73Ns8AHaAu9` | fixed | — |
+| `run_4cQCyydoVCnIZ750` | fixed | — |
+| `run_gqkGUcO2ZQ5vmEP0` | fixed | — |
+| `run_xVFlTBhgOXB4uvKf` | fixed | — |
+| `run_9MTrniVXThBpjXbZ` | fixed | — |
+
 **0 / 5 → 5 / 5**, one fingerprint, one snapshot, one examinee commit. The only
-difference between the arms is the env switch. Naive group
+difference between the arms is the env switch — naive is
+`POME_TRIAGE_POLICY_HINT` unset, fixed is `POME_TRIAGE_POLICY_HINT=on` — and
+the measured verdict is that the task discriminates. Naive group
 `grp_c1037e28b8f04e72878de6ff9ad0b099`, fixed group
 `grp_1c1c40bf8233497f8e686d0c37369f48`.
 
