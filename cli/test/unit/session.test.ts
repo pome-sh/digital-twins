@@ -113,7 +113,7 @@ describe("runSessionCreate secret output", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github"],
-      format: "json",
+      json: true,
     });
 
     const output = stdout.join("\n");
@@ -131,7 +131,7 @@ describe("runSessionCreate secret output", () => {
       await runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: ["stripe"],
-        format: "env",
+        json: false,
         secretsFile,
       });
 
@@ -151,26 +151,12 @@ describe("runSessionCreate secret output", () => {
     }
   });
 
-  it("refuses env format without printing exports when no secrets file is provided", async () => {
-    await runSessionCreate({
-      apiBaseUrl: "https://api.example.com",
-      twins: ["github"],
-      format: "env",
-    });
-
-    const combinedOutput = [...stdout, ...stderr].join("\n");
-    expect(combinedOutput).toContain("Refusing to print environment exports");
-    expect(combinedOutput).not.toContain("agent_secret_token");
-    expect(combinedOutput).not.toContain("github_secret_token");
-    expect(process.exitCode).toBe(2);
-  });
-
   // ── Multi-twin (M3): slack allowed, repeated --twin, slack redaction, env ──
   it("allows the slack twin (MOUNTED_TWINS) and creates a session for it", async () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["slack"],
-      format: "json",
+      json: true,
     });
     expect(mocks.createSession).toHaveBeenCalledWith(
       expect.objectContaining({ twins: ["slack"] }),
@@ -181,7 +167,7 @@ describe("runSessionCreate secret output", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github", "slack"],
-      format: "json",
+      json: true,
     });
     expect(mocks.createSession).toHaveBeenCalledWith(
       expect.objectContaining({ twins: ["github", "slack"] }),
@@ -192,7 +178,7 @@ describe("runSessionCreate secret output", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github", "github"],
-      format: "json",
+      json: true,
     });
     expect(mocks.createSession).toHaveBeenCalledWith(
       expect.objectContaining({ twins: ["github"] }),
@@ -202,7 +188,7 @@ describe("runSessionCreate secret output", () => {
       runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: ["notion"],
-        format: "json",
+        json: true,
       }),
     ).rejects.toThrow(/Unknown twin "notion"/);
   });
@@ -211,7 +197,7 @@ describe("runSessionCreate secret output", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["slack"],
-      format: "json",
+      json: true,
     });
     const output = stdout.join("\n");
     expect(output).toContain("***redacted***");
@@ -225,7 +211,7 @@ describe("runSessionCreate secret output", () => {
       await runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: ["github", "slack"],
-        format: "env",
+        json: false,
         secretsFile,
       });
       const contents = await readFile(secretsFile, "utf8");
@@ -255,7 +241,7 @@ describe("runSessionCreate secret output", () => {
       await runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: ["gmail"],
-        format: "env",
+        json: false,
         secretsFile,
       });
       const contents = await readFile(secretsFile, "utf8");

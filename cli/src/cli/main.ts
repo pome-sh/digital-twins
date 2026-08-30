@@ -96,7 +96,6 @@ import { parseTaskFile } from "../task/parseTask.js";
 import type { RecorderEvent } from "../types/shared.js";
 
 const PACKAGE_VERSION = readPackageVersion();
-const SESSION_CREATE_FORMATS = new Set(["text", "json", "env"]);
 const DEFAULT_AGENT_FILE = "examples/agents/scripted-triage-agent.ts";
 // `node` (not `npx tsx`): Node ≥ 24 strips this file's type annotations
 // natively, so the scaffolded zero-install quickstart never has to resolve a
@@ -595,30 +594,20 @@ export function createProgram() {
       "--secrets-file <path>",
       "Write shell exports containing session secrets to a local file with mode 0600",
     )
-    .option(
-      "--format <fmt>",
-      "Output format: text, json, or env. env writes the exports to --secrets-file instead of printing them.",
-      "text",
-    )
+    .option("--json", "Print the sandbox as JSON instead of the human summary.", false)
     .action(
       async (opts: {
         twin?: string[];
         apiUrl: string;
         secretsFile?: string;
-        format: string;
+        json: boolean;
         seed?: string;
       }) => {
         try {
-          const format = opts.format.trim().toLowerCase();
-          if (!SESSION_CREATE_FORMATS.has(format)) {
-            console.error("Unknown session create format. Use one of: text, json, env.");
-            process.exitCode = 2;
-            return;
-          }
           await runSessionCreate({
             apiBaseUrl: opts.apiUrl,
             twins: opts.twin ?? [],
-            format: format as "text" | "json" | "env",
+            json: opts.json,
             secretsFile: opts.secretsFile,
             seedPath: opts.seed,
           });
@@ -643,9 +632,9 @@ export function createProgram() {
       "Filter by sandbox state: running, ready, done, expired, or all. `running` also matches the server-side `ready` state, the way the dashboard shows them in one column.",
       "running",
     )
-    .option("--format <fmt>", "Output format: text or json", "text")
+    .option("--json", "Print the sandboxes as JSON.", false)
     .action(
-      async (opts: { apiUrl: string; limit: string; state: string; format: string }) => {
+      async (opts: { apiUrl: string; limit: string; state: string; json: boolean }) => {
         const validStates: SessionListStateFilter[] = [
           "running",
           "ready",
@@ -665,7 +654,7 @@ export function createProgram() {
             apiBaseUrl: opts.apiUrl,
             limit: Number.parseInt(opts.limit, 10) || 20,
             state: opts.state as SessionListStateFilter,
-            format: opts.format as "text" | "json",
+            json: opts.json,
           });
         } catch (err) {
           console.error(friendlyHostedError(err));

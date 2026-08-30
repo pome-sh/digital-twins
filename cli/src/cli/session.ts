@@ -194,7 +194,7 @@ export async function runSessionCreate(opts: {
   /** One-or-more twins. Repeated `--twin` flags stand up a multi-twin session.
    *  May be empty when `seedPath` names exactly one twin. */
   twins: string[];
-  format: "text" | "json" | "env";
+  json: boolean;
   secretsFile?: string;
   /** `--seed <path>`: the sandbox starts from this seed instead of each twin's
    *  default. Same file `pome twin start --seed` takes. */
@@ -230,20 +230,9 @@ export async function runSessionCreate(opts: {
     console.error(`Wrote sandbox secrets to ${opts.secretsFile} (mode 0600).`);
   }
 
-  if (opts.format === "json") {
+  if (opts.json) {
     const payload = redactSession(session);
     console.log(JSON.stringify(payload, null, 2));
-    return;
-  }
-
-  if (opts.format === "env") {
-    if (opts.secretsFile) {
-      return;
-    }
-    console.error(
-      "Refusing to print environment exports. Use --secrets-file <path> to write them to a 0600 file.",
-    );
-    process.exitCode = 2;
     return;
   }
 
@@ -320,7 +309,7 @@ function matchesStateFilter(
 export async function runSessionList(opts: {
   apiBaseUrl: string;
   limit: number;
-  format: "text" | "json";
+  json: boolean;
   state: SessionListStateFilter;
 }): Promise<void> {
   const creds = await resolveCredentials({ apiBaseUrl: opts.apiBaseUrl });
@@ -335,7 +324,7 @@ export async function runSessionList(opts: {
   const all = await client.listSessions({ limit: fetchLimit });
   const filtered = all.filter((r) => matchesStateFilter(r.state, opts.state));
   const rows = filtered.slice(0, opts.limit);
-  if (opts.format === "json") {
+  if (opts.json) {
     console.log(JSON.stringify(rows, null, 2));
     return;
   }
