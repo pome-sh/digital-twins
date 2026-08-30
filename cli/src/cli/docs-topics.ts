@@ -79,6 +79,12 @@ export const DOCS_TOPICS: DocsTopic[] = [
     keywords: ["messaging", "channels", "workspace", "slack", "exfiltration"],
   },
   {
+    id: "linear",
+    title: "Linear twin",
+    path: "/docs/twins/linear",
+    keywords: ["projects", "cycles", "linear"],
+  },
+  {
     id: "gmail",
     title: "Gmail twin",
     path: "/docs/twins/gmail",
