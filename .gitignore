@@ -15,11 +15,7 @@ coverage/
 .env
 .env.*
 !.env.example
-# release.yml writes the GitHub Packages token to $HOME/.npmrc precisely so it
-# never sits in the workspace; a laptop following the same steps writes it here.
 .npmrc
-# The pome-ops-push App private key, which can push to protected main and
-# trigger a publish. Rotating it means downloading one.
 *.pem
 
 # Local twin state (SQLite-backed runtime data). Unanchored: direct twin
@@ -45,8 +41,6 @@ matrix-results/
 .cursor/
 .vscode/
 .zed/
-# Local MCP server config. The repo ships none: a committed one can only work
-# for whoever already has access to every server it names.
 /.mcp.json
 
 # OS / editor
