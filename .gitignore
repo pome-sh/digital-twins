@@ -45,8 +45,8 @@ matrix-results/
 .cursor/
 .vscode/
 .zed/
-# Points at a launcher that clones the PRIVATE openapi-spec-mcp, so it can only
-# ever work for someone with access to it. Keep your own; the repo ships none.
+# Local MCP server config. The repo ships none: a committed one can only work
+# for whoever already has access to every server it names.
 /.mcp.json
 
 # OS / editor
