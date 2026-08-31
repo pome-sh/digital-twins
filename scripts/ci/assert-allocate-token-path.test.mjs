@@ -68,7 +68,7 @@ function insertInStep(text, name, line) {
 const PRECONDITION = "The pome-ops-push credentials must exist";
 const MINT = "Mint a pome-ops-push installation token";
 const PUSH = "Allocate, write, and push one commit to main";
-const PLAN = "What would this push allocate?";
+const PLAN = "What would a release allocate right now?";
 const names = (result) => result.errors.join("\n");
 
 console.log("assert-allocate-token-path.mjs — the real file");

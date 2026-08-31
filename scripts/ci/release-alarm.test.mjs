@@ -9,7 +9,6 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PUBLISHED_PACKAGES } from "./publish-relevance.mjs";
 import { check, compareVersions, parseTargets, readTargets } from "./release-alarm.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -31,18 +30,7 @@ function check_(label, condition, detail = "") {
 
 const minutesAgo = (m) => new Date(NOW - m * 60_000).toISOString();
 
-function writeChangelogs(dir, pending = {}) {
-  for (const pkg of PUBLISHED_PACKAGES) {
-    mkdirSync(join(dir, dirname(pkg.changelog)), { recursive: true });
-    const section = pending[pkg.name] ? `${pending[pkg.name]}\n\n- words from a PR\n\n` : "";
-    writeFileSync(
-      join(dir, pkg.changelog),
-      `# ${pkg.name} — CHANGELOG\n\n${section}## 1.0.0 — 2026-08-01\n\nShipped.\n`,
-    );
-  }
-}
-
-function fixture(versions = {}, pending = {}) {
+function fixture(versions = {}) {
   const dir = mkdtempSync(join(tmpdir(), "release-alarm-"));
   mkdirSync(join(dir, ".github/workflows"), { recursive: true });
   cpSync(
@@ -56,7 +44,6 @@ function fixture(versions = {}, pending = {}) {
       JSON.stringify({ name: t.name, version: versions[t.name] ?? "1.0.0" }),
     );
   }
-  writeChangelogs(dir, pending);
   return dir;
 }
 
@@ -88,9 +75,9 @@ const registryStub = (map) => (name, registry) =>
   map[`${name}@${registry || "npm"}`] ?? map[name] ?? { version: "1.0.0" };
 
 function run(opts = {}) {
-  const { versions, head, runs, registry = {}, pending, ...rest } = opts;
+  const { versions, head, runs, registry = {}, ...rest } = opts;
   return check({
-    root: opts.root ?? fixture(versions, pending),
+    root: opts.root ?? fixture(versions),
     repo: REPO,
     now: NOW,
     gitHub: ghStub({ head, runs }),
@@ -256,44 +243,6 @@ console.log("FAILED — a broken release path with nothing owed");
   check_("a skipped run does not", !kinds(run({ runs: [{ ageMin: 200, conclusion: "skipped" }] })).includes("FAILED"));
 }
 
-console.log("UNALLOCATED — a number nobody wrote");
-{
-  const r = run({
-    runs: [{ ageMin: 300, conclusion: "success" }],
-    pending: { "@pome-sh/cli": "## Unreleased (patch)" },
-  });
-  check_("fires", kinds(r).includes("UNALLOCATED"), r.alarms.join("\n"));
-  check_(
-    "names the file and the level",
-    r.alarms.some((a) => a.includes("cli/CHANGELOG.md") && a.includes("(patch)")),
-    r.alarms.join("\n"),
-  );
-  check_(
-    "and nothing else fires — every version matches its registry",
-    r.alarms.length === 1,
-    r.alarms.join("\n"),
-  );
-  check_("the report names the waiting package", /@pome-sh\/cli — pending patch/.test(r.report), r.report);
-
-  const malformed = run({
-    runs: [{ ageMin: 300, conclusion: "success" }],
-    pending: { "@pome-sh/wire": "## Unreleased" },
-  });
-  check_(
-    "a malformed pending heading is UNALLOCATED, not silence",
-    kinds(malformed).includes("UNALLOCATED") &&
-      malformed.alarms.some((a) => a.includes("not a release request")),
-    malformed.alarms.join("\n"),
-  );
-
-  const fresh = run({
-    head: { sha: HEAD_SHA, ageMin: 4 },
-    runs: [{ ageMin: 4, status: "in_progress" }],
-    pending: { "@pome-sh/cli": "## Unreleased (minor)" },
-  });
-  check_("stays silent inside the grace window", fresh.alarms.length === 0, fresh.alarms.join("\n"));
-}
-
 console.log("UNMEASURED — an unreadable registry is never read as 'unpublished'");
 {
   const r = run({
@@ -332,7 +281,6 @@ console.log("four consecutive failed runs on one day, replayed");
       mkdirSync(join(dir, dirname(t.manifest)), { recursive: true });
       writeFileSync(join(dir, t.manifest), JSON.stringify({ name: t.name, version: "1.0.0" }));
     }
-    writeChangelogs(dir);
     return dir;
   }
 

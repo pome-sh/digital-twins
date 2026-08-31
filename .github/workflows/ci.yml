@@ -130,7 +130,8 @@ jobs:
       - run: npm run gate:example-catalog
       - run: node scripts/emit-example-catalog.test.mjs
 
-      # Versions are written on main after the merge by allocate-version.yml, so
+      # Versions are written on main by allocate-version.yml when a human
+      # dispatches a release, never on the merge itself (F-1625), so
       # what this demands of a PR is the WORDS and not the number: an
       # `## Unreleased (patch|minor)` entry for every artifact the PR moves, no
       # hand-written version line, no rewrite of a released entry. The base is

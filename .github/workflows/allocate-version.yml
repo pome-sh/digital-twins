@@ -9,20 +9,22 @@ name: allocate version
 # (`scripts/ci/allocate-release-versions.mjs` decides), writes them into the
 # manifests and the CHANGELOG headings, and pushes ONE commit back to `main`.
 #
+# It runs when a human asks, never on a merge. One release covers every merge
+# since the last one: `pendingRelease` folds the accumulated `## Unreleased`
+# headings into one entry at the worst level any of them declared.
+#
 # ── WHAT THIS DELIBERATELY DOES NOT DO ───────────────────────────────────────
 #
 # It does not publish, and `release.yml` is untouched by it. `release.yml` still
 # triggers on push to `main`, still compares each package's local manifest
 # against its registry, still hard-fails on behind-npm and still baselines a
 # never-seen package at 0.0.0. The bump commit is a push to `main`, so the
-# publish is that commit's own `release.yml` run. Two consequences worth stating:
-# the run on the HUMAN merge commit sees no version diff and publishes nothing
-# (correct — the number does not exist yet at that sha), and `release.yml`'s
-# `concurrency: release-${{ github.ref }}` with `cancel-in-progress: false` is
-# what serialises the publish half.
+# publish is that commit's own `release.yml` run. `release.yml` keeps its push
+# arm: it is diff-gated, so an ordinary merge runs it and publishes nothing, and
+# its `concurrency: release-${{ github.ref }}` with `cancel-in-progress: false`
+# is what serialises the publish half.
 #
-# Nothing here waits for a release PR and nothing batches. What this moves is
-# WHO WRITES THE NUMBER, not when a release happens.
+# What this moves is WHO WRITES THE NUMBER. The trigger decides WHEN.
 #
 # ── WHY AN APP TOKEN AND NOT THE AMBIENT GITHUB_TOKEN ────────────────────────
 #
@@ -54,16 +56,14 @@ name: allocate version
 # nothing (reason 1) or publish nothing (reason 2), and both of those look like a
 # quiet green.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
   # release.yml's `dispatch-allocate-version` job POSTs this event the
   # moment a publish lands, which is the ONLY moment `planExampleRepins` can see
-  # the just-published sibling on the registry: the run on the human merge commit
-  # plans before the version exists, and the run on the bump commit it produces
-  # is the one the `[release-bump]` guard below skips. A NAMED type, never a bare
-  # `repository_dispatch:` — that accepts every event type anyone ever POSTs at
-  # this repository as a licence to push to `main`.
+  # the just-published sibling on the registry: the run that ALLOCATES plans
+  # before the version exists on npm, so the repin it owes cannot be part of the
+  # same commit. This event is the second pass that sees it. A NAMED type,
+  # never a bare `repository_dispatch:` — that accepts every event type anyone
+  # ever POSTs at this repository as a licence to push to `main`.
   #
   # `repository_dispatch` and not `workflow_dispatch`, which is what this shipped
   # as first and could never have fired: `POST /repos/{owner}/{repo}/dispatches`
@@ -73,13 +73,14 @@ on:
   # an org owner re-approves the app with a wider grant. (Both requirements are
   # GitHub's documented fine-grained permission for the endpoint.)
   #
-  # Three properties of this event make it behave identically to the push arm
-  # below, so nothing downstream needs a special case: GitHub only starts it from
-  # the workflow file on the DEFAULT BRANCH, `github.sha` is the last commit on
-  # the default branch, and `github.ref` is the default branch — so the checkout
-  # ref expression resolves to `main` exactly as on a push, and the concurrency
-  # group is the same `allocate-version-refs/heads/main`, which is what makes a
-  # dispatch queue behind an allocation already in flight instead of racing it.
+  # Three properties of this event make it behave identically to a
+  # `workflow_dispatch`, so nothing downstream needs a special case: GitHub only
+  # starts it from the workflow file on the DEFAULT BRANCH, `github.sha` is the
+  # last commit on the default branch, and `github.ref` is the default branch —
+  # so the checkout ref expression resolves to `main` either way, and the
+  # concurrency group is the same `allocate-version-refs/heads/main`, which is
+  # what makes a dispatch queue behind an allocation already in flight instead of
+  # racing it.
   repository_dispatch:
     types: [repin-examples]
   # Changing the allocator or the table it reads must prove the job wiring still
@@ -119,35 +120,9 @@ permissions:
 
 jobs:
   allocate:
-    name: write the version numbers this push earned
+    name: write the version numbers main has earned
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # A cheap "don't even start" on the allocator's own commit — NOT the loop
-    # guard. The guard is structural and lives in the allocator: relevance is
-    # measured from the last commit that moved a package's version, and the bump
-    # commit is one, so its own diff is already inside the previous release. If
-    # this literal and BUMP_COMMIT_MARKER in the script ever drift apart, the job
-    # runs and finds nothing to do.
-    #
-    # SCOPED TO `push` EXPLICITLY, because `github.event.head_commit` exists on
-    # no other event. On `workflow_dispatch` and on `repository_dispatch` it is
-    # null, `contains` casts null to the empty string, and the guard therefore
-    # passes — the right answer (a dispatch is a deliberate request and must run
-    # even when main's tip IS a `[release-bump]` commit, which is precisely the
-    # tip release.yml dispatches from) arrived at by coercion. Naming the event
-    # makes it a decision, and stops the plausible "fix" for that null — widening
-    # the guard to cover every event — which would turn release.yml's dispatch
-    # into a silent no-op and reopen the deadlock it exists to close.
-    #
-    # Termination does NOT rest on this guard for the dispatch arm, and must not:
-    # release.yml dispatches only after a real publish, and the single commit this
-    # run pushes can only cause another publish by MOVING a package version,
-    # which requires a pending `## Unreleased` entry — which this same run
-    # consumes. A re-pin-only commit touches `agent-examples/*` and their lockfiles, no
-    # package version, so release.yml's `plan` finds no diff against the registry,
-    # publishes nothing, and dispatches nothing. The chain is bounded by the
-    # number of pending entries and CI writes none.
-    if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[release-bump]') }}
     steps:
       # Named before the mint step rather than left to it: the action's own
       # failure on an empty input does not tell a reader which secret, on which
@@ -195,8 +170,8 @@ jobs:
       # release.
       #
       # THE REF IS PER ARM, and getting it wrong is how the first run of this
-      # workflow failed. On a push, `main` (not the event sha) because the number
-      # belongs to the TIP: if a second merge landed while this run queued, its
+      # workflow failed. On a dispatch, `main` (not the event sha) because the
+      # number belongs to the TIP: if a merge landed while this run queued, its
       # entry is already on main and belongs in the same release. On a
       # pull_request, `github.ref` — the merge ref — because that arm's whole job
       # is to prove THIS PR's allocator still runs, and a checkout of `main` does
@@ -226,7 +201,7 @@ jobs:
       - name: Regression-test the allocator
         run: node scripts/ci/allocate-release-versions.test.mjs
 
-      - name: What would this push allocate?
+      - name: What would a release allocate right now?
         if: github.event_name == 'pull_request'
         run: node scripts/ci/allocate-release-versions.mjs
 

@@ -249,14 +249,6 @@ console.log("\nrelease.yml wiring");
   );
 
   check(
-    "allocate-version.yml's [release-bump] guard is scoped to `push`, so the dispatched run is not skipped by a marker it cannot read",
-    /if:\s*\$\{\{\s*github\.event_name\s*!=\s*'push'\s*\|\|\s*!contains\(github\.event\.head_commit\.message,\s*'\[release-bump\]'\)\s*\}\}/.test(
-      allocate,
-    ),
-    "expected a job-level `if:` of the form `github.event_name != 'push' || !contains(github.event.head_commit.message, '[release-bump]')`",
-  );
-
-  check(
     "the publish job waits for the registry to serve what it published, with a staleness-forcing read",
     /npm view "\$\{PKG\}@\$\{version\}"[^\n]*--prefer-online/.test(publish),
     publish,
