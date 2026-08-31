@@ -15,6 +15,12 @@ coverage/
 .env
 .env.*
 !.env.example
+# release.yml writes the GitHub Packages token to $HOME/.npmrc precisely so it
+# never sits in the workspace; a laptop following the same steps writes it here.
+.npmrc
+# The pome-ops-push App private key, which can push to protected main and
+# trigger a publish. Rotating it means downloading one.
+*.pem
 
 # Local twin state (SQLite-backed runtime data). Unanchored: direct twin
 # boots (cwd = package root) self-generate .pome-data/<twin>/secret.
@@ -37,6 +43,8 @@ matrix-results/
 .gstack/
 .claude/
 .cursor/
+.vscode/
+.zed/
 # Points at a launcher that clones the PRIVATE openapi-spec-mcp, so it can only
 # ever work for someone with access to it. Keep your own; the repo ships none.
 /.mcp.json
@@ -49,6 +57,7 @@ Thumbs.db
 __pycache__/
 *.pyc
 *.pyo
+.venv/
 
 # Local Claude Code symlink to AGENTS.md (not part of the OSS tree)
 /CLAUDE.md
