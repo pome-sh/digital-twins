@@ -124,8 +124,7 @@ jobs:
           node-version: 24
 
       # Gate on the checker's own tests BEFORE checking, so a red run is a real
-      # claim about the release and not a broken checker. Same ordering as the
-      # deleted check-release-staleness.yml.
+      # claim about the release and not a broken checker.
       - name: Regression-test the checker
         run: node scripts/ci/release-alarm.test.mjs
 

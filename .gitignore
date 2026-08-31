@@ -15,6 +15,8 @@ coverage/
 .env
 .env.*
 !.env.example
+.npmrc
+*.pem
 
 # Local twin state (SQLite-backed runtime data). Unanchored: direct twin
 # boots (cwd = package root) self-generate .pome-data/<twin>/secret.
@@ -37,8 +39,8 @@ matrix-results/
 .gstack/
 .claude/
 .cursor/
-# Points at a launcher that clones the PRIVATE openapi-spec-mcp, so it can only
-# ever work for someone with access to it. Keep your own; the repo ships none.
+.vscode/
+.zed/
 /.mcp.json
 
 # OS / editor
@@ -49,6 +51,7 @@ Thumbs.db
 __pycache__/
 *.pyc
 *.pyo
+.venv/
 
 # Local Claude Code symlink to AGENTS.md (not part of the OSS tree)
 /CLAUDE.md

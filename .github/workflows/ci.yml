@@ -16,8 +16,8 @@ jobs:
   # and skip everything gated on `steps.scope.outputs.heavy`.
   typecheck-test:
     runs-on: ubuntu-latest
-    # Inherited from showcase-verify.yml, whose job carried `timeout-minutes: 20`
-    # for the two verify.sh steps now absorbed below: a twin that boots but never
+    # `timeout-minutes: 20` is for the two verify.sh steps below: a twin that
+    # boots but never
     # answers /healthz leaves each script in its own 120s wait, but a wedged
     # `npm ci`, build or twin subprocess has no such bound. Without this the
     # REQUIRED check inherits GitHub's 360-minute default and a wedge blocks the
@@ -519,7 +519,7 @@ jobs:
         if: steps.scope.outputs.heavy == 'true'
         run: npm run gate:golden
 
-      # ── Absorbed from showcase-verify.yml (deleted) ──────────────────────
+      # ── Showcases ────────────────────────────────────────────────────────
       # Each showcase's verify.sh is the regression test that keeps its
       # walkthrough's claims true. They boot their own LOCAL twins, mint their
       # own bearers and assert unattended: no account, no key, no sandbox,
@@ -545,11 +545,10 @@ jobs:
         if: steps.scope.outputs.heavy == 'true'
         run: bash showcases/cross-call-state/verify.sh
 
-      # Plain `success()` (the default), NOT the `!cancelled()` this step carried
-      # in showcase-verify.yml. There it bought both showcase verdicts in one run
-      # at no risk, because only five steps preceded it. Here ~45 do, and an
-      # explicit `if:` drops the implicit success check — so ANY earlier red (a
-      # flaky twin-slack coverage run, say) would skip `Resolve the CLI above`
+      # Plain `success()` (the default), never an explicit `!cancelled()`. ~45
+      # steps precede this one, and an explicit `if:` drops the implicit success
+      # check — so ANY earlier red (a flaky twin-slack coverage run, say) would
+      # skip `Resolve the CLI above`
       # while still running this, leaving POME_CLI unset. Both scripts default
       # `CLI` to `npx -y @pome-sh/cli@latest`, so the step would assert against
       # the PUBLISHED CLI — blind to this PR's diff — and report that as a
@@ -559,7 +558,7 @@ jobs:
         if: steps.scope.outputs.heavy == 'true'
         run: bash showcases/permission-denial/verify.sh
 
-      # ── Absorbed from quickstart-smoke.yml (deleted) ─────────────────────
+      # ── Quickstart smoke ─────────────────────────────────────────────────
       # The README's clean-machine flow: `pome twin start github`, then the
       # bundled triage agent reaches it with ENV-ONLY auth. Env-only is the
       # property — the agent must not probe the twin's disk for a secret, which
