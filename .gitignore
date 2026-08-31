@@ -37,6 +37,9 @@ matrix-results/
 .gstack/
 .claude/
 .cursor/
+# Points at a launcher that clones the PRIVATE openapi-spec-mcp, so it can only
+# ever work for someone with access to it. Keep your own; the repo ships none.
+/.mcp.json
 
 # OS / editor
 .DS_Store
