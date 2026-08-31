@@ -13,12 +13,8 @@ import { appendFileSync, existsSync, readFileSync, realpathSync } from "node:fs"
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { pendingRelease } from "./changelog-entry.mjs";
-import { PUBLISHED_PACKAGES } from "./publish-relevance.mjs";
-
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RELEASE_WORKFLOW = "release.yml";
-const ALLOCATE_WORKFLOW = "allocate-version.yml";
 
 export function parseTargets(root) {
   const targets = readTargets(root);
@@ -146,42 +142,6 @@ function inspectReleaseRuns({ repo, head, runs, now, graceMinutes, stuckMinutes 
   return { alarms, lines, headAge, forHead, inFlight };
 }
 
-function inspectPendingEntries({ root }) {
-  const alarms = [];
-  const lines = [];
-
-  for (const pkg of PUBLISHED_PACKAGES) {
-    const file = join(root, pkg.changelog);
-    if (!existsSync(file)) {
-      alarms.push(
-        `UNMEASURED — ${pkg.changelog} is missing, so nothing here can say whether ` +
-          `${pkg.name} is waiting for a version number.`,
-      );
-      continue;
-    }
-    let pending;
-    try {
-      pending = pendingRelease(readFileSync(file, "utf8"), pkg.changelog);
-    } catch (error) {
-      alarms.push(
-        `UNALLOCATED — ${pkg.changelog} cannot be read as a release request: ${error.message} ` +
-          `allocate-version.yml fails on the same parse, so nothing is being allocated.`,
-      );
-      continue;
-    }
-    if (!pending) continue;
-    lines.push(`${pkg.name} — pending ${pending.level} entry awaiting a number`);
-    alarms.push(
-      `UNALLOCATED — ${pkg.changelog} carries a pending \`## Unreleased (${pending.level})\` entry ` +
-        `that no allocation consumed. \`${ALLOCATE_WORKFLOW}\` writes the number on main after the ` +
-        `merge, so nothing has published this and the registry agrees with main about the OLD ` +
-        `version — the outcome check below cannot see it.`,
-    );
-  }
-
-  return { alarms, lines };
-}
-
 function inspectRegistries({ root, targets, readVersion }) {
   const alarms = [];
   const lines = [];
@@ -255,15 +215,12 @@ export function check({
   const alarms = [...path.alarms];
 
   if (path.headAge > graceMinutes) {
-    const allocation = inspectPendingEntries({ root });
-    lines.push(...allocation.lines);
-    alarms.push(...allocation.alarms);
     const registries = inspectRegistries({ root, targets, readVersion });
     lines.push(...registries.lines);
     alarms.push(...registries.alarms);
   } else {
     lines.push(
-      `registry drift and pending allocations not evaluated — HEAD is ` +
+      `registry drift not evaluated — HEAD is ` +
         `${path.headAge.toFixed(0)} min old (grace ${graceMinutes}); its number may still be ` +
         `being allocated and its release may still be building.`,
     );

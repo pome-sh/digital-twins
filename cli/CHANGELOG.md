@@ -3,11 +3,17 @@
 Entries are hand-written from 0.9.0 on. In a PR, add your entry under an
 `## Unreleased (patch)` (or `(minor)`) heading above the newest released one.
 `.github/workflows/allocate-version.yml` rewrites that heading to the version it
-allocates on `main` after the merge, in the same commit that moves
-`package.json`, and `.github/workflows/release.yml` publishes from there. Do not
-write a version number here or in `package.json`. Released entries are insertions
-only: a correction is the next entry, naming the one it corrects.
+allocates, in the same commit that moves `package.json`, and
+`.github/workflows/release.yml` publishes from there. Do not write a version
+number here or in `package.json`.
 
+Merging does not release; a human dispatches it, and one release covers every
+merge since the last one. Your entry may sit here a few days.
+
+**Keep it to a bold one-line summary and two or three sentences.** Say what a
+consumer must do differently. The reasoning belongs in the code it explains.
+Released entries are insertions only: a correction is the next entry, naming the
+one it corrects.
 
 ## 0.42.4 — 2026-08-30
 

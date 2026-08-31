@@ -57,9 +57,9 @@ for (const pkg of PUBLISHED_PACKAGES) {
   if (baseVersion !== null && headVersion !== baseVersion) {
     failures.push(
       `${pkg.name}: this PR moves ${pkg.manifest}'s version from ${baseVersion} to ${headVersion}. ` +
-        `Version numbers are allocated on \`main\` after the merge, by ` +
+        `Version numbers are allocated on \`main\` when a release is dispatched, by ` +
         `.github/workflows/allocate-version.yml — a PR that carries one is invalidated by any ` +
-        `other merge that consumes it, silently and while still green. Revert the version line ` +
+        `other merge that lands before that release, silently and while still green. Revert the version line ` +
         `and describe the change under \`${PENDING_HEADING_EXAMPLE}\` in ${pkg.changelog} ` +
         `instead. The number is not yours to write; the words are.`,
     );

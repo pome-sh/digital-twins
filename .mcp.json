@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "openapi-specs": {
-      "command": "bash",
-      "args": ["scripts/mcp/openapi-specs.sh"]
-    }
-  }
-}
