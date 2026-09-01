@@ -15,6 +15,12 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
+## Unreleased (minor)
+
+**`pome demo` and the hidden `pome demo-agent` are removed** (F-1718). Both
+commands are gone as a security fix. Start a new project with `pome init`
+instead.
+
 ## 0.42.4 — 2026-08-30
 
 **`pome checks <twin>` names the twin's real version instead of "unknown"**
