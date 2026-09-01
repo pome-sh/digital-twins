@@ -67,14 +67,14 @@ Graph nodes (`CHAIN` spans) carry the W3C parent/child tree, so the waterfall
 reconstructs the `intake → … → report` nesting — each node's tool calls sit under
 it, with durations on the timeline bars. No message bodies are exported.
 
-One honest limit, measured 2026-08-04: **twin HTTP rows nest one level shallower
-here than on a Claude-adapter agent.** Each row lands under the enclosing LLM
-turn rather than under the specific tool call that issued it. That is not the
-cloud guessing — the composer joins on a per-tool-call correlation id, and today
-only the Claude adapter injects one (`x-pome-correlation-id`); with no join key
-it falls back to the enclosing turn rather than inventing an edge. Extracting
-that layer for LangGraph and the Vercel AI SDK is not done yet. Nothing about
-grading depends on it: the criteria read the twins' final state, not the tree.
+One honest limit, measured 2026-08-04: **twin HTTP rows nest under the enclosing
+LLM turn rather than under the specific tool call that issued it.** That is not
+the cloud guessing — the composer joins on a per-tool-call correlation id
+(`x-pome-correlation-id`), and no agent injects one today; with no join key it
+falls back to the enclosing turn rather than inventing an edge. Wiring that
+per-tool-call correlation into LangGraph and the Vercel AI SDK is not done yet.
+Nothing about grading depends on it: the criteria read the twins' final state,
+not the tree.
 
 ## What Viktor does
 
@@ -190,8 +190,8 @@ columns = trials*, and the two Slack rows read `0/3` while every other row reads
 > order (`decide` can render after `report`) — the timeline bars beside them do,
 > so read those. That is fixed on `main` and is waiting on a release
 > tag, not on a fix. **Nesting depth:** twin HTTP rows sit under the enclosing
-> LLM turn rather than under the tool that issued them, because only the Claude
-> adapter injects the per-tool-call correlation id the composer joins on.
+> LLM turn rather than under the tool that issued them, because no agent injects
+> the per-tool-call correlation id the composer joins on today.
 
 ### The fix
 

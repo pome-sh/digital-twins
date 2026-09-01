@@ -1,5 +1,10 @@
 # @pome-sh/checks
 
+## Unreleased (patch)
+
+Doc-only: a build-config comment no longer references the removed
+`@pome-sh/adapter-claude-sdk` package. No API or behaviour change.
+
 ## 0.4.0 — 2026-08-29
 
 **Every twin's `parseSeed` refuses a key no seed field matches** (F-1689). The

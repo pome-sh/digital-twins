@@ -21,7 +21,6 @@
 ## Packages
 
 - [@pome-sh/cli](https://www.npmjs.com/package/@pome-sh/cli): the `pome` CLI — run tasks, inspect traces, upload for evaluation. The twin engine and all five twins ship inside it; there is nothing else to install.
-- [@pome-sh/adapter-claude-sdk](https://www.npmjs.com/package/@pome-sh/adapter-claude-sdk): wire a Claude Agent SDK agent to a Pome run
 
 ## Getting started
 

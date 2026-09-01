@@ -11,8 +11,7 @@
 // that way — commit 6369379 privatised them to fix a real bug (two zod schema
 // identities for one wire type) and that is explicit about not being
 // being reversed. So this package cannot DEPEND on them; it inlines their
-// compiled output via `noExternal`, exactly as `@pome-sh/cli` and
-// `@pome-sh/adapter-claude-sdk` already do.
+// compiled output via `noExternal`, exactly as `@pome-sh/cli` already does.
 //
 // That also settles a pin question with no good answer. AGENTS.md forbids exact
 // `@pome-sh/*` pins between internal packages (the rule); `"*"` in a

@@ -357,8 +357,8 @@ jobs:
 
       # The bundled agent-examples/ projects are standalone npm packages with
       # their own lockfiles, not workspaces, so neither `npm run typecheck` nor
-      # `npm test` above covers them. Typechecks each against the just-built
-      # adapter and runs each example's own suite.
+      # `npm test` above covers them. Typechecks each and runs each example's
+      # own suite.
       - name: Typecheck and test bundled examples
         if: steps.scope.outputs.heavy == 'true'
         run: npm run gate:examples
@@ -397,9 +397,9 @@ jobs:
           npm run probe:twins
           node scripts/probe-twin-endpoints.test.mjs
 
-      - name: Unit tests (wire, sdk, adapter, stripe, gmail, linear, checks, sandbox-domains)
+      - name: Unit tests (wire, sdk, stripe, gmail, linear, checks, sandbox-domains)
         if: steps.scope.outputs.heavy == 'true'
-        run: npx vitest run --project wire --project sdk --project adapter-claude-sdk --project twin-stripe --project twin-gmail --project twin-linear --project checks --project sandbox-domains
+        run: npx vitest run --project wire --project sdk --project twin-stripe --project twin-gmail --project twin-linear --project checks --project sandbox-domains
 
       # The tarball half of the @pome-sh/checks audit: the engine is not inlined,
       # zod stayed external (one schema identity), the DSL exists exactly once
@@ -493,13 +493,13 @@ jobs:
         if: steps.scope.outputs.heavy == 'true'
         run: node --test contract/cli-start.test.mjs
 
-      # The release gate, run on every PR: pack both published packages, install
+      # The release gate, run on every PR: pack the published packages, install
       # them in clean rooms with no access to this workspace, boot all five twins
-      # from the CLI tarball, and typecheck a real consumer against the adapter's
+      # from the CLI tarball, and typecheck a real consumer against each package's
       # shipped declarations. This is the check `bundleDependencies` never had —
       # it declared seven bundled packages, shipped none, and npm reported a
       # successful install.
-      - name: Clean-room pack test (both published packages)
+      - name: Clean-room pack test (published packages)
         if: steps.scope.outputs.heavy == 'true'
         run: npm run test:pack
 
@@ -567,8 +567,7 @@ jobs:
       #
       # The old workflow's first two steps are gone rather than moved: its
       # `npm ci && npm test` inside agent-examples/triage-agent is exactly what
-      # `gate:examples` above already does in every example, and its
-      # adapter/wire builds are a subset of `npm run build`. What is left is the
+      # `gate:examples` above already does in every example. What is left is the
       # part nothing else covers — a real CLI-started twin, reached with a JWT
       # minted from the shared env secret.
       #

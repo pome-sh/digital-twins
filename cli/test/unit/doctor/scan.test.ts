@@ -99,18 +99,6 @@ describe("scanAgentSources", () => {
     expect(result.wiring.envVar).toBe("POME_GITHUB_MCP_URL");
   });
 
-  it("collects adapter-import evidence", async () => {
-    const dir = await fixture({
-      "src/index.ts": [
-        'import { withPome, tool, query } from "@pome-sh/adapter-claude-sdk";',
-        "withPome();",
-      ].join("\n"),
-    });
-
-    const result = await scanAgentSources(dir);
-    expect(result.wiring.adapterImport).toBe(true);
-  });
-
   it("skips node_modules and non-code files", async () => {
     const dir = await fixture({
       "node_modules/evil/index.js": 'fetch("https://api.github.com");',

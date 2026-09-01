@@ -14,7 +14,6 @@ const SCAN_DIRS = [
   "packages/twin-stripe/src",
   "packages/wire/src",
   "packages/sdk/src",
-  "packages/adapter-claude-sdk/src",
   "cli/src",
 ];
 

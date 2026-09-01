@@ -16,7 +16,7 @@ export const REQUIRED_OPTIONS = ["tools", "settingSources"];
 
 const SDK_PACKAGE = "@anthropic-ai/claude-agent-sdk";
 
-const QUERY_MODULES = new Set([SDK_PACKAGE, "@pome-sh/adapter-claude-sdk"]);
+const QUERY_MODULES = new Set([SDK_PACKAGE]);
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".mts", ".cts", ".tsx", ".mjs", ".js", ".cjs"]);
 const PRUNED_DIRS = new Set(["node_modules", "dist", "build", ".git", "coverage"]);

@@ -17,8 +17,7 @@
 #      network, no credentials needed for this half. `pome run` hard-gates
 #      on `pome doctor`'s wiring checks with no --force, so this spins up a
 #      disposable scaffold dir with a minimal pome.json manifest + a wiring
-#      marker source (same technique as scripts/cas-adapter-acceptance.ts)
-#      rather than bypassing the gate.
+#      marker source rather than bypassing the gate.
 #   2. Uploads that trace with `pome eval <run-dir>` against POME_API_URL,
 #      authenticated with POME_API_KEY, and prints whatever verdict the
 #      cloud returns (`pome eval` already prints LABEL / score / criteria /
@@ -55,8 +54,8 @@ POME_BIN="$CLI_ROOT/dist/src/cli/main.js"
 
 if [[ -z "$RUN_DIR" ]]; then
   # `pome run` spawns the capture-server child by re-invoking
-  # process.execPath/process.argv[1] (see overhead-gate.ts /
-  # cas-adapter-acceptance.ts) — that re-invocation must be node-runnable, so
+  # process.execPath/process.argv[1] (see overhead-gate.ts) — that
+  # re-invocation must be node-runnable, so
   # this needs the BUILT CLI, not tsx-from-source. Build fresh so a stale
   # dist/ never silently masks what this round-trip is meant to catch.
   echo "[eval-roundtrip] building the CLI (npm run build)…" >&2
@@ -80,8 +79,8 @@ if [[ -z "$RUN_DIR" ]]; then
 }
 EOF
   cat > "$SCAFFOLD_DIR/agent.ts" <<'EOF'
-// eval-roundtrip.sh doctor wiring marker — see cas-adapter-acceptance.ts for
-// the same technique. Not actually executed; the real agent is --agent.
+// eval-roundtrip.sh doctor wiring marker.
+// Not actually executed; the real agent is --agent.
 const baseUrl = process.env.POME_GITHUB_REST_URL;
 void baseUrl;
 export {};

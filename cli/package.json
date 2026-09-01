@@ -50,7 +50,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "gate:recorder-overhead": "tsx scripts/recorder-overhead-gate.ts",
     "gate:agent-trace-overhead": "tsx scripts/overhead-gate.ts",
-    "gate:cas-adapter-acceptance": "tsx scripts/cas-adapter-acceptance.ts",
     "emit:manifest-schema": "node scripts/emit-manifest-schema.mjs",
     "check:manifest-schema": "node scripts/emit-manifest-schema.mjs --check"
   },

@@ -55,8 +55,6 @@ function scenarioWithRuns(runs: number): string {
 }
 
 const WIRED_AGENT_SOURCE = [
-  'import { withPome } from "@pome-sh/adapter-claude-sdk";',
-  "withPome();",
   "const baseUrl = process.env.POME_GITHUB_REST_URL;",
   "export { baseUrl };",
 ].join("\n");

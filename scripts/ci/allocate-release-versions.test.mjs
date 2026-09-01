@@ -23,7 +23,7 @@ const SCRIPT = join(ROOT, "scripts/ci/allocate-release-versions.mjs");
 const DATE = "2026-08-14";
 const CLI = PUBLISHED_PACKAGES.find((pkg) => pkg.name === "@pome-sh/cli");
 const WIRE = PUBLISHED_PACKAGES.find((pkg) => pkg.name === "@pome-sh/wire");
-const ADAPTER = PUBLISHED_PACKAGES.find((pkg) => pkg.name === "@pome-sh/adapter-claude-sdk");
+const CHECKS = PUBLISHED_PACKAGES.find((pkg) => pkg.name === "@pome-sh/checks");
 
 let failures = 0;
 function check(label, condition, detail = "") {
@@ -65,14 +65,14 @@ function repo() {
   return dir;
 }
 
-function withExamples(dir, { adapterPin }) {
+function withExamples(dir, { pin }) {
   write(dir, "package.json", JSON.stringify({ name: "root", private: true, workspaces: ["packages/*", "cli"] }));
   write(
     dir,
     "agent-examples/support-triage/package.json",
     JSON.stringify({
       name: "support-triage-example",
-      dependencies: { "@pome-sh/adapter-claude-sdk": adapterPin },
+      dependencies: { "@pome-sh/checks": pin },
     }),
   );
 }
@@ -253,15 +253,15 @@ console.log("the wire coupling, at bump time");
     const result = plan(dir);
     const names = result.allocations.map((a) => a.name).sort();
     check(
-      "one wire change allocates three artifacts",
-      JSON.stringify(names) === JSON.stringify(["@pome-sh/adapter-claude-sdk", "@pome-sh/cli", "@pome-sh/wire"]),
+      "one wire change allocates two artifacts",
+      JSON.stringify(names) === JSON.stringify(["@pome-sh/cli", "@pome-sh/wire"]),
       names.join(", "),
     );
     check("wire's own entry is the author's words", named(result, "@pome-sh/wire").reason === "entry+relevance");
-    check("the two inliners get version-only entries", named(result, "@pome-sh/cli").reason === "relevance");
+    check("the inliner gets a version-only entry", named(result, "@pome-sh/cli").reason === "relevance");
     check(
-      "the subject collapses when several packages move",
-      result.message.startsWith(`release: 3 packages ${BUMP_COMMIT_MARKER}`),
+      "the subject lists each package when only a couple move",
+      result.message.split("\n")[0] === `release: @pome-sh/cli 1.0.1, @pome-sh/wire 1.0.1 ${BUMP_COMMIT_MARKER}`,
       result.message,
     );
     check(
@@ -393,7 +393,7 @@ console.log("the script's own surface");
     check("exits 0", r.status === 0, `${r.stdout}${r.stderr}`);
     check("names each allocation on stdout", /@pome-sh\/wire: 1\.0\.0 → 1\.0\.1/.test(r.stdout), r.stdout);
     check("--write actually writes", read(dir, WIRE.manifest).includes('"version": "1.0.1"'));
-    check("--plan-out is machine-readable", JSON.parse(readFileSync(planOut, "utf8")).allocations.length === 3);
+    check("--plan-out is machine-readable", JSON.parse(readFileSync(planOut, "utf8")).allocations.length === 2);
     check("--message-out carries the marker", readFileSync(messageOut, "utf8").includes(BUMP_COMMIT_MARKER));
     check(
       "--regen-out is a runnable script naming wire's emitter",
@@ -402,7 +402,7 @@ console.log("the script's own surface");
     );
 
     git(dir, "add", "-A");
-    git(dir, "commit", "-qm", `release: 3 packages ${BUMP_COMMIT_MARKER}`);
+    git(dir, "commit", "-qm", `release: 2 packages ${BUMP_COMMIT_MARKER}`);
     const again = spawnSync("node", [SCRIPT, "--write", "--regen-out", regenOut, dir], {
       cwd: dir,
       encoding: "utf8",
@@ -431,13 +431,13 @@ console.log("repin — a broken example can never block a version allocation");
 {
   const dir = repo();
   try {
-    withExamples(dir, { adapterPin: "0.9.0" });
+    withExamples(dir, { pin: "0.9.0" });
     write(dir, "agent-examples/broken/package.json", "{ this is not json");
     pend(dir, CLI, { body: "- a fix consumers need" });
     git(dir, "add", "-A");
     git(dir, "commit", "-qm", "a merge (#912)");
 
-    const result = plan(dir, onlyPublished("@pome-sh/adapter-claude-sdk", "1.0.0"));
+    const result = plan(dir, onlyPublished("@pome-sh/checks", "1.0.0"));
     check("the CLI still gets its version", named(result, "@pome-sh/cli")?.to === "1.0.1", JSON.stringify(result.allocations));
     check("the repin is dropped, not fatal", result.repins.length === 0, JSON.stringify(result.repins));
     check(
@@ -456,27 +456,27 @@ console.log("repin — a drifted pin against an already-published sibling is rep
 {
   const dir = repo();
   try {
-    withExamples(dir, { adapterPin: "0.9.0" }); // ADAPTER is seeded at 1.0.0 by repo()
+    withExamples(dir, { pin: "0.9.0" }); // CHECKS is seeded at 1.0.0 by repo()
     git(dir, "add", "-A");
     git(dir, "commit", "-qm", "add examples");
 
-    const npmView = onlyPublished("@pome-sh/adapter-claude-sdk", "1.0.0");
+    const npmView = onlyPublished("@pome-sh/checks", "1.0.0");
     const result = plan(dir, npmView);
     check("nothing is owed a NEW version", result.allocations.length === 0, JSON.stringify(result.allocations));
     check("exactly one repin is planned", result.repins.length === 1, JSON.stringify(result.repins));
     const repin = result.repins[0];
     check("it names the example, the dep, and both versions", repin.example === "support-triage" && repin.from === "0.9.0" && repin.to === "1.0.0", JSON.stringify(repin));
     const rewritten = JSON.parse(repin.writes[0].contents);
-    check("the manifest write carries the new pin", rewritten.dependencies["@pome-sh/adapter-claude-sdk"] === "1.0.0", repin.writes[0].contents);
+    check("the manifest write carries the new pin", rewritten.dependencies["@pome-sh/checks"] === "1.0.0", repin.writes[0].contents);
     check("a lockfile-regen command is named for that example", repin.regenerate[0].includes("agent-examples/support-triage"), JSON.stringify(repin.regenerate));
     check(
       "a repin-only commit gets its own message, not an empty one",
-      result.message.startsWith("chore: re-pin 1 example dep(s)") && result.message.includes("agent-examples/support-triage @pome-sh/adapter-claude-sdk 0.9.0 → 1.0.0"),
+      result.message.startsWith("chore: re-pin 1 example dep(s)") && result.message.includes("agent-examples/support-triage @pome-sh/checks 0.9.0 → 1.0.0"),
       result.message,
     );
 
     land(dir, result);
-    check("the example manifest is actually rewritten on disk", JSON.parse(read(dir, "agent-examples/support-triage/package.json")).dependencies["@pome-sh/adapter-claude-sdk"] === "1.0.0");
+    check("the example manifest is actually rewritten on disk", JSON.parse(read(dir, "agent-examples/support-triage/package.json")).dependencies["@pome-sh/checks"] === "1.0.0");
     check("running again with the same npmView is a clean no-op", plan(dir, npmView).repins.length === 0 && plan(dir, npmView).allocations.length === 0);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -487,14 +487,14 @@ console.log("repin — the version THIS run allocates is never repinned to in th
 {
   const dir = repo();
   try {
-    withExamples(dir, { adapterPin: "1.0.0" });
-    pend(dir, ADAPTER, { body: "- the adapter learned a thing" });
+    withExamples(dir, { pin: "1.0.0" });
+    pend(dir, CHECKS, { body: "- checks learned a thing" });
     git(dir, "add", "-A");
-    git(dir, "commit", "-qm", "adapter change + examples (#111)");
+    git(dir, "commit", "-qm", "checks change + examples (#111)");
 
-    const npmViewOnlyOld = onlyPublished("@pome-sh/adapter-claude-sdk", "1.0.0"); // 1.0.1 is NOT published
+    const npmViewOnlyOld = onlyPublished("@pome-sh/checks", "1.0.0"); // 1.0.1 is NOT published
     const result = plan(dir, npmViewOnlyOld);
-    check("the adapter is allocated 1.0.1", named(result, "@pome-sh/adapter-claude-sdk")?.to === "1.0.1", JSON.stringify(result.allocations));
+    check("checks is allocated 1.0.1", named(result, "@pome-sh/checks")?.to === "1.0.1", JSON.stringify(result.allocations));
     check(
       "but nothing is repinned to the still-unpublished 1.0.1 — the pin already matches the published 1.0.0",
       result.repins.length === 0,
@@ -502,9 +502,9 @@ console.log("repin — the version THIS run allocates is never repinned to in th
     );
 
     land(dir, result);
-    check("the manifest still pins 1.0.0 after landing — nothing broke npm ci", JSON.parse(read(dir, "agent-examples/support-triage/package.json")).dependencies["@pome-sh/adapter-claude-sdk"] === "1.0.0");
+    check("the manifest still pins 1.0.0 after landing — nothing broke npm ci", JSON.parse(read(dir, "agent-examples/support-triage/package.json")).dependencies["@pome-sh/checks"] === "1.0.0");
 
-    const npmViewNowNew = onlyPublished("@pome-sh/adapter-claude-sdk", "1.0.1");
+    const npmViewNowNew = onlyPublished("@pome-sh/checks", "1.0.1");
     const next = plan(dir, npmViewNowNew);
     check("the next run repins to the now-published 1.0.1", next.repins.length === 1 && next.repins[0].to === "1.0.1", JSON.stringify(next.repins));
   } finally {
@@ -519,22 +519,22 @@ for (const { from, to } of [
 ]) {
   const dir = repo();
   try {
-    write(dir, ADAPTER.manifest, `{\n  "name": "${ADAPTER.name}",\n  "version": "${to}"\n}\n`); // already released
-    withExamples(dir, { adapterPin: from }); // support-triage never got the memo
+    write(dir, CHECKS.manifest, `{\n  "name": "${CHECKS.name}",\n  "version": "${to}"\n}\n`); // already released
+    withExamples(dir, { pin: from }); // support-triage never got the memo
     git(dir, "add", "-A");
-    git(dir, "commit", "-qm", `release: ${ADAPTER.name} ${to} [release-bump]`);
+    git(dir, "commit", "-qm", `release: ${CHECKS.name} ${to} [release-bump]`);
 
-    const result = plan(dir, onlyPublished(ADAPTER.name, to));
+    const result = plan(dir, onlyPublished(CHECKS.name, to));
     check(
       `${from} -> ${to}: exactly the pin #${from === "0.3.3" ? "395" : "425"} fixed by hand`,
       result.repins.length === 1 &&
         result.repins[0].from === from &&
         result.repins[0].to === to &&
-        JSON.parse(result.repins[0].writes[0].contents).dependencies[ADAPTER.name] === to,
+        JSON.parse(result.repins[0].writes[0].contents).dependencies[CHECKS.name] === to,
       JSON.stringify(result.repins),
     );
     land(dir, result);
-    check(`${from} -> ${to}: lands cleanly and is a no-op afterwards`, plan(dir, onlyPublished(ADAPTER.name, to)).repins.length === 0);
+    check(`${from} -> ${to}: lands cleanly and is a no-op afterwards`, plan(dir, onlyPublished(CHECKS.name, to)).repins.length === 0);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

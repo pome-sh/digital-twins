@@ -27,17 +27,17 @@ function pass(name) {
 function fixture({ workspaceVersion, examplePin, exampleField = "dependencies", extraExamples = {} }) {
   const root = mkdtempSync(join(tmpdir(), "example-pins-"));
   writeFileSync(join(root, "package.json"), JSON.stringify({ name: "root", workspaces: ["packages/*"] }));
-  mkdirSync(join(root, "packages", "adapter-claude-sdk"), { recursive: true });
+  mkdirSync(join(root, "packages", "wire"), { recursive: true });
   writeFileSync(
-    join(root, "packages", "adapter-claude-sdk", "package.json"),
-    JSON.stringify({ name: "@pome-sh/adapter-claude-sdk", version: workspaceVersion }),
+    join(root, "packages", "wire", "package.json"),
+    JSON.stringify({ name: "@pome-sh/wire", version: workspaceVersion }),
   );
   mkdirSync(join(root, "agent-examples", "support-triage"), { recursive: true });
   writeFileSync(
     join(root, "agent-examples", "support-triage", "package.json"),
     JSON.stringify({
       name: "support-triage-example",
-      [exampleField]: { "@pome-sh/adapter-claude-sdk": examplePin },
+      [exampleField]: { "@pome-sh/wire": examplePin },
     }),
   );
   for (const [name, manifest] of Object.entries(extraExamples)) {
@@ -54,7 +54,7 @@ function fixture({ workspaceVersion, examplePin, exampleField = "dependencies", 
     exact.length === 1 &&
     exact[0].example === "support-triage" &&
     exact[0].field === "dependencies" &&
-    exact[0].dep === "@pome-sh/adapter-claude-sdk" &&
+    exact[0].dep === "@pome-sh/wire" &&
     exact[0].pin === "0.3.1" &&
     exact[0].workspaceVersion === "0.3.3"
   ) {
@@ -64,7 +64,7 @@ function fixture({ workspaceVersion, examplePin, exampleField = "dependencies", 
   }
 }
 
-for (const pin of ["file:../../packages/adapter-claude-sdk", "link:../../packages/adapter-claude-sdk"]) {
+for (const pin of ["file:../../packages/wire", "link:../../packages/wire"]) {
   const root = fixture({ workspaceVersion: "0.3.3", examplePin: pin });
   const { exact, linked, unwatchable } = discoverExampleSiblingDeps(root);
   if (exact.length === 0 && linked.length === 1 && unwatchable.length === 0) {
@@ -74,7 +74,7 @@ for (const pin of ["file:../../packages/adapter-claude-sdk", "link:../../package
   }
 }
 
-for (const pin of ["*", "^0.3.3", "~0.3.1", "0.3.x", ">=0.3.0", "latest", "npm:@pome-sh/adapter-claude-sdk@0.3.3"]) {
+for (const pin of ["*", "^0.3.3", "~0.3.1", "0.3.x", ">=0.3.0", "latest", "npm:@pome-sh/wire@0.3.3"]) {
   const root = fixture({ workspaceVersion: "0.3.3", examplePin: pin });
   const { exact, linked, unwatchable } = discoverExampleSiblingDeps(root);
   if (exact.length === 0 && linked.length === 0 && unwatchable.length === 1) {
@@ -89,7 +89,7 @@ for (const pin of ["*", "^0.3.3", "~0.3.1", "0.3.x", ">=0.3.0", "latest", "npm:@
     workspaceVersion: "0.3.3",
     examplePin: "^0.3.3",
     extraExamples: {
-      "other-example": { name: "other", dependencies: { "@pome-sh/adapter-claude-sdk": "0.3.3" } },
+      "other-example": { name: "other", dependencies: { "@pome-sh/wire": "0.3.3" } },
     },
   });
   const ok = reportExamplePinParity(root, () => ({ status: "published" }));
@@ -100,7 +100,7 @@ for (const pin of ["*", "^0.3.3", "~0.3.1", "0.3.x", ">=0.3.0", "latest", "npm:@
 {
   const root = fixture({
     workspaceVersion: "0.3.3",
-    examplePin: "file:../../packages/adapter-claude-sdk",
+    examplePin: "file:../../packages/wire",
     extraExamples: { "no-pins-here": { name: "x" } },
   });
   let calls = 0;
@@ -151,7 +151,7 @@ for (const pin of ["*", "^0.3.3", "~0.3.1", "0.3.x", ">=0.3.0", "latest", "npm:@
   }
 }
 
-const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/adapter-claude-sdk" };
+const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/wire" };
 
 {
   const result = checkExamplePinsPublished(
@@ -234,25 +234,25 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
   }
 
   withMockNpm('echo "npm error code E404" >&2; exit 1', () => {
-    const result = defaultNpmView("@pome-sh/adapter-claude-sdk", "9.9.9");
+    const result = defaultNpmView("@pome-sh/wire", "9.9.9");
     if (result.status === "unpublished") pass("9a. defaultNpmView classifies E404 as unpublished");
     else fail("9a. defaultNpmView classifies E404 as unpublished", JSON.stringify(result));
   });
 
   withMockNpm('echo "npm error code E401" >&2; exit 1', () => {
-    const result = defaultNpmView("@pome-sh/adapter-claude-sdk", "0.3.3", { attempts: 1 });
+    const result = defaultNpmView("@pome-sh/wire", "0.3.3", { attempts: 1 });
     if (result.status === "error") pass("9b. defaultNpmView classifies a non-404 error as a hard failure");
     else fail("9b. defaultNpmView classifies a non-404 error as a hard failure", JSON.stringify(result));
   });
 
   withMockNpm('echo "0.3.3"', () => {
-    const result = defaultNpmView("@pome-sh/adapter-claude-sdk", "0.3.3");
+    const result = defaultNpmView("@pome-sh/wire", "0.3.3");
     if (result.status === "published") pass("9c. defaultNpmView classifies a clean exit as published");
     else fail("9c. defaultNpmView classifies a clean exit as published", JSON.stringify(result));
   });
 
   withMockNpm("exit 1", () => {
-    const result = defaultNpmView("@pome-sh/adapter-claude-sdk", "0.3.3", { attempts: 1 });
+    const result = defaultNpmView("@pome-sh/wire", "0.3.3", { attempts: 1 });
     if (result.status === "error" && result.detail) {
       pass("9d. defaultNpmView classifies an empty-stderr failure as an error, not unpublished");
     } else {
@@ -266,7 +266,7 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
       `n=$(cat "${counter}" 2>/dev/null || echo 0); n=$((n+1)); echo "$n" > "${counter}"\n` +
         'if [ "$n" -lt 3 ]; then echo "npm error code E503" >&2; exit 1; fi\necho "0.3.3"',
       () => {
-        const result = defaultNpmView("@pome-sh/adapter-claude-sdk", "0.3.3", { attempts: 3, delayMs: 0 });
+        const result = defaultNpmView("@pome-sh/wire", "0.3.3", { attempts: 3, delayMs: 0 });
         if (result.status === "published") pass("9e. a transient 5xx is retried, not turned straight into a red");
         else fail("9e. a transient 5xx is retried, not turned straight into a red", JSON.stringify(result));
       },
@@ -274,7 +274,7 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
   }
 
   withMockNpm('echo "npm error code E503" >&2; exit 1', () => {
-    const result = defaultNpmView("@pome-sh/adapter-claude-sdk", "0.3.3", { attempts: 3, delayMs: 0 });
+    const result = defaultNpmView("@pome-sh/wire", "0.3.3", { attempts: 3, delayMs: 0 });
     if (result.status === "error" && result.attempts === 3) {
       pass("9f. a persistent error is still an error after all attempts");
     } else {
@@ -288,7 +288,7 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
       `n=$(cat "${counter}" 2>/dev/null || echo 0); n=$((n+1)); echo "$n" > "${counter}"\n` +
         'echo "npm error code E404" >&2; exit 1',
       () => {
-        const result = defaultNpmView("@pome-sh/adapter-claude-sdk", "9.9.9", { attempts: 3, delayMs: 0 });
+        const result = defaultNpmView("@pome-sh/wire", "9.9.9", { attempts: 3, delayMs: 0 });
         const tries = Number(readFileSync(counter, "utf8").trim());
         if (result.status === "unpublished" && tries === 1) pass("9g. an E404 short-circuits the retry budget");
         else fail("9g. an E404 short-circuits the retry budget", `${JSON.stringify(result)} after ${tries} try/tries`);
@@ -303,16 +303,16 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
 
   {
     const root = fixture({ workspaceVersion: "0.3.6", examplePin: "0.3.5" });
-    const repins = planExampleRepins(root, published("@pome-sh/adapter-claude-sdk", "0.3.6"));
+    const repins = planExampleRepins(root, published("@pome-sh/wire", "0.3.6"));
     const manifestAfter = JSON.parse(readFileSync(join(root, "agent-examples/support-triage/package.json"), "utf8"));
     if (
       repins.length === 1 &&
       repins[0].example === "support-triage" &&
       repins[0].from === "0.3.5" &&
       repins[0].to === "0.3.6" &&
-      manifestAfter.dependencies["@pome-sh/adapter-claude-sdk"] === "0.3.5" && // on disk: repins only PLANS writes
+      manifestAfter.dependencies["@pome-sh/wire"] === "0.3.5" && // on disk: repins only PLANS writes
       repins[0].writes[0].path === "agent-examples/support-triage/package.json" &&
-      JSON.parse(repins[0].writes[0].contents).dependencies["@pome-sh/adapter-claude-sdk"] === "0.3.6" &&
+      JSON.parse(repins[0].writes[0].contents).dependencies["@pome-sh/wire"] === "0.3.6" &&
       repins[0].regenerate.length === 1 &&
       repins[0].regenerate[0].includes('cd "agent-examples/support-triage"') && // quoted: this string is bash'ed in CI
 
@@ -333,7 +333,7 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
 
   {
     const root = fixture({ workspaceVersion: "0.3.6", examplePin: "0.3.6" });
-    const repins = planExampleRepins(root, published("@pome-sh/adapter-claude-sdk", "0.3.6"));
+    const repins = planExampleRepins(root, published("@pome-sh/wire", "0.3.6"));
     if (repins.length === 0) pass("13. a pin that already matches the published sibling is a no-op");
     else fail("13. a pin that already matches the published sibling is a no-op", JSON.stringify(repins));
   }
@@ -350,9 +350,9 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     { was: "0.3.5", published: "0.3.6" },
   ]) {
     const root = fixture({ workspaceVersion: newVersion, examplePin: was });
-    const repins = planExampleRepins(root, published("@pome-sh/adapter-claude-sdk", newVersion));
+    const repins = planExampleRepins(root, published("@pome-sh/wire", newVersion));
     const rewritten = JSON.parse(repins[0]?.writes[0]?.contents ?? "{}");
-    if (repins.length === 1 && rewritten.dependencies?.["@pome-sh/adapter-claude-sdk"] === newVersion) {
+    if (repins.length === 1 && rewritten.dependencies?.["@pome-sh/wire"] === newVersion) {
       pass(`15. replays the ${was} -> ${newVersion} incident exactly as the human PR did`);
     } else {
       fail(`15. replays the ${was} -> ${newVersion} incident exactly as the human PR did`, JSON.stringify(repins));
@@ -363,7 +363,7 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     const root = mkdtempSync(join(tmpdir(), "example-pins-two-"));
     writeFileSync(join(root, "package.json"), JSON.stringify({ name: "root", workspaces: ["packages/*"] }));
     for (const [dir, name, version] of [
-      ["adapter-claude-sdk", "@pome-sh/adapter-claude-sdk", "0.3.6"],
+      ["wire", "@pome-sh/wire", "0.3.6"],
       ["checks", "@pome-sh/checks", "1.2.0"],
     ]) {
       mkdirSync(join(root, "packages", dir), { recursive: true });
@@ -374,7 +374,7 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
       join(root, "agent-examples", "support-triage", "package.json"),
       JSON.stringify({
         name: "support-triage-example",
-        dependencies: { "@pome-sh/adapter-claude-sdk": "0.3.5", "@pome-sh/checks": "1.1.0" },
+        dependencies: { "@pome-sh/wire": "0.3.5", "@pome-sh/checks": "1.1.0" },
       }),
     );
     const repins = planExampleRepins(root, () => ({ status: "published" }));
@@ -382,7 +382,7 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     const onDisk = JSON.parse(lastForPath?.writes[0].contents ?? "{}");
     if (
       repins.length === 2 &&
-      onDisk.dependencies["@pome-sh/adapter-claude-sdk"] === "0.3.6" &&
+      onDisk.dependencies["@pome-sh/wire"] === "0.3.6" &&
       onDisk.dependencies["@pome-sh/checks"] === "1.2.0"
     ) {
       pass("16b. two drifted pins in one example both survive the last-write-wins apply");
@@ -394,18 +394,18 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
   {
     const root = mkdtempSync(join(tmpdir(), "example-pins-ambig-"));
     writeFileSync(join(root, "package.json"), JSON.stringify({ name: "root", workspaces: ["packages/*"] }));
-    mkdirSync(join(root, "packages", "adapter-claude-sdk"), { recursive: true });
+    mkdirSync(join(root, "packages", "wire"), { recursive: true });
     writeFileSync(
-      join(root, "packages", "adapter-claude-sdk", "package.json"),
-      JSON.stringify({ name: "@pome-sh/adapter-claude-sdk", version: "0.3.6" }),
+      join(root, "packages", "wire", "package.json"),
+      JSON.stringify({ name: "@pome-sh/wire", version: "0.3.6" }),
     );
     mkdirSync(join(root, "agent-examples", "support-triage"), { recursive: true });
     writeFileSync(
       join(root, "agent-examples", "support-triage", "package.json"),
       JSON.stringify({
         name: "support-triage-example",
-        dependencies: { "@pome-sh/adapter-claude-sdk": "0.3.5" },
-        overrides: { "@pome-sh/adapter-claude-sdk": "0.3.5" },
+        dependencies: { "@pome-sh/wire": "0.3.5" },
+        overrides: { "@pome-sh/wire": "0.3.5" },
       }),
     );
     let threw = null;
@@ -432,8 +432,8 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
       extraExamples: {
         "ambiguous-example": {
           name: "ambiguous-example",
-          dependencies: { "@pome-sh/adapter-claude-sdk": "0.3.4" },
-          overrides: { "@pome-sh/adapter-claude-sdk": "0.3.4" },
+          dependencies: { "@pome-sh/wire": "0.3.4" },
+          overrides: { "@pome-sh/wire": "0.3.4" },
         },
       },
     });

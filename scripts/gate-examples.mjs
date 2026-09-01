@@ -30,16 +30,6 @@ if (examples.length === 0) {
   process.exit(1);
 }
 
-console.log("Building @pome-sh/adapter-claude-sdk…");
-try {
-  run("npm", ["run", "build", "-w", "@pome-sh/adapter-claude-sdk"], repoRoot);
-} catch {
-  console.error(
-    "Failed to build @pome-sh/adapter-claude-sdk. Run `npm ci` at the repo root first.",
-  );
-  process.exit(1);
-}
-
 const failures = [];
 for (const { rel, dir: cwd } of examples) {
   console.log(`\n=== ${rel} ===`);

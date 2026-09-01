@@ -61,8 +61,6 @@ const EXPLICIT_SCENARIO =
   "# Trivial\n\n## Prompt\nPretend prompt.\n\n## Success Criteria\n- [code] No unsupported endpoint was called\n";
 
 const WIRED_AGENT_SOURCE = [
-  'import { withPome } from "@pome-sh/adapter-claude-sdk";',
-  "withPome();",
   "const baseUrl = process.env.POME_GITHUB_REST_URL;",
   "export { baseUrl };",
 ].join("\n");

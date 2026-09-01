@@ -29,7 +29,7 @@ function assert(cond, msg) {
   console.error(`FAIL  ${msg}`);
 }
 
-const IMPORT_LINE = 'import { query } from "@pome-sh/adapter-claude-sdk";';
+const IMPORT_LINE = 'import { query } from "@anthropic-ai/claude-agent-sdk";';
 const missingOf = (result) => result.findings.flatMap((f) => f.missing).sort();
 
 const OPEN_DOORS = {
@@ -99,7 +99,7 @@ const SEALED = {
   "quoted keys": `${IMPORT_LINE}\nawait query({ prompt: "go", options: { "tools": [], "settingSources": [] } });`,
   "a quoted `options` key": `${IMPORT_LINE}\nawait query({ prompt: "go", "options": { tools: [], settingSources: [] } });`,
   "shorthand options": `${IMPORT_LINE}\nconst options = { tools: [], settingSources: [] };\nawait query({ prompt, options });`,
-  "aliased import": `import { query as ask } from "@pome-sh/adapter-claude-sdk";\nawait ask({ prompt: "go", options: { tools: [], settingSources: [] } });`,
+  "aliased import": `import { query as ask } from "@anthropic-ai/claude-agent-sdk";\nawait ask({ prompt: "go", options: { tools: [], settingSources: [] } });`,
   "namespace import": `import * as sdk from "@anthropic-ai/claude-agent-sdk";\nawait sdk.query({ prompt: "go", options: { tools: [], settingSources: [] } });`,
   "raw SDK import": `import { query } from "@anthropic-ai/claude-agent-sdk";\nawait query({ prompt: "go", options: { tools: [], settingSources: [] } });`,
   "TypeScript syntax the parser must read": `${IMPORT_LINE}\ninterface W { readonly url: string }\nconst cfg = { url: process.env.U as string } satisfies W;\nawait query({ prompt: cfg.url, options: { tools: [] as string[], settingSources: [] } });`,

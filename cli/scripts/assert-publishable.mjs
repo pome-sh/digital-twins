@@ -3,7 +3,7 @@
 //
 // Publish guard: refuse to publish a @pome-sh/cli tarball that cannot install.
 //
-// Every `@pome-sh/*` package except the CLI itself and the Claude adapter is
+// Every `@pome-sh/*` package the CLI depends on that is not itself published is
 // `private: true`, so a dependency on one is only satisfiable if it physically
 // rides inside the tarball. Two ways that can be true:
 //   - the CLI has NO `@pome-sh/*` runtime dependency at all (the bundler

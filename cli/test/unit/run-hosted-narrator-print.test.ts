@@ -81,8 +81,6 @@ async function fixtureRepo(): Promise<string> {
   await writeFile(
     join(dir, "src/agent.ts"),
     [
-      'import { withPome } from "@pome-sh/adapter-claude-sdk";',
-      "withPome();",
       "const baseUrl = process.env.POME_GITHUB_REST_URL;",
       "export { baseUrl };",
     ].join("\n"),

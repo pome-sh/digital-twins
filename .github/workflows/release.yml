@@ -7,9 +7,9 @@ name: release
 # same commit, and this workflow publishes what that commit moved. The number is
 # not the PR author's to write, so there is nothing to remember and no version PR.
 #
-# @pome-sh/cli, @pome-sh/adapter-claude-sdk and @pome-sh/checks version
+# @pome-sh/cli and @pome-sh/checks version
 # INDEPENDENTLY (D11) and are diff-gated separately: the CLI bundles the internal
-# packages, the adapter bundles the wire types, @pome-sh/checks bundles the five
+# packages, @pome-sh/checks bundles the five
 # twins' declaration layer plus the sdk check DSL, and none depends on another's
 # published version. There is no lockstep to enforce and therefore no
 # sync-versions script.
@@ -45,8 +45,8 @@ name: release
 # target is untouched, and wire stays bundled-inlined into the two npmjs
 # tarballs exactly as before (tsup `noExternal`).
 #
-# Hence wire is now the npmjs lane's FOURTH matrix entry (`plan`/`publish`,
-# alongside cli/adapter/checks) AND still has its own GitHub Packages lane
+# Hence wire is now an npmjs lane matrix entry (`plan`/`publish`,
+# alongside cli/checks/sandbox-domains) AND still has its own GitHub Packages lane
 # (`plan-wire`/`publish-wire`) — not a replacement of one lane by the other:
 #
 #   - The auth MECHANISM differs per registry, not per package. npmjs uses OIDC
@@ -63,7 +63,7 @@ name: release
 #     never-publish-behind-latest floor check). If that read lived in `plan`,
 #     any GitHub Packages 401/403/outage — or an org owner flipping the
 #     package's visibility settings — would fail `plan` and silently skip the
-#     @pome-sh/cli, @pome-sh/adapter-claude-sdk and @pome-sh/checks publishes,
+#     @pome-sh/cli, @pome-sh/checks and @pome-sh/sandbox-domains publishes,
 #     which have nothing to do with GitHub Packages. Blast radius now matches
 #     the artifact. Symmetrically, wire's npmjs decision/publish lives entirely
 #     in `plan`/`publish` so an npmjs outage cannot take down the GitHub
@@ -96,7 +96,6 @@ jobs:
       contents: read
     outputs:
       cli: ${{ steps.diff.outputs.cli }}
-      adapter: ${{ steps.diff.outputs.adapter }}
       checks: ${{ steps.diff.outputs.checks }}
       sandboxDomains: ${{ steps.diff.outputs.sandboxDomains }}
       wireNpm: ${{ steps.diff.outputs.wireNpm }}
@@ -115,7 +114,6 @@ jobs:
         run: |
           set -euo pipefail
           scripts/ci/decide-publish.sh "@pome-sh/cli" "cli/package.json" "cli"
-          scripts/ci/decide-publish.sh "@pome-sh/adapter-claude-sdk" "packages/adapter-claude-sdk/package.json" "adapter"
           scripts/ci/decide-publish.sh "@pome-sh/checks" "packages/checks/package.json" "checks"
           # @pome-sh/sandbox-domains — the grading RUNTIME, the other leg of
           # pome-cloud's drift gate. Decided on the same lane and in
@@ -167,7 +165,7 @@ jobs:
   publish:
     name: publish ${{ matrix.package }}
     needs: plan
-    if: needs.plan.outputs.cli == 'true' || needs.plan.outputs.adapter == 'true' || needs.plan.outputs.checks == 'true' || needs.plan.outputs.sandboxDomains == 'true' || needs.plan.outputs.wireNpm == 'true'
+    if: needs.plan.outputs.cli == 'true' || needs.plan.outputs.checks == 'true' || needs.plan.outputs.sandboxDomains == 'true' || needs.plan.outputs.wireNpm == 'true'
     runs-on: ubuntu-latest
     strategy:
       # Never cancel a sibling mid-publish: a half-published set is worse than
@@ -177,8 +175,6 @@ jobs:
         include:
           - package: "@pome-sh/cli"
             enabled: ${{ needs.plan.outputs.cli }}
-          - package: "@pome-sh/adapter-claude-sdk"
-            enabled: ${{ needs.plan.outputs.adapter }}
           # @pome-sh/checks — the grading vocabulary, for pome-cloud.
           # Same lane, same OIDC trusted publishing, its own version line. It is
           # the third npmjs package rather than a second GitHub Packages one
@@ -257,9 +253,9 @@ jobs:
       - name: Bundled-runtime-dependency lint rule
         if: matrix.enabled == 'true'
         run: npm run lint -- bundled-deps
-      # The release gate: install both tarballs in a clean room, boot all five
-      # twins from the CLI tarball, and typecheck a consumer against the
-      # adapter's shipped declarations.
+      # The release gate: install the tarballs in a clean room, boot all five
+      # twins from the CLI tarball, and typecheck a consumer against each
+      # package's shipped declarations.
       - name: Clean-room pack test
         if: matrix.enabled == 'true'
         run: npm run test:pack
@@ -308,8 +304,8 @@ jobs:
       # publish wire to GitHub Packages twice while npmjs got nothing. An
       # explicit `--registry` flag outranks `publishConfig` and is the only
       # thing that reliably wins here — the same reasoning `publish-wire`
-      # applies in the opposite direction for defence-in-depth. cli, adapter
-      # and checks have no `publishConfig.registry`, so they fall through to
+      # applies in the opposite direction for defence-in-depth. cli, checks
+      # and sandbox-domains have no `publishConfig.registry`, so they fall through to
       # the plain `npm publish` and pick up the registry `setup-node` wrote.
       - name: Publish
         if: matrix.enabled == 'true'
@@ -401,7 +397,7 @@ jobs:
   # declarations). They say nothing about wire's own tarball, and they still run
   # on every PR and on both npmjs publishes — which is what keeps wire's
   # bundled-inlining role verified. Publishing wire does not change that role:
-  # cli/ and adapter/ depend on it as a devDependency and tsup inlines it, so no
+  # cli/ depends on it as a devDependency and tsup inlines it, so no
   # end user ever resolves it from a registry.
   publish-wire:
     name: publish @pome-sh/wire (GitHub Packages)
@@ -461,9 +457,9 @@ jobs:
           npm publish -w @pome-sh/wire --registry https://npm.pkg.github.com
 
   # The moment a version lands on a registry is also the moment
-  # scripts/check-example-pins-published.mjs can go red on `main`:
-  # agent-examples/support-triage pins @pome-sh/adapter-claude-sdk from the
-  # registry, and allocate-version.yml is the only thing that re-pins it
+  # scripts/check-example-pins-published.mjs can go red on `main`: if any
+  # agent-examples/* package pins a published @pome-sh/* package from the
+  # registry, allocate-version.yml is the only thing that re-pins it
   # (planExampleRepins, which the allocator imports). But the two
   # allocate-version.yml runs that bracket a publish both miss the window —
   # the run on the human merge commit plans BEFORE the version exists on the
@@ -504,7 +500,7 @@ jobs:
   # that decides. The consequence to state plainly, because it is a widening:
   # `publish` FAILING no longer suppresses this job when `publish-wire`
   # succeeded, and that is correct rather than tolerated — the matrix does not
-  # fail fast, so a run where the adapter published and the CLI failed has
+  # fail fast, so a run where one npmjs package published and the CLI failed has
   # already put a version on the registry that `agent-examples/*` is now drifted from.
   # Suppressing the re-pin there would leave `main` red on the drift as well as
   # on the failure.

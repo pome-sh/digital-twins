@@ -4,6 +4,11 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
+## Unreleased (patch)
+
+Doc-only: source comments and the README no longer reference the removed
+`@pome-sh/adapter-claude-sdk` package. No API or behaviour change.
+
 ## 0.4.0 — 2026-08-26
 
 **`@pome-sh/wire/run-completeness` learns the narrator's two states.** A run

@@ -68,11 +68,11 @@ export async function runTask(options: RunTaskOptions) {
   const writeRun = writeRunNoScore;
 
   // Per-run signals file. Lives as a sibling of events.jsonl in the
-  // run's artifact directory so adapters that import `@pome-sh/adapter-claude-sdk`
-  // and call `withPome()` can write M0 HookEvent / ToolUseEvent rows. The
-  // runner merges these into events.jsonl post-run via
-  // `mergeAdapterSignalsIntoEvents`. Forward-slash path is passed to the
-  // subprocess so cross-platform shell quoting stays sane.
+  // run's artifact directory so an agent that writes M0 HookEvent / ToolUseEvent
+  // rows to `POME_ADAPTER_SIGNALS_PATH` has a target. The runner merges these
+  // into events.jsonl post-run via `mergeAdapterSignalsIntoEvents`.
+  // Forward-slash path is passed to the subprocess so cross-platform shell
+  // quoting stays sane.
   const runDir = join(artifactsDir, scenario.slug, runId);
   await mkdir(runDir, { recursive: true });
   const signalsPath = join(runDir, "signals.jsonl");

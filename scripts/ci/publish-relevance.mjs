@@ -51,13 +51,6 @@ export const PUBLISHED_PACKAGES = [
     pathPrefixes: ["cli/", "packages/twin-", "packages/wire/", "packages/sdk/"],
   },
   {
-    name: "@pome-sh/adapter-claude-sdk",
-    manifest: "packages/adapter-claude-sdk/package.json",
-    changelog: "packages/adapter-claude-sdk/CHANGELOG.md",
-    registry: "npm",
-    pathPrefixes: ["packages/adapter-claude-sdk/", "packages/wire/"],
-  },
-  {
     name: "@pome-sh/checks",
     manifest: "packages/checks/package.json",
     changelog: "packages/checks/CHANGELOG.md",

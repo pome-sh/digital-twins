@@ -250,8 +250,8 @@ export async function runTaskHosted(
   // emits them; otherwise the heuristic correlator path runs over events alone.
   const signalsDir = await mkdtemp(join(tmpdir(), "pome-signals-"));
   const signalsPath = join(signalsDir, `${randomUUID()}.jsonl`);
-  // Touch the file so adapters that `appendFileSync` to it on first signal
-  // don't race the read in the empty case.
+  // Touch the file so an agent that `appendFileSync`s to it on first signal
+  // doesn't race the read in the empty case.
   await writeFile(signalsPath, "");
 
   // 1. Spawn cloud session — fails fast on auth/quota/orch. Trial
@@ -303,12 +303,12 @@ export async function runTaskHosted(
 
     // Agent telemetry → pome-cloud. The agent runs as a LOCAL subprocess even on
     // hosted runs, and its LLM calls happen inside the SDK (they never traverse
-    // pome's capture-server proxy), so the agent emits its OWN `gen_ai` OTLP
-    // spans (via @pome-sh/adapter-claude-sdk). They post to the SESSION-SCOPED
-    // traces endpoint, which ingests them into THIS sim session's
-    // `otlp-spans.jsonl` blob; finalize rolls them up onto the run for the
-    // dashboard's "Agent telemetry" panel. Wire contract (sim-traces.ts):
-    //   - OTLP/HTTP JSON only (the adapter exporter is http/json).
+    // pome's capture-server proxy), so an agent that wants an "Agent telemetry"
+    // waterfall emits its OWN `gen_ai` OTLP spans from its own exporter. They
+    // post to the SESSION-SCOPED traces endpoint, which ingests them into THIS
+    // sim session's `otlp-spans.jsonl` blob; finalize rolls them up onto the run
+    // for the dashboard's "Agent telemetry" panel. Wire contract (sim-traces.ts):
+    //   - OTLP/HTTP JSON only.
     //   - Auth: the team API key via `X-API-KEY`. sim-traces documents a
     //     preferred `Bearer <agent_token>` path too, but every /v1/sessions
     //     sub-router shares a `use("*", requireApiKey)` middleware that runs
@@ -316,8 +316,8 @@ export async function runTaskHosted(
     //     team-key fallback is the path that actually reaches ingest. The key
     //     is the caller's own and the agent runs locally, so this is the same
     //     trust boundary as POME_GITHUB_TOKEN below.
-    // POME_OTEL_EXPORTER_OTLP_ENDPOINT / _HEADERS are the pome-namespaced env the
-    // bundled adapter reads; with no endpoint the adapter emission is inert.
+    // POME_OTEL_EXPORTER_OTLP_ENDPOINT / _HEADERS are the pome-namespaced env an
+    // agent's exporter reads; with no endpoint set the agent emits nothing.
     // POME_OTEL_COLLECTOR_URL fully overrides the endpoint for non-standard deploys.
     const otlpEndpoint =
       process.env.POME_OTEL_COLLECTOR_URL?.trim() ||

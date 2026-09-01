@@ -476,16 +476,6 @@ function check(name, got, want) {
 {
   const dir = mkdtempSync(join(tmpdir(), "smoke-examples-marker-"));
   try {
-    mkdirSync(join(dir, "via-adapter", "src"), { recursive: true });
-    writeFileSync(
-      join(dir, "via-adapter", "package.json"),
-      JSON.stringify({
-        scripts: { start: "tsx src/index.ts" },
-        dependencies: { "@pome-sh/adapter-claude-sdk": "file:../../packages/adapter-claude-sdk" },
-      }),
-    );
-    writeFileSync(join(dir, "via-adapter", "src", "index.ts"), "import { query } from '@pome-sh/adapter-claude-sdk';\n");
-
     mkdirSync(join(dir, "via-literal", "src"), { recursive: true });
     writeFileSync(
       join(dir, "via-literal", "package.json"),
@@ -503,16 +493,6 @@ function check(name, got, want) {
     );
     writeFileSync(join(dir, "forgot-it", "src", "index.ts"), "console.log('does real work, prints nothing marker-shaped');\n");
 
-    mkdirSync(join(dir, "registry-pinned", "src"), { recursive: true });
-    writeFileSync(
-      join(dir, "registry-pinned", "package.json"),
-      JSON.stringify({
-        scripts: { start: "tsx src/index.ts" },
-        dependencies: { "@pome-sh/adapter-claude-sdk": "0.3.5" },
-      }),
-    );
-    writeFileSync(join(dir, "registry-pinned", "src", "index.ts"), "import { query } from '@pome-sh/adapter-claude-sdk';\n");
-
     mkdirSync(join(dir, "mentions-it", "src"), { recursive: true });
     writeFileSync(
       join(dir, "mentions-it", "package.json"),
@@ -523,20 +503,15 @@ function check(name, got, want) {
       `// the smoke gate looks for ${OUTBOUND_MARKER} here.\nconsole.log("no emission");\n`,
     );
 
-    const clean = assertEveryExampleEmitsMarker(dir, ["via-adapter", "via-literal"]);
-    check("an example covered by the shared seam or its own literal passes", clean.ok, true);
+    const clean = assertEveryExampleEmitsMarker(dir, ["via-literal"]);
+    check("an example that prints its own marker literal passes", clean.ok, true);
     check("a clean pass carries no message", clean.message, null);
 
-    const withGap = assertEveryExampleEmitsMarker(dir, ["via-adapter", "via-literal", "forgot-it"]);
+    const withGap = assertEveryExampleEmitsMarker(dir, ["via-literal", "forgot-it"]);
     check("an example with no route to the marker reds the guard", withGap.ok, false);
     assert.match(withGap.message, /forgot-it/);
     assert.match(withGap.message, new RegExp(OUTBOUND_MARKER));
-    assert.ok(!withGap.message.includes("via-adapter"), "a covered example must not be named as missing");
     assert.ok(!withGap.message.includes("via-literal"), "a covered example must not be named as missing");
-
-    const registryPin = assertEveryExampleEmitsMarker(dir, ["registry-pinned"]);
-    check("a REGISTRY-pinned adapter dependency does not buy coverage", registryPin.ok, false);
-    assert.match(registryPin.message, /registry-pinned/);
 
     const mention = assertEveryExampleEmitsMarker(dir, ["mentions-it"]);
     check("the marker mentioned in a comment does not buy coverage", mention.ok, false);

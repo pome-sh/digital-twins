@@ -214,15 +214,15 @@ async function checkRouting(configDir: string): Promise<DoctorCheck> {
     };
   }
 
-  if (scan.wiring.envVar === null && !scan.wiring.adapterImport) {
+  if (scan.wiring.envVar === null) {
     return {
       id: "routing",
       status: "fail",
       label: "requests are not routed to the twin",
-      cause: `no POME_*_REST_URL / POME_*_MCP_URL read and no @pome-sh adapter found in the ${scan.filesScanned} source file(s) under ${relative(process.cwd(), configDir) || "."} — the agent has no path to the twin.`,
+      cause: `no POME_*_REST_URL / POME_*_MCP_URL read in the ${scan.filesScanned} source file(s) under ${relative(process.cwd(), configDir) || "."} — the agent has no path to the twin.`,
       fix: [
-        'wire the adapter: import { withPome } from "@pome-sh/adapter-claude-sdk"; call withPome() at startup;',
-        "read the twin base URL from POME_GITHUB_REST_URL (injected by the runner) — or let your own coding agent wire it with the coach skills (`npx skills add pome-sh/digital-twins --skill '*'`).",
+        "read the twin base URL from the env the runner injects (e.g. POME_GITHUB_REST_URL / POME_GITHUB_MCP_URL) and send your requests there —",
+        "or let your own coding agent wire it with the coach skills (`npx skills add pome-sh/digital-twins --skill '*'`).",
       ].join("\n"),
     };
   }
@@ -231,7 +231,7 @@ async function checkRouting(configDir: string): Promise<DoctorCheck> {
     id: "routing",
     status: "pass",
     label: "requests route to the twin",
-    detail: scan.wiring.envVar ? `reads ${scan.wiring.envVar}` : "withPome() installed",
+    detail: `reads ${scan.wiring.envVar}`,
   };
 }
 
