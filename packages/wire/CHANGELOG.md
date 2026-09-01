@@ -4,7 +4,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
-## Unreleased (patch)
+## 0.4.1 — 2026-09-01
 
 Doc-only: source comments and the README no longer reference the removed
 `@pome-sh/adapter-claude-sdk` package. No API or behaviour change.

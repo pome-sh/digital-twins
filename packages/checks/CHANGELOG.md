@@ -1,6 +1,6 @@
 # @pome-sh/checks
 
-## Unreleased (patch)
+## 0.4.1 — 2026-09-01
 
 Doc-only: a build-config comment no longer references the removed
 `@pome-sh/adapter-claude-sdk` package. No API or behaviour change.

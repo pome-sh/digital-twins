@@ -15,7 +15,7 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
-## Unreleased (minor)
+## 0.43.0 — 2026-09-01
 
 **`pome demo` and the hidden `pome demo-agent` are removed** (F-1718). Both
 commands are gone as a security fix. Start a new project with `pome init`
