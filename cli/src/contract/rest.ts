@@ -66,11 +66,11 @@ const createSessionRequestObjectSchema = z
     // POST /v1/sessions. The dashboard generates one per Start-button click;
     // legacy clients work without it.
     idempotency_key: z.string().uuid().optional(),
-    // Client-minted trial-group identity — `pome run -n k`
-    // (and `pome demo`) stamp one id per invocation, shared by all k trial
-    // sessions. The cloud copies it onto sessions.group_id at mint and onto
-    // runs.group_id at finalize; the demo/eval mints already accept the same
-    // field. Format mirrors the cloud's GROUP_ID_RE. Legacy clients omit it.
+    // Client-minted trial-group identity — `pome run -n k` stamps one id per
+    // invocation, shared by all k trial sessions. The cloud copies it onto
+    // sessions.group_id at mint and onto runs.group_id at finalize; the eval
+    // mint accepts the same field. Format mirrors the cloud's GROUP_ID_RE.
+    // Legacy clients omit it.
     group_id: z.string().regex(/^[A-Za-z0-9_-]{6,64}$/).optional(),
     // Per the manifest format spec: per-run override of the manifest's agent.version —
     // an opaque user-declared label stamped onto the session/run rows.
