@@ -36,8 +36,7 @@ import { realpathSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
-import { flushPomeTelemetry, query, tool, withPome } from "@pome-sh/adapter-claude-sdk";
+import { createSdkMcpServer, query, tool } from "@anthropic-ai/claude-agent-sdk";
 import { sign } from "hono/jwt";
 import { z } from "zod";
 
@@ -96,16 +95,15 @@ async function main() {
   // ANTHROPIC_API_KEY from the environment) picks it up.
   process.env.ANTHROPIC_API_KEY = resolveAnthropicKey();
 
-  // Agent telemetry (per-task tokens / latency / errors on the dashboard) is
-  // emitted automatically by the `withPome()` launch hook: it reads the OTLP env the pome
-  // CLI injects (POME_OTEL_EXPORTER_OTLP_ENDPOINT/_HEADERS) and the wrapped
-  // `query()` emits a `gen_ai` span per LLM turn, flushing before exit. No-op
-  // when no endpoint is configured, so standalone dev needs nothing here.
-
   banner({ task: TASK, mcpUrl: MCP_URL, sid: MCP_SID });
 
   const tools = buildTwinTools({ mcpUrl: MCP_URL, token });
   const server = createSdkMcpServer({ name: "github-twin", version: "0.1.0", tools });
+
+  // Positive-evidence marker `scripts/smoke-examples.mjs` classifies
+  // REACHED-OUTBOUND on, printed immediately before the first outbound (model)
+  // call. Gated so real users never see it.
+  if (process.env.POME_SMOKE_MARK_OUTBOUND === "1") console.error("POME_SMOKE_REACHED_OUTBOUND");
 
   const run = query({
     prompt: TASK,
@@ -196,10 +194,6 @@ async function main() {
     exitCode = 1;
   } finally {
     thinking.stop();
-    // The query() wrapper flushes telemetry on the terminal `result` message;
-    // this is the belt-and-suspenders drain for paths that throw or abandon the
-    // stream before a result arrives, so partial-run spans still ship.
-    await flushPomeTelemetry();
   }
 
   process.exit(exitCode);
@@ -472,9 +466,7 @@ function trimSlash(url: string): string {
 }
 
 // Only run the agent when executed directly (`npx tsx src/index.ts`). Guarding
-// the launch keeps the module importable without kicking off a full
-// agent run — and keeps the `withPome()` fetch-hook out of import-time side
-// effects.
+// the launch keeps the module importable without kicking off a full agent run.
 //
 // This block MUST stay at the bottom of the module. `main()` reaches
 // `new TwinMcpClient(...)` immediately, and `class` declarations sit in the
@@ -492,6 +484,5 @@ const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolvePath(process.argv[1])) : "";
 
 if (ENTRY === SELF) {
-  withPome();
   await main();
 }

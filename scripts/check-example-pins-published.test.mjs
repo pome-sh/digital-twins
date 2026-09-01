@@ -130,6 +130,27 @@ for (const pin of ["*", "^0.3.3", "~0.3.1", "0.3.x", ">=0.3.0", "latest", "npm:@
   }
 }
 
+{
+  // No example depends on any @pome-sh/* package at all — the state once the
+  // adapter is removed from every example. This is a legitimate clean pass, not
+  // a blind spot, so parity holds vacuously instead of throwing.
+  const root = fixture({ workspaceVersion: "0.3.3", examplePin: "0.3.3" });
+  writeFileSync(
+    join(root, "agent-examples", "support-triage", "package.json"),
+    JSON.stringify({ dependencies: { "@anthropic-ai/claude-agent-sdk": "^0.3.221" } }),
+  );
+  let calls = 0;
+  const ok = reportExamplePinParity(root, () => {
+    calls += 1;
+    return { status: "published" };
+  });
+  if (ok === true && calls === 0) {
+    pass("4c. zero @pome-sh/* example deps is a vacuous pass, not a throw");
+  } else {
+    fail("4c. zero @pome-sh/* example deps is a vacuous pass, not a throw", `ok=${ok} after ${calls} registry call(s)`);
+  }
+}
+
 const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/adapter-claude-sdk" };
 
 {
@@ -445,11 +466,13 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
   const { dirname, resolve } = await import("node:path");
   const { fileURLToPath } = await import("node:url");
   const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-  const { exact, unwatchable } = discoverExampleSiblingDeps(repoRoot);
-  if (exact.length >= 1 && unwatchable.length === 0) {
-    pass(`10. the real tree has ${exact.length} watched exact pin(s) and 0 unwatchable`);
+  const { exact, linked, unwatchable } = discoverExampleSiblingDeps(repoRoot);
+  // No example depends on a @pome-sh/* package, so every kind of pin is empty:
+  // nothing to watch, and no stray file: link or unwatchable range either.
+  if (exact.length === 0 && linked.length === 0 && unwatchable.length === 0) {
+    pass("10. the real tree has no @pome-sh/* example deps to watch");
   } else {
-    fail("10. the real tree has watched exact pin(s) and 0 unwatchable", JSON.stringify({ exact, unwatchable }));
+    fail("10. the real tree has no @pome-sh/* example deps to watch", JSON.stringify({ exact, linked, unwatchable }));
   }
 }
 

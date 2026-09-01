@@ -414,22 +414,12 @@ via env), it works the task over MCP, and exits when done.
 > since been taken on both arms — 0/5 → 5/5. The lesson is measured, not
 > designed.
 
-### Telemetry
+### Capture
 
-`query` is imported from `@pome-sh/adapter-claude-sdk`, not from
-`@anthropic-ai/claude-agent-sdk`. It is a drop-in — the message stream is
-byte-for-byte what the SDK yields — and it emits gen_ai OTLP spans (model,
-per-turn input/output tokens, latency) whenever a runner injects
-`POME_OTEL_EXPORTER_OTLP_ENDPOINT`, which both `pome run` and the coach do. With
-no endpoint set it is inert, so a standalone run is unaffected.
-
-Using the adapter rather than hand-rolling the exporter is deliberate: per-turn
-token accounting has two non-obvious traps the adapter already fixed — one API
-turn arrives as several `assistant` messages that each repeat the same `usage`
-object (naive counting over-reported one run's input by 79%), and the true
-per-turn `output_tokens` only arrives on a `message_delta` stream event, not on
-the assistant message. An example that re-implemented this would be teaching the
-bug.
+`query` is imported straight from `@anthropic-ai/claude-agent-sdk`. The agent
+reaches the twins over MCP-over-HTTP, so nothing is instrumented agent-side:
+capture happens at the twin, whose recorder writes a `TwinHttpEvent` for every
+request that reaches it. A standalone run needs no extra configuration.
 
 ### How the coach launches it
 

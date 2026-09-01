@@ -30,17 +30,10 @@ import { realpathSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// F0-4 / L7 — overlay pome adapter signals on the Claude Agent SDK trace.
-// `withPome()` installs a `globalThis.fetch` hook that emits
-// `ToolUseEvent` / `HookEvent` / `SubagentSpawnEvent` rows to
-// `POME_ADAPTER_SIGNALS_PATH` (Pome CLI injects this env var) and a
-// `x-pome-correlation-id` header on outgoing fetches so the twin recorder
-// links each twin-HTTP row back to the originating tool call. `tool` and
-// `query` are drop-in replacements for the upstream SDK exports — the
-// adapter just adds the signals layer. `createSdkMcpServer` is not part of
-// the adapter's surface; keep importing it from the SDK directly.
-import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
-import { query, tool, withPome } from "@pome-sh/adapter-claude-sdk";
+// This agent talks to the twin over plain HTTP (see TwinMcpClient below), so
+// capture happens at the twin: the recorder writes a TwinHttpEvent for every
+// request that reaches it. Nothing is instrumented agent-side.
+import { createSdkMcpServer, query, tool } from "@anthropic-ai/claude-agent-sdk";
 import { sign } from "hono/jwt";
 import { z } from "zod";
 
@@ -128,6 +121,11 @@ async function main() {
 
   const tools = buildTwinTools({ mcpUrl: MCP_URL, token });
   const server = createSdkMcpServer({ name: "github-twin", version: "0.1.0", tools });
+
+  // Positive-evidence marker `scripts/smoke-examples.mjs` classifies
+  // REACHED-OUTBOUND on, printed immediately before the first outbound (model)
+  // call. Gated so real users never see it.
+  if (process.env.POME_SMOKE_MARK_OUTBOUND === "1") console.error("POME_SMOKE_REACHED_OUTBOUND");
 
   const run = query({
     prompt: TASK,
@@ -475,8 +473,5 @@ const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolvePath(process.argv[1])) : "";
 
 if (ENTRY === SELF) {
-  // Install the pome fetch-hook only for a real run — keeps the module free of
-  // import-time side effects (the auth-token unit test imports it).
-  withPome();
   await main();
 }

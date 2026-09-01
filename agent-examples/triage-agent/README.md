@@ -305,5 +305,4 @@ prints on startup:
 - An **unknown id does not error** — the CLI silently falls back to its default.
 
 So don't trust the value you passed; trust the `model:` line, which reports what
-the SDK actually resolved (it's the same `message.model` that feeds the
-dashboard's gen_ai spans).
+the SDK actually resolved.

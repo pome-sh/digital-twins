@@ -26,20 +26,16 @@
  * So the two arms of this example are a naive agent and an informed one, not a
  * broken agent and a repaired one. `POME_TRIAGE_POLICY_HINT=on` is the fix.
  *
- * `query` comes from `@pome-sh/adapter-claude-sdk` rather than the raw SDK. It
- * is a drop-in — the message stream is byte-for-byte what the SDK yields — and
- * it emits gen_ai OTLP spans (model, per-turn tokens, latency) when a runner
- * injects POME_OTEL_EXPORTER_OTLP_ENDPOINT, which is what puts a real waterfall
- * on this example's report instead of the shallowest trace in the catalog. It is
- * inert with no endpoint set, so a standalone run is unaffected.
+ * The agent reaches the twins over MCP-over-HTTP (`mcpServers` below), so
+ * capture happens at the twin: the recorder writes a TwinHttpEvent for every
+ * request that reaches it. Nothing is instrumented agent-side.
  */
 
 import { realpathSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
-import { query } from "@pome-sh/adapter-claude-sdk";
+import { query, type McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 
 // ─── The one line under test ───────────────────────────────────────────────
 //
@@ -351,10 +347,7 @@ async function main() {
 
   // Positive-evidence marker `scripts/smoke-examples.mjs` classifies
   // REACHED-OUTBOUND on, printed immediately before this example's first
-  // outbound (model) call. This example pins the PUBLISHED
-  // `@pome-sh/adapter-claude-sdk` (it must stay `npx degit`-fetchable
-  // standalone), so the workspace `query()`'s own marker is NOT in the tarball
-  // it installs — the literal has to be here. Gated so real users never see it.
+  // outbound (model) call. Gated so real users never see it.
   if (process.env.POME_SMOKE_MARK_OUTBOUND === "1") console.error("POME_SMOKE_REACHED_OUTBOUND");
   const run = query({ prompt: wiring.task, options: examineeOptions(mcpServers) });
 
