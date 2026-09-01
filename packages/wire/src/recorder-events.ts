@@ -78,8 +78,8 @@ const recorderEventObjectSchema = z.object({
   task_step_id: z.string().min(1).nullable().optional(),
   scenario_step_id: z.string().min(1).nullable().optional(),
   step_id: z.string().nullable(),
-  // tool_call_id is set by the `@pome-sh/adapter-claude-sdk` adapter when active.
-  // Null for the heuristic-correlator path (no adapter signal available).
+  // tool_call_id is set when an agent stamps the correlation header on its twin
+  // requests. Null for the heuristic-correlator path (no correlation signal).
   tool_call_id: z.string().nullable(),
   method: z.string().min(1),
   path: z.string(),

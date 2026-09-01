@@ -74,10 +74,9 @@ return withCorrelation(id, () => handler(args));
 
 `readFrameworkToolCallId` is the only framework-shaped line, and it is all an
 adapter owns: the Claude Agent SDK puts the id on an MCP
-`_meta["claudecode/toolUseId"]` key (see
-[`packages/adapter-claude-sdk/src/wrapHandler.ts`](../adapter-claude-sdk/src/wrapHandler.ts)),
-the Vercel AI SDK exposes `toolCallId` on the tool-call part, LangGraph on the
-`ToolCall`. None of them needs to re-derive the store or the fetch patch.
+`_meta["claudecode/toolUseId"]` key, the Vercel AI SDK exposes `toolCallId` on
+the tool-call part, LangGraph on the `ToolCall`. None of them needs to re-derive
+the store or the fetch patch.
 
 Subpath-only, not on the root barrel: importing it constructs an
 `AsyncLocalStorage`, and no twin, the sdk or the CLI is the agent side of this

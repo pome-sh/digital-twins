@@ -29,7 +29,6 @@ packages/
   checks/             the check DSL and the twins' check declarations
   sandbox-domains/    the same twins with no server — domain object, SQLite
                       opener, seed parser, for reading state in-process
-  adapter-claude-sdk/ Claude Agent SDK correlation wrapper
 contract/             cross-package tests against a booted twin
 scripts/              build and CI gates
 skills/               Claude skills shipped as a plugin
@@ -137,7 +136,7 @@ that passed.
 
 | Package | Registry |
 |---|---|
-| `@pome-sh/cli`, `@pome-sh/adapter-claude-sdk` | npm, for end users |
+| `@pome-sh/cli` | npm, for end users |
 | `@pome-sh/checks`, `@pome-sh/sandbox-domains` | npm, consumed by our own services |
 | `@pome-sh/wire` | GitHub Packages, sibling repositories only |
 | `@pome-sh/sdk`, `@pome-sh/twin-*` | not published — `private: true`, bundled into the tarballs by tsup |

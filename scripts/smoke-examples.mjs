@@ -187,10 +187,7 @@ export function discoverExamples(dir = examplesDir) {
 export function assertEveryExampleEmitsMarker(dir, examples) {
   const missing = [];
   for (const name of examples) {
-    const pkgPath = join(dir, name, "package.json");
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-    if (adapterResolvesToWorkspace(deps) || sourceContainsMarker(join(dir, name, "src"))) continue;
+    if (sourceContainsMarker(join(dir, name, "src"))) continue;
     missing.push(name);
   }
   if (missing.length === 0) return { ok: true, message: null };
@@ -198,15 +195,9 @@ export function assertEveryExampleEmitsMarker(dir, examples) {
     ok: false,
     message:
       `${missing.length} example(s) have no route to emitting ${OUTBOUND_MARKER}: ${missing.join(", ")}. ` +
-      `Either depend on @pome-sh/adapter-claude-sdk (its query() emits the marker for you) or print the ` +
-      `literal "${OUTBOUND_MARKER}" yourself, gated on process.env.${MARK_OUTBOUND_ENV} === "1", ` +
+      `Print the literal "${OUTBOUND_MARKER}" yourself, gated on process.env.${MARK_OUTBOUND_ENV} === "1", ` +
       `immediately before this example's first outbound (twin or model) call.`,
   };
-}
-
-function adapterResolvesToWorkspace(deps) {
-  const pin = deps["@pome-sh/adapter-claude-sdk"];
-  return typeof pin === "string" && /^(?:file:|link:|\.\.?\/)/.test(pin);
 }
 
 const MARKER_EMISSION = new RegExp(`console\\.error\\(\\s*["'\`]${OUTBOUND_MARKER}["'\`]`);

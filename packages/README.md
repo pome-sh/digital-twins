@@ -48,8 +48,8 @@ at all). Adding a twin means updating those two alongside the registry.
 [`wire/`](./wire/) is the vocabulary every process in this repo agrees on for
 describing a run: Zod schemas and types for recorder events, the OpenTelemetry
 span extension of that union, and secret redaction. The CLI, the twin engine
-(`@pome-sh/sdk`), [`@pome-sh/adapter-claude-sdk`](./adapter-claude-sdk/), and
-three of the five twins (`twin-github`, `twin-slack`, `twin-stripe`) import
+(`@pome-sh/sdk`), and three of the five twins (`twin-github`, `twin-slack`,
+`twin-stripe`) import
 from it directly; `twin-gmail` and `twin-linear` only reach it transitively
 through `@pome-sh/sdk`. It's the one place a wire-shape change has to happen
 for every producer and consumer to see it consistently.
@@ -158,8 +158,8 @@ same reason in both.
 
 ## Private vs. published
 
-Four packages in this repo are published to **npm**: two for end users
-(`@pome-sh/cli`, `@pome-sh/adapter-claude-sdk`) and two for the cloud grader
+Three packages in this repo are published to **npm**: one for end users
+(`@pome-sh/cli`) and two for the cloud grader
 (`@pome-sh/checks`, `@pome-sh/sandbox-domains`). One (`@pome-sh/wire`) is published
 to **GitHub Packages** for internal cross-repo consumers as well as npm.
 Everything else under `packages/` is `private: true` and reaches users only as
@@ -171,20 +171,18 @@ ever.
 | [`checks/`](./checks/) | `@pome-sh/checks` | Grading vocabulary — the five twins' check declarations, seed schemas and default seeds, plus the check DSL | **Yes** — npm, for pome-cloud |
 | [`sandbox-domains/`](./sandbox-domains/) | `@pome-sh/sandbox-domains` | Grading runtime — the five twins' domain objects, SQLite openers and seed parsers, plus the tape-row wrapper | **Yes** — npm, for pome-cloud |
 | [`sdk/`](./sdk/) | `@pome-sh/sdk` | Twin engine — HTTP mount, auth, recorder, MCP dispatch, SQLite | No — bundled into `@pome-sh/cli` and `@pome-sh/sandbox-domains` |
-| [`wire/`](./wire/) | `@pome-sh/wire` | Trace surface — recorder-events, redaction, OTel schemas | **Both** — bundled into `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk`, *and* published to GitHub Packages (`npm.pkg.github.com`) for pome-cloud |
+| [`wire/`](./wire/) | `@pome-sh/wire` | Trace surface — recorder-events, redaction, OTel schemas | **Both** — bundled into `@pome-sh/cli`, *and* published to GitHub Packages (`npm.pkg.github.com`) for pome-cloud |
 | [`twin-github/`](./twin-github/), `twin-stripe/`, `twin-slack/`, `twin-gmail/`, `twin-linear/` | `@pome-sh/twin-*` | The five digital twins | No — bundled into `@pome-sh/cli`, `@pome-sh/checks` (declarations) and `@pome-sh/sandbox-domains` (domain layer); also published as signed GHCR container images for pome-cloud |
-| [`adapter-claude-sdk/`](./adapter-claude-sdk/) | `@pome-sh/adapter-claude-sdk` | Claude Agent SDK adapter for user agent code | **Yes** — npm |
 
 "Bundled" means tsup's `noExternal: [/^@pome-sh\//]` inlines the internal
 package's compiled output straight into the publishing package's own `dist/`
 at build time (`cli/tsup.config.ts`); the internal package never appears in the
 published `package.json`'s `dependencies` and is never fetched from the
 registry at install time. The end-user **`pome` CLI** itself lives at repo
-root [`cli/`](../cli/), not under `packages/` — it's the other npm-published
-package, alongside `@pome-sh/adapter-claude-sdk` here.
+root [`cli/`](../cli/), not under `packages/`.
 
 `@pome-sh/wire` is the only row that is both, and the distinction matters
-because the two paths never meet. `cli/` and `adapter-claude-sdk/` depend on it
+because the two paths never meet. `cli/` depends on it
 as a **devDependency** at `"*"` and tsup inlines it, so an end user's install
 graph contains no `@pome-sh/wire` at all — which is load-bearing, because the
 GitHub Packages copy requires a GitHub token even to read and would 401 for

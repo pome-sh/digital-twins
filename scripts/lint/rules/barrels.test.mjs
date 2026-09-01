@@ -18,7 +18,6 @@ const OTHERS = [
   "packages/twin-slack/src/domain/index.ts",
   "packages/twin-stripe/src/index.ts",
   "packages/twin-stripe/src/domain/index.ts",
-  "packages/adapter-claude-sdk/src/index.ts",
   "cli/src/contract/index.ts",
 ];
 

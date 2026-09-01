@@ -3,9 +3,9 @@
  * correlation — framework-agnostic per-tool-call trace correlation.
  *
  * The mechanism that lets a twin's `TwinHttpEvent` name the tool call that
- * caused it, with none of the agent framework's vocabulary in it. Extracted from
- * `@pome-sh/adapter-claude-sdk`, where only the `tool()` / `query()` wrapping
- * around it was ever Claude-specific.
+ * caused it, with none of the agent framework's vocabulary in it — so any
+ * framework's `tool()` / `query()` wrapping can reuse it without re-deriving the
+ * race-proof correlation.
  *
  * Three pieces:
  *   • `./context.ts` — the AsyncLocalStorage store (`withCorrelation`,

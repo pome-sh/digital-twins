@@ -78,8 +78,6 @@ describe("pome run — doctor preflight gate", () => {
   it("runs exactly as before on a correctly wired repo", async () => {
     const dir = await fixtureRepo(
       [
-        'import { withPome } from "@pome-sh/adapter-claude-sdk";',
-        "withPome();",
         "const baseUrl = process.env.POME_GITHUB_REST_URL;",
         "export { baseUrl };",
       ].join("\n"),

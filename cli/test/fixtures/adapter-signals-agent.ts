@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// E2E fixture. Mimics what `@pome-sh/adapter-claude-sdk`'s `withPome()` does for the
-// parts this test cares about: 1.
+// E2E fixture. Mimics an agent that writes M0 signal rows to
+// POME_ADAPTER_SIGNALS_PATH, for the parts this test cares about: 1.
 
 import { appendFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";

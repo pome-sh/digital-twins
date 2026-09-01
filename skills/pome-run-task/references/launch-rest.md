@@ -27,10 +27,9 @@ fix. There is no `--force`: a red check means do not launch.
 3. **routing** — the process reads its twin base URL from the injected env /
    `rest_urls`, and **no production-host literal survives in agent source** —
    even a `?? "https://api.github.com"` fallback is a twin bypass. (Loopback
-   fallbacks like `http://127.0.0.1:3333` are fine.) For a Claude Agent SDK
-   examinee this also means `withPome()` runs once at startup and `query`/`tool`
-   come from `@pome-sh/adapter-claude-sdk`; for other stacks the trace comes
-   from the twin side and routing is env alone.
+   fallbacks like `http://127.0.0.1:3333` are fine.) The trace comes from the
+   twin side and routing is env alone: the agent reads the injected `POME_*_URL`
+   and sends its requests there.
 4. **egress floor** — deny-by-default egress is intact: `POME_EGRESS_ALLOW`
    carries the twin patterns + loopback and **no `*` wildcard**. Never widen
    egress to make a check pass.

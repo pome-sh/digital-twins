@@ -4,7 +4,7 @@
 //
 // Finds hardcoded production API hosts (file:line) that would bypass the
 // POME_*_REST_URL env contract, and collects positive wiring evidence — a
-// POME_*_{REST,MCP}_URL / POME_*_API_BASE read or an adapter import. The
+// POME_*_{REST,MCP}_URL / POME_*_API_BASE read. The
 // dynamic proof that requests reach the twin is `pome run`'s recorded trace;
 // doctor stays fast, deterministic, and LLM-free, so its routing verdict is
 // "would this source bypass the twin", answered statically with a nameable
@@ -22,7 +22,6 @@ export interface HardcodedHostFinding {
 
 export interface WiringEvidence {
   envVar: string | null; // first POME_*_{REST,MCP}_URL / POME_*_API_BASE seen
-  adapterImport: boolean; // @pome-sh/adapter-* import or withPome() call
 }
 
 export interface ScanResult {
@@ -45,7 +44,6 @@ const PRODUCTION_HOSTS: ReadonlyArray<{ host: string; envVar: string }> = [
 ];
 
 const WIRING_ENV_REGEX = /POME_[A-Z0-9]+_(?:REST_URL|MCP_URL|API_BASE)/;
-const ADAPTER_REGEX = /@pome-sh\/adapter-|withPome\s*\(/;
 
 const CODE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 const SKIP_DIRS = new Set([
@@ -99,7 +97,7 @@ async function collectFiles(root: string): Promise<string[]> {
 export async function scanAgentSources(rootDir: string): Promise<ScanResult> {
   const files = await collectFiles(rootDir);
   let hardcoded: HardcodedHostFinding | null = null;
-  const wiring: WiringEvidence = { envVar: null, adapterImport: false };
+  const wiring: WiringEvidence = { envVar: null };
   let filesScanned = 0;
 
   for (const file of files) {
@@ -139,9 +137,6 @@ export async function scanAgentSources(rootDir: string): Promise<ScanResult> {
       if (wiring.envVar === null) {
         const match = WIRING_ENV_REGEX.exec(line);
         if (match) wiring.envVar = match[0];
-      }
-      if (!wiring.adapterImport && ADAPTER_REGEX.test(line)) {
-        wiring.adapterImport = true;
       }
     }
   }

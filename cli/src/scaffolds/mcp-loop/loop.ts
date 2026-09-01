@@ -16,8 +16,8 @@
 //
 // Trace signals (best-effort, NOT analyzed in v1): when POME_ADAPTER_SIGNALS_PATH
 // is set, the loop appends ToolUseEvent / ToolResultEvent rows whose on-disk
-// shape is isomorphic with @pome-sh/adapter-claude-sdk's signals.ts, so traces
-// stay comparable across scaffolds and v2's explanation layer inherits them.
+// shape matches the M0 event schema in @pome-sh/wire, so traces stay comparable
+// across scaffolds and v2's explanation layer inherits them.
 import { appendFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import {
@@ -159,10 +159,10 @@ export function createHttpMcpClient(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// Best-effort trace signals (isomorphic with @pome-sh/adapter-claude-sdk).
+// Best-effort trace signals (M0 event rows for POME_ADAPTER_SIGNALS_PATH).
 // ---------------------------------------------------------------------------
 
-// Hand-built JSON-line rows matching the adapter's on-disk shapes (no
+// Hand-built JSON-line rows matching the M0 event shapes in @pome-sh/wire (no
 // @pome-sh/wire runtime dep). The CLI runner merges this file into the canonical
 // events.jsonl after the subprocess exits.
 function emitToolUse(

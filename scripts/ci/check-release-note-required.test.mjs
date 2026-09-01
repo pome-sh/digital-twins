@@ -86,8 +86,8 @@ console.log("check-release-note-required.mjs — publish relevance (inherited)")
 }
 
 {
-  const r = run({ changes: { "packages/adapter-claude-sdk/test/spans.test.ts": "// test\n" } });
-  check("test-only change in the adapter needs no entry", r.status === 0, r.out);
+  const r = run({ changes: { "packages/checks/test/spans.test.ts": "// test\n" } });
+  check("test-only change in a package needs no entry", r.status === 0, r.out);
 }
 
 {
@@ -244,19 +244,17 @@ console.log("the coupling: one change, several artifacts");
     (pkg) => pkg.name,
   );
   check(
-    "a wire src change demands an entry from wire, the CLI and the adapter",
+    "a wire src change demands an entry from wire and the CLI",
     r.status === 1 &&
-      named.length === 3 &&
-      ["@pome-sh/wire", "@pome-sh/cli", "@pome-sh/adapter-claude-sdk"].every((name) =>
-        named.includes(name),
-      ),
+      named.length === 2 &&
+      ["@pome-sh/wire", "@pome-sh/cli"].every((name) => named.includes(name)),
     `named: ${named.join(", ") || "none"}\n${r.out}`,
   );
   const all = run({
     changes: { "packages/wire/src/thing.ts": "export const a = 1;\n" },
     entries: named,
   });
-  check("…and passes once all three carry one", all.status === 0, all.out);
+  check("…and passes once both carry one", all.status === 0, all.out);
 }
 
 {

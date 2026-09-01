@@ -9,8 +9,6 @@ import { describe, expect, it } from "vitest";
 import { runDoctorChecks } from "../../../src/doctor/checks.js";
 
 const WIRED_AGENT = [
-  'import { withPome } from "@pome-sh/adapter-claude-sdk";',
-  "withPome();",
   'const baseUrl = process.env.POME_GITHUB_REST_URL ?? "http://127.0.0.1:3333";',
   "export { baseUrl };",
 ].join("\n");
@@ -100,7 +98,7 @@ describe("runDoctorChecks", () => {
     expect(report.ok).toBe(false);
     const routing = report.checks.at(-1)!;
     expect(routing).toMatchObject({ id: "routing", status: "fail" });
-    expect(routing.fix).toContain("withPome");
+    expect(routing.fix).toContain("POME_GITHUB_REST_URL");
   }, 30_000);
 
   it("skips the local twin boot in hosted mode but still gates config/routing/egress", async () => {

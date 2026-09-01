@@ -289,12 +289,12 @@ console.log("four consecutive failed runs on one day, replayed");
     root: historical(
       [
         `scripts/ci/decide-publish.sh "@pome-sh/cli" "cli/package.json" "cli"`,
-        `scripts/ci/decide-publish.sh "@pome-sh/adapter-claude-sdk" "packages/adapter-claude-sdk/package.json" "adapter"`,
+        `scripts/ci/decide-publish.sh "@pome-sh/sandbox-domains" "packages/sandbox-domains/package.json" "sandboxDomains"`,
         `scripts/ci/decide-publish.sh "@pome-sh/wire" "packages/wire/package.json" "wire" "${GH_PACKAGES}"`,
       ].join("\n"),
       {
         "cli/package.json": "0.21.8",
-        "packages/adapter-claude-sdk/package.json": "0.3.3",
+        "packages/sandbox-domains/package.json": "0.3.3",
         "packages/wire/package.json": "0.2.1",
       },
     ),
@@ -316,7 +316,7 @@ console.log("four consecutive failed runs on one day, replayed");
     readVersion: (name) =>
       ({
         "@pome-sh/cli": { version: "0.21.8" },
-        "@pome-sh/adapter-claude-sdk": { version: "0.3.1" },
+        "@pome-sh/sandbox-domains": { version: "0.3.1" },
         "@pome-sh/wire": { version: "0.2.1" },
       })[name],
   });
@@ -327,7 +327,7 @@ console.log("four consecutive failed runs on one day, replayed");
   );
   check_(
     "names the package the publish job actually failed on",
-    early.alarms.some((a) => a.startsWith("UNPUBLISHED") && a.includes("@pome-sh/adapter-claude-sdk 0.3.3")),
+    early.alarms.some((a) => a.startsWith("UNPUBLISHED") && a.includes("@pome-sh/sandbox-domains 0.3.3")),
     early.alarms.join("\n"),
   );
   check_(
@@ -347,7 +347,6 @@ console.log("four consecutive failed runs on one day, replayed");
       readFileSync(join(ROOT, ".github/workflows/release.yml"), "utf8"),
       {
         "cli/package.json": "0.21.9",
-        "packages/adapter-claude-sdk/package.json": "0.3.3",
         "packages/checks/package.json": "0.1.0",
         "packages/wire/package.json": "0.2.1",
       },
@@ -371,7 +370,6 @@ console.log("four consecutive failed runs on one day, replayed");
         ? { version: "0.2.1" }
         : {
             "@pome-sh/cli": { version: "0.21.9" },
-            "@pome-sh/adapter-claude-sdk": { version: "0.3.1" },
             "@pome-sh/checks": { version: "0.0.0", unpublished: true },
             "@pome-sh/wire": { version: "0.0.0", unpublished: true },
           }[name] ?? { version: "1.0.0" },
@@ -379,9 +377,9 @@ console.log("four consecutive failed runs on one day, replayed");
   });
   const unpublished = late.alarms.filter((a) => a.startsWith("UNPUBLISHED"));
   check_(
-    "names exactly the three packages whose publish jobs failed at 11:28",
-    unpublished.length === 3 &&
-      ["@pome-sh/adapter-claude-sdk", "@pome-sh/checks", "@pome-sh/wire"].every((p) =>
+    "names exactly the two packages whose publish jobs failed at 11:28",
+    unpublished.length === 2 &&
+      ["@pome-sh/checks", "@pome-sh/wire"].every((p) =>
         unpublished.some((a) => a.includes(p)),
       ),
     unpublished.join("\n"),
