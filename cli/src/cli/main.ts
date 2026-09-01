@@ -166,7 +166,7 @@ export function createProgram() {
   program
     .name("pome")
     .description(
-      "Test AI agents against digital twins of real SaaS APIs. Runs are recorded to app.pome.sh. Start with `pome demo`.",
+      "Test AI agents against digital twins of real SaaS APIs. Runs are recorded to app.pome.sh. Start with `pome init`.",
     )
     .version(PACKAGE_VERSION)
     .showHelpAfterError("(add --help for usage)");
@@ -1030,51 +1030,6 @@ export function createProgram() {
         process.exitCode = worstExit;
       }
     );
-
-  program
-    .command("demo")
-    .summary("Run a sample task, no account needed")
-    .description(
-      "Zero-auth first-run demo: boots a local GitHub twin, runs the bundled demo agent for 5 isolated trials (model calls via pome's anonymous demo gateway), and prints per-trial verdicts evaluated in Pome cloud. No signup, no API keys; ends with a no-login preview link.",
-    )
-    .option(
-      "--trials <n>",
-      "Number of trials to run, 1 to 10",
-      "5",
-    )
-    .action(
-      async (opts: { trials: string }, cmd: Command) => {
-        const trials = Number.parseInt(opts.trials, 10);
-        if (!Number.isInteger(trials) || trials < 1 || trials > 10) {
-          console.error(`Invalid --trials "${opts.trials}" (expected 1-10).`);
-          process.exitCode = 5;
-          return;
-        }
-        // Dynamic import mirrors doctor/install: keep the demo dependency
-        // graph out of every other command's startup path.
-        const { runDemo } = await import("../demo/runDemo.js");
-        const result = await runDemo({
-          apiBase: globals(cmd).apiUrl.replace(/\/$/, ""),
-          dashboardBase:
-            process.env.POME_DASHBOARD_URL ?? DEFAULT_DASHBOARD_URL,
-          trials,
-          artifactsDir: globals(cmd).artifactsDir,
-        });
-        process.exitCode = result.exitCode;
-      },
-    );
-
-  // Hidden: the bundled demo agent `pome demo` spawns as its trial child
-  // through the real capture path. Reads the POME_* env contract
-  // injected by runTask plus POME_DEMO_* gateway coordinates.
-  program
-    .command("demo-agent", { hidden: true })
-    .description("Internal: the bundled demo agent process (spawned by `pome demo`).")
-    .action(async () => {
-      const { runDemoAgentCommand } = await import("../demo/agent.js");
-      const code = await runDemoAgentCommand();
-      if (code !== 0) process.exitCode = code;
-    });
 
   program
     .command("doctor")
