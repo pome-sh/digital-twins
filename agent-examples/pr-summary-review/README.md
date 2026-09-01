@@ -119,8 +119,6 @@ All optional. Defaults match `npx @pome-sh/cli twin start github`.
 | `INFISICAL_ENV` | `dev` | Infisical environment slug for the key lookup. |
 | `INFISICAL_PROJECT_ID` | — | Infisical project ID (if not inferred from `.infisical.json`). |
 | `POME_INFISICAL_SECRET_NAME` | `ANTHROPIC_API_KEY` | Secret name to fetch from Infisical. |
-| `POME_OTEL_EXPORTER_OTLP_ENDPOINT` | — | Session-scoped OTLP/JSON traces endpoint for agent telemetry (per-task tokens/latency/errors on the dashboard). Set by hosted `pome run`; `withPome()` emits `gen_ai` spans here. When unset, telemetry stays off. |
-| `POME_OTEL_EXPORTER_OTLP_HEADERS` | — | OTLP request headers (the `x-api-key=<team key>` auth that the session traces endpoint accepts), `key=value,…` format. Set by hosted `pome run`. |
 | `POME_GITHUB_MCP_URL` | `http://127.0.0.1:3333/s/standalone/mcp` | Twin MCP endpoint. Pome CLI sets this automatically. |
 | `POME_AUTH_TOKEN` | — | Pre-minted bearer JWT. `pome twin start` prints one; Pome CLI sets it automatically. When unset, the agent mints its own from `TWIN_AUTH_SECRET`. |
 | `POME_TASK` | bundled summarize+review prompt | Override the agent's task. Pome CLI sets this from the task file. |

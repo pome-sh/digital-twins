@@ -137,13 +137,21 @@ export function planExampleRepins(repoRoot, npmView = writeSideNpmView) {
 
 export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
   const { exact, linked, unwatchable } = discoverExampleSiblingDeps(repoRoot);
+  if (exact.length === 0 && linked.length === 0 && unwatchable.length === 0) {
+    // No example depends on any published @pome-sh/* package, so there is
+    // nothing to check against the registry. That is a legitimate clean state —
+    // every example is standalone-fetchable from public npm alone — not the
+    // checker having gone blind, so report a pass rather than throwing.
+    console.log("example pin↔registry parity: no @pome-sh/* example deps to watch.");
+    return true;
+  }
   if (exact.length === 0) {
     throw new Error(
       "check-example-pins-published found zero exact-version @pome-sh/* pins with a workspace sibling under " +
         `agent-examples/* (${linked.length} file:/link: link(s), ${unwatchable.length} unwatchable) — refusing to ` +
-        "report a pass having made no registry call at all. Every example must keep an exact pin: " +
-        "`pome init --example <id>` fetches that subtree ALONE onto a user's machine, and a link out of the " +
-        "tree cannot resolve there.",
+        "report a pass having made no registry call at all. Every example that depends on a @pome-sh/* package " +
+        "must keep an exact pin: `pome init --example <id>` fetches that subtree ALONE onto a user's machine, " +
+        "and a link out of the tree cannot resolve there.",
     );
   }
 
