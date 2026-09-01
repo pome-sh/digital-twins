@@ -60,10 +60,6 @@ import {
 import { normalizeRegisterTwins, runRegisterAgent } from "./register.js";
 import { resolvePackageRoot } from "./resolve-package-root.js";
 import {
-  ClaudeManagedDeferredError,
-  writeSdkScaffold,
-} from "./init-sdk.js";
-import {
   ExampleScaffoldError,
   exampleIds,
   scaffoldExample,
@@ -178,10 +174,6 @@ export function createProgram() {
       "Create pome.json, plus starter files in a new project — or, with --example <id>, fetch a complete runnable example into ./<id>",
     )
     .option(
-      "--sdk <name>",
-      "Scaffold for a specific agent SDK (claude | claude-managed). Adds the SDK-specific example file and pre-fills agent.framework so the dashboard badges runs correctly.",
-    )
-    .option(
       "--bare",
       "Write only the manifest — skip the starter task library and sample agents. Auto-selected when the current directory already has a package.json (the bring-your-own-agent case).",
     )
@@ -193,9 +185,7 @@ export function createProgram() {
       "--example <id>",
       `Scaffold a complete bundled example into ./<id> instead of a starter project. Ids: ${exampleIds().join(", ")}.`,
     )
-    .action(async (opts: { sdk?: string; bare?: boolean; starter?: boolean; example?: string }) => {
-      const sdk = opts.sdk?.trim();
-
+    .action(async (opts: { bare?: boolean; starter?: boolean; example?: string }) => {
       // `--example` fetches a whole standalone package — its own pome.json,
       // lockfile, tasks and agent. Combining it with a flag that shapes the
       // starter scaffold would write a competing manifest in the cwd next to
@@ -203,7 +193,7 @@ export function createProgram() {
       // layered.
       const exampleId = opts.example?.trim();
       if (exampleId !== undefined) {
-        const conflicting = (["sdk", "bare", "starter"] as const).filter(
+        const conflicting = (["bare", "starter"] as const).filter(
           (flag) => opts[flag] !== undefined && opts[flag] !== false,
         );
         if (conflicting.length > 0) {
@@ -230,22 +220,6 @@ export function createProgram() {
         return;
       }
 
-      if (
-        sdk !== undefined &&
-        sdk !== "claude" &&
-        sdk !== "claude-managed"
-      ) {
-        console.error(
-          `Unknown --sdk value "${opts.sdk}". Supported: claude, claude-managed.`,
-        );
-        process.exitCode = 2;
-        return;
-      }
-      if (sdk === "claude-managed") {
-        console.error(new ClaudeManagedDeferredError().message);
-        process.exitCode = 2;
-        return;
-      }
       if (opts.bare && opts.starter) {
         console.error("Pass at most one of --bare / --starter.");
         process.exitCode = 2;
@@ -272,10 +246,9 @@ export function createProgram() {
 
       // Bare mode omits `command`: the BYO user launches their own agent, so a
       // default pointer at an unscaffolded examples/agents/... file would be a
-      // broken instruction. --sdk still writes a real file and sets command.
-      let command: string | undefined = bare ? undefined : DEFAULT_AGENT_COMMAND;
-      let framework: string | undefined;
-      let postInitMessage = bare
+      // broken instruction.
+      const command: string | undefined = bare ? undefined : DEFAULT_AGENT_COMMAND;
+      const postInitMessage = bare
         ? "Pome initialized (existing project — starter library skipped).\n" +
           "Next steps:\n" +
           '  1. Set "command" in pome.json to your agent\'s launch command\n' +
@@ -285,7 +258,6 @@ export function createProgram() {
           "\n" +
           "Optional follow-ups:\n" +
           "  - pome tasks github --copy       # drop the starter task library into tasks/\n" +
-          "  - pome init --sdk claude         # scaffold a Claude Agent SDK starter\n" +
           "\n" +
           "See `pome docs getting-started` for a narrative walkthrough."
         : "Pome initialized.\n" +
@@ -295,19 +267,9 @@ export function createProgram() {
           "  3. pome run tasks/01-bug-happy-path.md\n" +
           "\n" +
           "Optional follow-ups:\n" +
-          "  - pome init --sdk claude         # scaffold a Claude Agent SDK starter\n" +
           "  - pome tasks stripe --copy       # add Stripe payment tasks when needed\n" +
           "\n" +
           "See `pome docs getting-started` for a narrative walkthrough.";
-
-      if (sdk) {
-        const scaffold = await writeSdkScaffold(sdk);
-        command = scaffold.agentCommand;
-        framework = scaffold.agentSdkValue;
-        postInitMessage =
-          `Pome initialized with --sdk ${sdk}. Scaffolded ${scaffold.exampleAgentRelativePath}.\n` +
-          scaffold.postInstallHint;
-      }
 
       // Point the manifest at an existing task directory so bare `pome run`
       // resolves it. The starter path always creates tasks/; bare mode
@@ -322,7 +284,6 @@ export function createProgram() {
       if (!existing) {
         const slug = deriveAgentSlug(basename(process.cwd())) || "my-agent";
         const agent: Record<string, unknown> = { slug };
-        if (framework) agent.framework = framework;
         const manifest: Record<string, unknown> = {
           $schema: MANIFEST_SCHEMA_URL,
           agent,
@@ -332,18 +293,6 @@ export function createProgram() {
         manifest.artifacts_dir = "runs";
         manifest.pass_threshold = 100;
         await writeManifest(join(process.cwd(), MANIFEST_JSON), "json", manifest);
-      } else if (sdk) {
-        const priorAgent =
-          typeof existing.raw.agent === "object" && existing.raw.agent !== null
-            ? (existing.raw.agent as Record<string, unknown>)
-            : {};
-        const nextAgent = { ...priorAgent };
-        if (framework) nextAgent.framework = framework;
-        await writeManifest(existing.path, existing.format, {
-          ...existing.raw,
-          agent: nextAgent,
-          command,
-        });
       }
       console.error(postInitMessage);
     });

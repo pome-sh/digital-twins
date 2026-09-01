@@ -252,7 +252,7 @@ describe("pome init --example <id>", () => {
     expect(readFileSync(join(dir, "merge-agent", "notes.md"), "utf8")).toBe("mine\n");
   });
 
-  it.each(["--sdk claude", "--bare", "--starter"])(
+  it.each(["--bare", "--starter"])(
     "refuses to combine --example with %s",
     async (flag) => {
       await tempProject();
