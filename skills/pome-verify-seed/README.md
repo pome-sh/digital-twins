@@ -1,40 +1,36 @@
-# pome-verify-seed — coach Skill 2
+# pome-verify-seed
 
-Verify a task's seed is a fair exam before any run: `verify_seed` +
-guard-aware triage, state-diff review, `evaluate_criteria` dry-run, and an
-opt-in live probe session. The skill itself is [`SKILL.md`](./SKILL.md); the
-expanded checklist is
-[`references/seed-fidelity-checklist.md`](./references/seed-fidelity-checklist.md).
+## Purpose
 
-## Layout
+This skill checks whether a task seed creates a valid, consistent, and useful initial state.
 
-One authored source per skill — this directory. Nothing is generated from it.
+## When to use
 
-```
-pome-verify-seed/
-├── SKILL.md      # the skill (frontmatter + instructions, <100 lines)
-├── references/   # seed-fidelity-checklist.md — loaded on demand, not inlined
-└── README.md     # this file
-```
+Use this skill before the first run of a new or changed task.
 
-## Install
+Use it again after any seed or deterministic-criterion change.
 
-Part of the coach set — install the whole set with one command (see
-[`skills/README.md`](../README.md)); `references/` ships with the skill so the
-one-level-deep link resolves:
+## Inputs
 
-```bash
-npx skills add pome-sh/digital-twins --skill '*'
-```
+- A task identifier or complete task source.
+- The task prompt, criteria, configuration, and seed.
+- Optional access to a live Pome sandbox for read-only inspection.
 
-Requires the Pome control MCP connection (`claude mcp add --transport http pome
-https://mcp.pome.sh/mcp`) so the `mcp__pome__*` tools resolve.
+## Outputs
 
-## Test evidence
+- A seed verdict with supporting reasons.
+- The initial status of each deterministic criterion.
+- Seed-to-prompt consistency findings.
+- Required seed or criterion corrections.
 
-The fixture matrix (healthy-blocking / broken-all-pass / no-seed-state task
-markdowns) and the kept e2e transcripts are historical evidence and stay in the
-pome-cloud repo (`apps/docs/docs/skills/pome-verify-seed/{fixtures,e2e}/`). The
-false-`BROKEN` behavior the first fixture exercises is the cold-start field
-report §7 finding ("`verify_seed` cries wolf on every blocking task") —
-the skill triages by criterion intent instead of trusting the verdict.
+## Basic use path
+
+1. Validate the task grammar.
+2. Run `pome checks lint <task-file>` for local task files.
+3. Call `verify_seed` for the initial criterion results.
+4. Call `evaluate_criteria` for deterministic evaluation details.
+5. Compare the seed with every prompt claim.
+6. Correct each invalid reference or pre-satisfied positive criterion.
+7. Repeat the checks after each correction.
+
+See [`references/seed-fidelity-checklist.md`](./references/seed-fidelity-checklist.md) for the full checklist.

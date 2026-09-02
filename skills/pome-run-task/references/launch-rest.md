@@ -1,66 +1,58 @@
-# Launcher — REST examinee (Skill 4 reference)
+# Launch a REST agent
 
-The runtime-specific seam for a **non-managed** examinee
-(`examinee_launch.transport: "rest"`): a self-hosted agent process that talks to
-the twins over plain REST instead of MCP. This is the path Gagan's
-`minimal-viktor` took (scored 100/100 pre-A3). Same contract, no `ant`, no vault.
-Assemble from the spec, run the process on the kickoff task, watch for idle, then
-return to SKILL.md §3 to `finalize_run` while the twin session is live.
+Use this procedure when `examinee_launch.transport` is `rest`.
 
-The spec still owns policy — you execute it. Field names are verbatim from
-`examinee_launch`.
+## Inputs
 
-## 0. Preflight the wiring (before you launch)
+- `examinee_task.prompt`
+- `examinee_launch.rest_urls`
+- `examinee_launch.env`
+- `examinee_launch.initial_events`, when present
+- The Pome `session_id`
 
-A REST examinee is a repo you run yourself, so its wiring is yours to get right:
-if the process reaches a real API instead of the twin, the run is silently
-worthless — it tested nothing and may have touched production. Validate the
-wiring **before** you start the process, the same four checks `pome doctor`
-runs, **in order, stopping at the first failure** with one named cause + one
-fix. There is no `--force`: a red check means do not launch.
+Treat `POME_AUTH_TOKEN` and `agent_token` as credentials. Do not write either value to a file or log.
 
-1. **config** — the examinee repo has a valid `pome.json` manifest with a real
-   `agent.command` (not the scaffold default).
-2. **twin reachable** — the twin the task needs is up and answering:
-   `examinee_launch.rest_urls[<twin>]` (and the bearer-authed session route)
-   respond, not a connection refusal.
-3. **routing** — the process reads its twin base URL from the injected env /
-   `rest_urls`, and **no production-host literal survives in agent source** —
-   even a `?? "https://api.github.com"` fallback is a twin bypass. (Loopback
-   fallbacks like `http://127.0.0.1:3333` are fine.) The trace comes from the
-   twin side and routing is env alone: the agent reads the injected `POME_*_URL`
-   and sends its requests there.
-4. **egress floor** — deny-by-default egress is intact: `POME_EGRESS_ALLOW`
-   carries the twin patterns + loopback and **no `*` wildcard**. Never widen
-   egress to make a check pass.
+## Check the project
 
-If the examinee repo has the pome CLI installed, just run `pome doctor` in it —
-it executes exactly these checks and exits non-zero on the first failure, with
-the cause (`file:line` where knowable) and the fix. Otherwise reason through the
-four above. Only once the wiring is green do you map the spec and launch.
+1. Run `pome doctor` in the agent project.
+2. Correct each manifest, routing, or egress failure.
+3. Do not use a wildcard in `POME_EGRESS_ALLOW`.
+4. Confirm that the agent reads `POME_<TWIN>_REST_URL` or another returned URL field.
+5. Remove production API base URLs that bypass the returned twin URL.
 
-## Map the spec into the process
+`pome doctor` boots a temporary local GitHub twin during its full check. It does not validate every hosted URL.
 
-| `examinee_launch` field | Becomes, for the REST examinee |
+## Map launch data
+
+| Launch data | Process configuration |
 | --- | --- |
-| `rest_urls` `{ <twin>: <url> }` | the base URL the process calls per twin (`<twinsBase>/<twin>/s/<sid>`) — the github twin speaks GitHub-REST shapes, the slack twin Slack-Web method names with **no `/api` prefix** |
-| `env.POME_GITHUB_REST_URL` / `env.POME_SLACK_REST_URL` | the same per-twin bases as environment variables, if the process reads config from env |
-| `env.POME_AUTH_TOKEN` (= `agent_token`) | the bearer for every twin call — `Authorization: Bearer <token>`. **SENSITIVE**: inject it into the process env for this run only, never write it to a file or bake it into the agent |
-| `network` clamp / closed-book (D10) | you own egress here — give the process **no** `web_search` / `web_fetch` and no general internet; it should reach only the twin URLs, matching the seeded world |
-| `initial_events` | feed them to the process verbatim if it is an ambient/deployment-kickoff agent |
+| `rest_urls.<twin>` | Base URL for that twin. |
+| `env.POME_<TWIN>_REST_URL` | Base URL when the agent reads process variables. |
+| `env.POME_AUTH_TOKEN` | Bearer token for twin requests. |
+| `initial_events` | Initial input for an event-driven agent. |
+| `examinee_task.prompt` | Task input for the agent. |
 
-There is no `mcp_permission_policy` concern on this path — REST has no
-tool-confirmation handshake, so the confirmation deadlock does not apply.
+The CLI also uses `POME_TASK`, `POME_TWIN_NAMES`, and per-twin MCP URL variables during normal runs.
 
-## Run and detect idle
+Do not add `/api` to a Slack twin base URL. Slack routes use method paths such as `/conversations.list`.
 
-1. Point the process's twin/tool endpoints at `rest_urls` (or inject the `env`
-   vars), with `POME_AUTH_TOKEN` as the bearer.
-2. Start it on the kickoff task = `examinee_task.prompt` (plus `initial_events`
-   if applicable).
-3. **Idle** = the process has finished the task and stopped calling the twins
-   (it exits, or blocks with no further requests). Detection is process-level:
-   watch the process, or the twin request stream going quiet.
-4. The instant it idles, go to **SKILL.md §3**: `finalize_run(session_id)` on
-   the Pome `session_id`, while the twin sandbox is still up.
-   Do not shut the twins down first — a late finalize loses the tape.
+## Launch
+
+1. Create a clean process environment for this run.
+2. Copy the returned `env` entries into that process environment.
+3. Set each agent API client to its returned twin base URL.
+4. Restrict network access to the allowed hosts in the launch data.
+5. Disable unrelated internet tools when the launch data requires closed-book operation.
+6. Deliver `initial_events` without changes when the field is present.
+7. Start the agent with `examinee_task.prompt`.
+
+## Detect completion
+
+Treat the agent as idle only when it has completed the task and stopped making twin calls.
+
+1. Monitor the process and its twin requests.
+2. Stop waiting when the process exits successfully or waits for new input.
+3. Call `finalize_run(session_id)` immediately.
+4. Finalize before you stop any associated sandbox.
+
+Output: Control returns to `pome-run-task` with a finalized Pome run.

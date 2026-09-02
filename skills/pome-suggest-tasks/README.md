@@ -1,39 +1,34 @@
-# pome-suggest-tasks — coach own-agent front door
+# pome-suggest-tasks
 
-Propose a builder's first Pome task by reading their already-registered agent:
-read `pome.json` (`twins`) + the agent's prompt/code, propose 2–3 grounded
-candidates, interview to pick one, then hand to `pome-author-task`. The skill
-itself is [`SKILL.md`](./SKILL.md); the one-session chain it fronts is
-[`references/cold-walk.md`](./references/cold-walk.md).
+## Purpose
 
-## Layout
+This skill proposes test tasks from a local agent's tools, prompt, source code, and configured twins.
 
-One authored source per skill — this directory. Nothing is generated from it.
+## When to use
 
-```
-pome-suggest-tasks/
-├── SKILL.md      # the skill (frontmatter + instructions, <100 lines)
-├── references/   # cold-walk.md — the six-step chain, loaded on demand
-└── README.md     # this file
-```
+Use this skill after registration when the project has no suitable task.
 
-## Role
+## Inputs
 
-Runs after registration, before Skill 1 (`pome-author-task`) — the
-own-agent parallel to `pome-intake` (Skill 0, for managed agents). It closes the
-M2 "users don't know how to write tasks" gap by **proposing** tasks grounded in
-what the agent actually does, not by docs. It authors nothing itself: it
-produces one chosen candidate and hands off to the authoring chain.
+- A valid `pome.json` manifest.
+- The agent command, prompt, tools, and relevant source code.
+- The twins that the task can use.
+- Existing local or team tasks, when available.
 
-## Install
+If the manifest has no `twins` field, specify the twins before task selection.
 
-Part of the coach set — install the whole set with one command (see
-[`skills/README.md`](../README.md)); `references/` ships with the skill so the
-one-level-deep link resolves:
+## Outputs
 
-```bash
-npx skills add pome-sh/digital-twins --skill '*'
-```
+- Two or three task candidates.
+- The risk, target twin, and expected end state for each candidate.
+- One selected candidate for `pome-author-task`.
 
-Requires the Pome control MCP connection (`claude mcp add --transport http pome
-https://mcp.pome.sh/mcp`) so the `mcp__pome__*` tools resolve.
+## Basic use path
+
+1. Register the local project with `pome register agent <name>`.
+2. Ask for task suggestions.
+3. Let the skill inspect the manifest and agent source.
+4. Select or revise one candidate.
+5. Continue with `pome-author-task`.
+
+See [`references/cold-walk.md`](./references/cold-walk.md) for the full path.

@@ -1,71 +1,62 @@
-# Launcher — Claude managed agent (Skill 4 reference)
+# Launch a managed agent
 
-The runtime-specific seam for a **Claude managed agent** examinee
-(`examinee_launch.transport: "mcp"`): assemble the clone on Anthropic's Managed
-Agents cloud with the `ant` CLI, start it on the kickoff task, watch for idle,
-then return to SKILL.md §3 to `finalize_run` while the twin session is still
-live. Adding a platform means adding a sibling file like this one — never editing
-the pipeline (ADR-018).
+Use this procedure when `examinee_launch.transport` is `mcp` and the runtime uses Anthropic Managed Agents.
 
-Field names below are verbatim from `run_task`'s `examinee_launch` (Tool
-Contract v0.3, as-shipped); where this prose and the live spec disagree, the spec
-wins. Exact `ant` flags come from `ant --help` / the Managed Agents docs — this
-reference fixes the **mapping and the order**, not CLI syntax.
+## Requirements
 
-Requires `ant` authenticated (`brew install anthropics/tap/ant && ant auth
-login`). No `ant` → you cannot launch a managed-agent
-examinee; either authenticate or run the examinee yourself and use the REST path.
+- Install the `ant` CLI with `brew install anthropics/tap/ant`.
+- Authenticate with `ant auth login`.
+- Read current command syntax from `ant --help`.
 
-## The spec drives everything — map it, don't invent it
+This reference defines the required mapping. The installed `ant` version defines its exact flags.
 
-| `examinee_launch` field | Becomes, on Managed Agents |
+## Inputs
+
+- The agent model and instructions.
+- `examinee_task.prompt`.
+- The complete `examinee_launch` object.
+- The Pome `session_id`.
+
+Treat each `mcp_servers[].bearer` value as a credential. Store it only in the managed credential store.
+
+## Map launch data
+
+| `examinee_launch` field | Managed-agent configuration |
 | --- | --- |
-| `network: { mode: "limited", allowed_hosts }` | the **environment**'s network clamp: limited egress, `allowed_hosts` copied verbatim (only the twin host) |
-| `env_packages` | the environment's packages, verbatim |
-| `mcp_servers[]` `{ name, url, bearer }` | one **mcp_toolset** per entry — `mcp_server_name` = `name`, server `url` = `url` (the per-session twin route, unchanged) |
-| `mcp_permission_policy: { type: "always_allow" }` | `permission_policy` on **every** mcp_toolset (see below — this is not optional) |
-| `known_network_clamp_bypass` / `hermetic: false` | **disable `web_search` and `web_fetch`** on the agent — closed-book (D10). They egress past the clamp untaped; the spec flags that they are *not* auto-stripped, so you strip them |
-| `mcp_servers[].bearer` (= `agent_token`) | a **vault** `static_bearer` credential bound to each twin URL — SENSITIVE, lives in the vault, never inline in the agent def and never on disk |
-| `memory_policy` + `initial_events` | memory store attached as a **snapshot-clone per run** (D9 — never the production store); `initial_events` become the session's `initial_events`, verbatim |
-| `instructions` | the coach's assembly instructions — follow them; they restate always_allow / closed-book so a drifting reader still gets it right |
+| `network` | Runtime network policy and allowed hosts. |
+| `env_packages` | Runtime packages. |
+| `mcp_servers[]` | One MCP tool set for each entry. |
+| `mcp_permission_policy` | Permission policy for every Pome MCP tool set. |
+| `mcp_servers[].bearer` | Managed bearer credential bound to the matching server URL. |
+| `memory_policy` | Per-run memory configuration. Do not attach production memory. |
+| `initial_events` | Session initial events. Preserve order and content. |
+| `instructions` | Additional assembly instructions from the launch response. |
 
-Model comes from intake (the agent's real model, e.g. `opus-4-8`), not from the
-spec. `examinee_task.prompt` is the kickoff message.
+Do not infer omitted policy. Follow the returned launch data.
 
-## Assembly order
+## Create the runtime
 
-1. **Environment** — `ant beta:environments create`: `network.mode: limited`,
-   `allowed_hosts` = `examinee_launch.network.allowed_hosts`, packages =
-   `env_packages`. Pome already computed the clamp; you copy it.
-2. **Vault** — create `static_bearer` credentials, one per twin URL, value =
-   that server's `bearer`. Bind by URL so each mcp_toolset resolves its own
-   token. The bearer never appears in the agent definition or a file.
-3. **Agent clone** — `ant beta:agents create`: the intake model; one
-   `mcp_toolset` per `mcp_servers[]` entry with `permission_policy` set to
-   `examinee_launch.mcp_permission_policy` (`always_allow`); the vault attached;
-   `web_search` and `web_fetch` **removed**; memory as a snapshot-clone.
-4. **Session** — `ant beta:sessions create` on the agent + environment, with
-   `initial_events` verbatim and the kickoff task = `examinee_task.prompt`.
+1. Create the managed runtime environment.
+2. Apply `network.mode` and `network.allowed_hosts` without expansion.
+3. Install only the packages in `env_packages`.
+4. Create one managed bearer credential for each MCP server URL.
+5. Create one MCP tool set for each `mcp_servers` entry.
+6. Apply `mcp_permission_policy` to every Pome MCP tool set.
+7. Remove internet tools when the launch response requires closed-book operation.
+8. Create per-run memory according to `memory_policy`.
+9. Create the managed agent with the registered model and instructions.
+10. Create a session with the returned `initial_events`.
+11. Send `examinee_task.prompt` as the task input.
 
-## always_allow is load-bearing
+Do not place bearer values in the agent definition, task text, command history, or output.
 
-Managed Agents defaults a minimal `mcp_toolset` to **ask-for-permission**. A
-headless coach never sends `user.tool_confirmation`, so an examinee without
-`always_allow` deadlocks on its *first* MCP call — the session idles in
-`requires_action` and scores nothing. `examinee_launch.mcp_permission_policy`
-now carries `always_allow` exactly so this cannot happen; apply it to **every**
-toolset. If you inherit a session already stuck in `requires_action` on tool
-confirmation, recover with `sessions.update` → `always_allow` plus one
-`tool_confirmation` to release the pending call, then let it run — but the
-supported path is to set it up front.
+## Detect completion
 
-## Detect idle → finalize immediately
+1. Poll the managed session with the current `ant` session command.
+2. Continue while the agent emits tool calls or produces output.
+3. Stop when the agent completes or waits for new input.
+4. Call `finalize_run(session_id)` immediately.
+5. Use the Pome `session_id`, not the managed-agent session identifier.
+6. Finalize before you remove the managed session.
 
-Poll the session (`ant beta:sessions retrieve --session-id <sid>`). Idle =
-the examinee has finished the kickoff task and is emitting no further tool calls
-(terminal/completed, or awaiting input with nothing more coming). The moment it
-idles, **stop polling and go to SKILL.md §3** — `finalize_run(session_id)` on
-the **Pome** `session_id` (not the `ant` session id), while the
-twin sandbox is still up. Do not tear the `ant` session down first: if the twin
-session expires or is finalized-too-late, the tape is gone. `finalize_run` pulls
-the tape and scores; only then is the managed-agent session safe to discard.
+Output: Control returns to `pome-run-task` with a finalized Pome run.

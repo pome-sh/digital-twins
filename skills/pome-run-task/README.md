@@ -1,95 +1,41 @@
-# pome-run-task — coach Skill 4
+# pome-run-task
 
-Run a seed-verified Pome task against the builder's examinee and score it
-from the live twin tape: `run_task` to mint the session, launch the examinee
-on its runtime, `finalize_run` the instant it idles, then narrate `get_report` —
-and a fix loop that re-runs only the failed tasks and shows the delta. The
-skill itself is [`SKILL.md`](./SKILL.md); the two runtime launchers it dispatches
-to live in [`references/`](./references/).
+## Purpose
 
-Runs downstream of Skills 0–2: intake ([`pome-intake`](../pome-intake/README.md))
-registers the examinee clone, author ([`pome-author-task`](../pome-author-task/README.md))
-writes the graded task, verify ([`pome-verify-seed`](../pome-verify-seed/README.md))
-confirms the seed is a fair exam. This skill is the last leg — it launches the
-examinee for real and grades it.
+This skill runs a verified task against an agent and reports the hosted grading result.
 
-## Seam-first, per ADR-018
+## When to use
 
-Only one step in the pipeline is examinee-runtime-specific here: **launching the
-examinee**. Minting, finalizing, scoring, reporting, and the fix loop are
-runtime-agnostic and stay in `SKILL.md`. Each launcher is an isolated module in
-`references/`, dispatched on the Runtime line. Adding a platform (a new REST
-driver, V1.5's no-code Anthropic driver, a non-Anthropic host) is a bounded
-change: one new launcher file + the contract emitting that platform's
-`examinee_launch` policy — never a pipeline rewrite. Launch **policy**
-(`always_allow`, closed-book web tools, memory snapshot-clone, the network clamp)
-is owned by `examinee_launch`; the skill executes the spec and never restates it
-in prose (prose drifts). ADR-018 (examinee-runtime abstraction) lives in the pome-cloud repo
-(`docs/decisions/018-examinee-runtime-abstraction.md`).
+Use this skill after task validation and seed verification succeed.
 
-## Layout
+Use it again after you change the agent and assign a new agent version.
 
-One authored source per skill — this directory. Nothing is generated from it;
-what you see is what ships.
+## Inputs
 
-```
-pome-run-task/
-├── SKILL.md                          # the skill (frontmatter + instructions, <100 lines)
-├── references/
-│   ├── launch-managed-agent.md       # seam: assemble + run on Managed Agents via ant
-│   └── launch-rest.md                # seam: run a self-hosted REST examinee
-└── README.md                         # this file
-```
+- A verified `task_id`.
+- The registered `agent_id`.
+- A declared `agent_version`.
+- The agent runtime and launch configuration.
+- The task trial count and pass threshold.
 
-## Install
+## Outputs
 
-Part of the coach set — install the whole set with one command (see
-[`skills/README.md`](../README.md)); `references/` ships with the skill so the
-one-level-deep links resolve:
+- A finalized run identifier.
+- A score and per-criterion results.
+- The grading provenance and dashboard link.
+- A comparison with the baseline after a corrected-agent run.
 
-```bash
-npx skills add pome-sh/digital-twins --skill '*'
-```
+## Basic use path
 
-Requires the Pome control MCP connection (`claude mcp add --transport http pome
-https://mcp.pome.sh/mcp`) so the `run_task` / `finalize_run` / `get_report` /
-`register_agent` / `list_runs` tools resolve, and — for a managed-agent examinee
-— `ant` authenticated (`ant auth login`).
+1. Confirm that the task seed passed verification.
+2. Call `run_task`, or call `run_trials` for multiple trials.
+3. Launch the agent from the returned `examinee_launch` data.
+4. Protect the returned `agent_token` as a credential.
+5. Call `finalize_run` as soon as the agent becomes idle.
+6. Call `get_report` with the returned run identifier.
+7. Correct the agent, not the task, when the agent fails a valid criterion.
 
-## The run loop
+Use the applicable launcher:
 
-1. **Mint** — `run_task(task_id, agent_id, agent_version, group_id)` →
-   `session_id`, `agent_token` (SENSITIVE — hand it to the examinee at launch,
-   then let go of it), `examinee_task`,
-   `examinee_launch`. Pass `agent_version` from the manifest's `agent.version`
-   on every run — run-sets are partitioned by it, so an unversioned run cannot
-   be told apart from a later one. Mint the `group_id` upfront so an attempt's
-   trials aggregate as one exam (a post-fix rerun opens a new group, bumps the
-   version, and links back — see step 5); for a `runs: N` task use
-   `run_trials(n, task_id, agent_version, group_id)`, the batch form. Heal a
-   `twins not enabled` 400 with one additive `register_agent`.
-2. **Launch** — dispatch on the Runtime line: managed agent → `ant`
-   (`references/launch-managed-agent.md`); anything else → REST
-   (`references/launch-rest.md`). The launcher assembles from `examinee_launch`,
-   starts the examinee, and watches for idle.
-3. **Finalize immediately** — `finalize_run(session_id)` the instant
-   the examinee idles, while the twin tape is still live. A late finalize loses
-   the tape.
-4. **Report** — `get_report(run_id)`: score, criteria (kind/status), provenance
-   `hosted`, the `app.pome.sh` link.
-5. **Fix loop** — on a failure, hand the report's `## Handoff (fix prompt)` to the
-   builder; they edit the **examinee** prompt; re-run only the failed tasks
-   (same `agent_id`, a **new** `agent_version` — the edited prompt is a
-   different thing under test) as a fresh run-set — a **new** `group_id`
-   carrying the failing run's group_id as `baseline_group_id` (the report's
-   `## Rerun after fixing` section pre-fills all three); diff the two reports
-   and show the delta.
-   Anti-cheat guardrail: never weaken a criterion/`passThreshold` or edit the
-   seed to force a green — a criterion fix goes back through author/verify.
-
-## Test evidence
-
-The fixture pair (a leaky vs hardened examinee prompt for exercising the fix
-loop) and the kept e2e transcript of the A3 managed-agent live run (100/100,
-provenance `hosted`) are historical evidence and stay in the pome-cloud repo
-(`apps/docs/docs/skills/`, under this skill's legacy-named directory).
+- [`references/launch-managed-agent.md`](./references/launch-managed-agent.md)
+- [`references/launch-rest.md`](./references/launch-rest.md)

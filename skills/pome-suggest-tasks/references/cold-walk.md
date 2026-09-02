@@ -1,65 +1,73 @@
-# M2 cold walk — registration → first own-agent report
+# First task path
 
-The one-session journey `pome-suggest-tasks` fronts. Each step lists **input ·
-what the coach does · expected artifact**. The two human checkpoints are marked
-⚑; every other step is automatic on the happy path. A step stops for the builder
-ONLY on the failure named in its row — no founder rescue otherwise (Done-when #3).
+Use this path to move from a registered local project to its first graded report.
 
-1. **Registration** (upstream — not this skill)
-   - Input: a foreign repo with the agent's code.
-   - Coach: confirm the agent is registered via the **CLI** — a local repo, so
-     `pome register agent`, **not** MCP `register_agent` (see the pome router's
-     "One register verb"): a `pome.json` (with `twins`) and a populated
-     `.pome/link.json` are present. This skill only verifies the manifest is
-     there and enters the chain.
-   - Artifact: `pome.json` + `.pome/link.json` at the repo root; an `agent_id`
-     on the platform.
-   - Stops if: no `pome.json` → route back to the entry path.
+## Register the project
 
-2. **Suggestion** (`pome-suggest-tasks`)
-   - Input: `pome.json` + the agent's prompt/code; empty `tasks/` and empty
-     `list_tasks`.
-   - Coach: read the agent, propose 2–3 grounded candidates.
-   - Artifact: 2–3 one-line candidates — each fear · twin · bad/good end-state.
+Input: A local project that contains the agent.
 
-3. ⚑ **Pick** (checkpoint 1 — still `pome-suggest-tasks`)
-   - Input: the candidate list.
-   - Coach: short interview — the builder picks or refines one.
-   - Artifact: one chosen candidate (prompt + fear + twin + bad/good end-state).
+1. Confirm that the project uses `pome.json`.
+2. Run `pome init --bare` if the project has no Pome manifest.
+3. Replace a YAML-only Pome manifest with an equivalent `pome.json` before you continue.
+4. Set `command` in the manifest.
+5. Set `twins` when you do not want the platform default.
+6. Run `pome login`.
+7. Run `pome register agent <name>`.
 
-4. **Authoring** (`pome-author-task`)
-   - Input: the chosen candidate.
-   - Coach: write the task markdown into the repo's `tasks/` dir (the source of
-     truth), `validate_task`, dry-run `verify_seed`, `evaluate_criteria`, then
-     `save_task` to publish that file to the catalog (ADR-019 decision 3: file
-     first, catalog follows — never the reverse).
-   - Artifact: a committed `tasks/<NN>-….md` source file plus its published
-     catalog entry (`task_id`).
-   - Stops if: `validate_task` errors or a `code` criterion is `unmatched` → fix
-     with the builder, never save blind.
+Output: A valid manifest and a local `.pome/link.json` registration cache.
 
-5. **Verified seed** (`pome-verify-seed`)
-   - Input: the saved task.
-   - Coach: judge the seed a fair exam — it boots, matches the prompt, and a
-     positive discriminator carries the signal.
-   - Artifact: verdict **HEALTHY seed**.
-   - Stops if: BROKEN / unfair → fix the seed or restate criteria, then
-     re-verify (never weaken the exam to pass it).
+Stop if registration fails. Correct the reported cause before you continue.
 
-6. **Run** (`pome-run-task`)
-   - Input: the verified task + `agent_id`.
-   - Coach: `run_task` mints the session, launch the examinee via the REST
-     launcher (preflighted), `finalize_run` the instant it idles.
-   - Artifact: a finalized `run_id` with a score, graded off the live twin tape.
-   - Stops if: the run comes back red → hand the fix prompt to the builder, who
-     edits the **examinee's** prompt (never the task), then re-run only what
-     failed.
+## Select a task
 
-7. ⚑ **Report** (checkpoint 2 — still `pome-run-task`)
-   - Input: `run_id`.
-   - Coach: `get_report`, narrate the Score /100 + criteria + dashboard link.
-   - Artifact: the **first own-agent finalized report** (Done-when #2).
+Input: The manifest, agent prompt, agent tools, and relevant source code.
 
-**Pass criterion for the whole walk (Done-when #3):** a builder starts at a fresh
-registered repo and reaches step 7 in one session, the coach stopping only at the
-two ⚑ checkpoints and any genuine failure above — no founder help.
+1. Inspect the actions that the agent can perform.
+2. Limit each candidate to configured twins.
+3. Propose two or three concrete risks.
+4. State the expected safe result for each risk.
+5. Ask the user to select or revise one candidate.
+
+Output: One task candidate with a prompt, target twins, and expected result.
+
+## Author the task
+
+Input: The selected candidate.
+
+1. Create the task Markdown file in the configured task directory.
+2. Use `pome checks <twin>` to inspect deterministic checks.
+3. Use `pome checks add` to add each `[code]` criterion.
+4. Add `[model]` criteria for required reasoning or intent.
+5. Run `pome checks lint <task-file>`.
+6. Validate the complete task with the Pome control MCP.
+7. Save the validated task to the team catalog.
+
+Output: One valid task file and one team-catalog task identifier.
+
+Stop if the task does not parse or a `[code]` criterion does not bind.
+
+## Verify the seed
+
+Input: The valid task.
+
+1. Call `verify_seed`.
+2. Call `evaluate_criteria`.
+3. Compare every prompt claim with the seeded state.
+4. Correct invalid references and pre-satisfied positive criteria.
+5. Repeat verification after each correction.
+
+Output: A seed verdict with criterion evidence.
+
+## Run and report
+
+Input: The verified task, registered agent, version, and runtime configuration.
+
+1. Call `run_task` or `run_trials`.
+2. Launch the agent with the returned launch data.
+3. Call `finalize_run` when the agent becomes idle.
+4. Call `get_report` with the run identifier.
+5. Report the score, criterion results, provenance, and dashboard link.
+
+Output: A finalized hosted report.
+
+If a valid criterion fails, correct the agent. Do not weaken the task to change the result.
