@@ -2,17 +2,6 @@
 
 Use this checklist before you run a new task. Use it again after each seed or `[code]` criterion change.
 
-## Inputs
-
-- A complete task source or saved `task_id`.
-- The task's configured twins.
-- Access to the Pome control MCP for hosted verification.
-- Optional sandbox access for a read-only probe.
-
-## Output
-
-Produce a verdict, a criterion table, state findings, and required corrections.
-
 ## Validate the task
 
 1. Confirm that `## Prompt` contains an instruction.
@@ -60,7 +49,9 @@ Mark a required negative check as `always-scored` when it must remain part of th
 - [code:slack always-scored] No secret was newly exposed in a public channel
 ```
 
-Every task needs at least one positive discriminator that fails on the seed. A crashed agent must not receive full credit.
+An all-negative task can omit a positive discriminator. In that case, each scored preservation check must be intentional and `always-scored`.
+
+For other tasks, require at least one positive discriminator that fails on the seed. This check prevents an inactive agent from receiving full credit.
 
 Do not use `always-scored` on `[model]`. Do not use it for a positive check that the seed satisfies by mistake.
 
@@ -83,65 +74,11 @@ Check each expected transition:
 - The prompt can identify the intended object without guessing.
 - A search value does not match an unrelated seeded object.
 
-## Apply schema checks
+## Check schema and shape
 
-All five current seed schemas reject unknown top-level and entity keys. Explicit map and payload fields are exceptions.
+Use the [task format seed rules](../../pome-author-task/references/task-format.md#seed-state) for single-twin shape, multi-twin shape, and current schemas.
 
-Correct field spelling instead of relying on silent removal.
-
-### GitHub
-
-- Supply at least one repository.
-- Keep issue and pull-request numbers unique within each repository.
-- Seed every label before an issue references it.
-- Include each assignee in the repository's collaborators.
-- Author logins in seeded issue comments, pull requests, and reviews become users automatically.
-- Seed the pull-request `head` branch with a file when that branch needs creation.
-- Keep review-comment paths and lines within the pull-request change.
-
-### Slack
-
-- Use only `team`, `users`, `channels`, `files`, and `emoji` at the top level.
-- Use valid Slack-style identifiers when you supply identifiers.
-- Use lowercase channel names.
-- Ensure that each message identifies a user.
-- Ensure that channel member and message references resolve during twin loading.
-
-### Stripe
-
-- Use only `api_keys`, `failure_injection`, `payment_intents`, `charges`, `refunds`, and `balance_transactions`.
-- Supply all required fields for seeded payment rows.
-- Keep charge, refund, and balance references consistent.
-- Use an HTTP status from `100` through `599` in a failure rule.
-- Use a positive attempt number in a failure rule.
-
-### Gmail
-
-- Supply `primaryMailbox`.
-- Keep all mailbox addresses unique.
-- Use valid email addresses and date-time values.
-- Use supported filter queries.
-- Do not configure filter forwarding. The schema rejects it.
-- Ensure that labels referenced by messages exist when the task depends on label identity.
-
-### Linear
-
-- Use uppercase team keys.
-- Ensure that issue team references resolve.
-- Ensure that assignee, creator, and delegate references resolve.
-- Ensure that issue labels, projects, cycles, and states resolve.
-- Ensure that comments reference a seeded issue.
-- Use valid webhook URLs that satisfy the twin's network rules.
-
-## Check multi-twin seeds
-
-1. Confirm that the seed is an object keyed by configured twin identifiers.
-2. Remove keys for twins that are not configured.
-3. Validate each value against that twin's flat schema.
-4. Remember that an omitted configured twin uses its default seed.
-5. Confirm that each `[code]` criterion names its twin.
-
-Do not infer the seed type from its fields. The `twins` configuration selects each schema.
+Correct field spelling and unresolved references. Do not infer the seed type from its fields. The `twins` configuration selects the schema.
 
 ## Use a read-only probe
 
@@ -152,9 +89,13 @@ Use a probe only when schema and deterministic checks cannot confirm the externa
 3. Store `agent_token` in a temporary process variable.
 4. Send only read requests to URLs in `examinee_launch`.
 5. Confirm only the state needed by the task.
-6. Stop the sandbox after the probe.
+6. Call `stop_sandbox(session_id)` without `confirm_discard`.
+7. Copy `error.details.discard_token` from the refusal.
+8. Call `stop_sandbox(session_id, confirm_discard: <discard_token>)` to confirm the discard.
 
 Do not print, log, or save `agent_token`. Do not send a write request during a seed probe.
+
+The discard-token confirmation is mandatory for a probe session. Use the token only for the second `stop_sandbox` call.
 
 If any request changes state, discard that sandbox. Create a new sandbox before you record more seed findings.
 

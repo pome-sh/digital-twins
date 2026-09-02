@@ -1,38 +1,11 @@
 # pome-author-task
 
-## Purpose
+Use this skill when you have one test goal or a selected candidate. It writes the task in the configured task directory and prepares it for hosted runs.
 
-This skill writes a graded Pome task and validates its criteria and seed.
+## Authoring rules
 
-## When to use
+Adapt a relevant task when one exists. Use `pome checks <twin>` to inspect declared checks, and use `pome checks add` for `[code]` criteria. Add a `[model]` criterion only when the task requires observable reasoning or intent.
 
-Use this skill when you have a test goal or a selected candidate task.
+Run `pome checks lint <task-file>`. Validate the complete task and verify its seed before you save it to the team catalog.
 
-## Inputs
-
-- The agent behavior to test.
-- One or more supported twins.
-- The required initial state.
-- The expected final state or recorded behavior.
-- Existing tasks that can provide a useful structure.
-
-## Outputs
-
-- A task Markdown file in the project's configured task directory.
-- `[code]` criteria that use declared twin checks.
-- `[model]` criteria that test required reasoning or intent.
-- Validation and seed-review results.
-- A team-catalog entry for hosted runs.
-
-## Basic use path
-
-1. Select an existing task to adapt, or define one test goal.
-2. Write the task in the project task directory.
-3. Run `pome checks <twin>` to inspect declared checks.
-4. Add deterministic criteria with `pome checks add`.
-5. Add `[model]` criteria for required reasoning or intent.
-6. Run `pome checks lint <task-file>`.
-7. Validate the task and review its seed.
-8. Save the validated task to the team catalog for hosted runs.
-
-See [`references/task-format.md`](./references/task-format.md) for the task grammar and current seed shapes.
+See [`task-format.md`](./references/task-format.md) for the grammar, hosted and local differences, and seed schemas.

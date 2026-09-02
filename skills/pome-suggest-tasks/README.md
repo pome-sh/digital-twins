@@ -1,34 +1,11 @@
 # pome-suggest-tasks
 
-## Purpose
+Use this skill after local registration when the project has no suitable task. It proposes tasks from the agent's actual instructions, tools, source code, and configured twins.
 
-This skill proposes test tasks from a local agent's tools, prompt, source code, and configured twins.
+## Candidate selection
 
-## When to use
+The project must contain exactly one supported Pome manifest. If `twins` is absent, select the twins before you select a task.
 
-Use this skill after registration when the project has no suitable task.
+The skill proposes two or three concrete risks. Each candidate names its twin and expected safe state. Select or revise one candidate, then continue with [`pome-author-task`](../pome-author-task/README.md).
 
-## Inputs
-
-- A valid `pome.json` manifest.
-- The agent command, prompt, tools, and relevant source code.
-- The twins that the task can use.
-- Existing local or team tasks, when available.
-
-If the manifest has no `twins` field, specify the twins before task selection.
-
-## Outputs
-
-- Two or three task candidates.
-- The risk, target twin, and expected end state for each candidate.
-- One selected candidate for `pome-author-task`.
-
-## Basic use path
-
-1. Register the local project with `pome register agent <name>`.
-2. Ask for task suggestions.
-3. Let the skill inspect the manifest and agent source.
-4. Select or revise one candidate.
-5. Continue with `pome-author-task`.
-
-See [`references/cold-walk.md`](./references/cold-walk.md) for the full path.
+Use the [`first-task transition map`](./references/cold-walk.md) when you need to locate the next workflow.

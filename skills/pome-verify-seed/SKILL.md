@@ -9,8 +9,8 @@ You are the **coach**: you talk to the builder and to the Pome control MCP
 (`mcp.pome.sh`). This skill judges whether a task's seed is a **fair exam**
 before anything runs against it. Fair means four things: the seed boots; the
 seeded world matches what `## Prompt` / `## Setup` claim; every non-guard
-criterion is NOT yet passed on the initial state; and at least one **positive
-discriminator** carries the signal. It verifies — it never runs the exam.
+criterion is NOT yet passed on the initial state; and each scored guard is
+intentional. It verifies — it never runs the exam.
 
 ## The triage rule: classify criteria, never trust the verdict string
 
@@ -20,8 +20,8 @@ blocking task**, because of one distinction it does not make:
 
 - A **guard** is a do-no-harm criterion, true at seed *by construction* —
   `Pull request #1 is not merged`, `No message containing "sk-prod" appears…`.
-  Passing at seed is its job. But it cannot tell a working agent from one that crashed on
-  startup, so it must never be the only signal.
+  Passing at seed is its job. Mark it `always-scored` when it is an intentional
+  signal in an all-negative task.
 - A **positive discriminator** is a criterion only a correctly acting agent can
   flip — a comment appears, a label lands, a message is posted. These MUST be
   `not passed` / `failed` on the seed.
@@ -31,9 +31,10 @@ Triage each `already_passing` entry by intent, then judge:
 | Finding | Judgment |
 | --- | --- |
 | Only guards pass at seed, ≥1 positive discriminator does not | **HEALTHY** — override the `BROKEN seed` verdict, say why |
+| All criteria are intentional `always-scored` guards in an all-negative task | **HEALTHY** — the task grades preservation only |
 | Any non-guard criterion passes at seed | **BROKEN** — the exam is pre-won; weaken the seed or restate the criterion |
-| All criteria pass at seed | **BROKEN** — grades nothing, no matter what the verdict says |
-| No positive discriminator exists at all | **BROKEN** — even if nothing pre-passes; a crashed agent scores full marks |
+| All criteria pass at seed without intentional `always-scored` preservation guards | **BROKEN** — grades nothing |
+| No positive discriminator and no intentional `always-scored` preservation guard exists | **BROKEN** — carries no signal |
 | Any `code` criterion is `unmatched` | **Authoring error** — the text is not an instance of any declared check. Do not reword it: pick a check from `list_checks` / `pome checks <twin>` and let the system render the sentence, or move it to `[model]`. Route back to `pome-author-task` |
 
 ## Fast path (default — in-process, free, no session)
@@ -84,17 +85,10 @@ costs one session slot; offer it, don't default to it.
 4. **Reset / teardown**: end every probe session with `stop_sandbox`. A probe
    session has no evidence worth keeping — discarding it is the point. Never
    `finalize_run` a probe session; that would score the untouched seed.
-   Call `stop_sandbox`; if it succeeds outright, teardown is done. **If it is
-   refused** (an open session holds an ungraded run, and the platform
-   will not destroy one silently), the refusal carries a server-issued
-   `discard_token` in its `error.details`. That is a one-shot confirmation
-   nonce for this refusal, not a credential — it authenticates nothing and
-   grants no access. Pass it straight back as `stop_sandbox`'s
-   `confirm_discard` parameter. Today's
-   control plane never refuses, so expect the one-call success — treat the
-   refusal-then-confirm path as the case to handle once it goes live, not the
-   default. The token cannot be guessed ahead of the refusal, which is what
-   keeps the same guard meaningful for real runs.
+   Call `stop_sandbox` without confirmation. Copy the server-issued
+   `discard_token` from `error.details`. Pass it directly to a second
+   `stop_sandbox` call as `confirm_discard`. This confirmation is mandatory.
+   The token grants no access and is valid only for this discard.
 
 ## Report
 

@@ -1,30 +1,15 @@
 # pome
 
-## Purpose
+Use this skill when you want to test an agent but do not know which Pome workflow applies. It routes from your current state without restarting completed work.
 
-This skill selects the correct Pome workflow for your request and agent runtime.
+## Routing table
 
-## When to use
+| Current state | Next skill |
+| --- | --- |
+| Claude managed-agent definition | [`pome-intake`](../pome-intake/README.md) |
+| Registered local agent with no suitable task | [`pome-suggest-tasks`](../pome-suggest-tasks/README.md) |
+| Test goal or selected candidate | [`pome-author-task`](../pome-author-task/README.md) |
+| Drafted task that needs seed review | [`pome-verify-seed`](../pome-verify-seed/README.md) |
+| Verified task that is ready to run | [`pome-run-task`](../pome-run-task/README.md) |
 
-Use this skill when you want to test an agent but do not know which Pome skill applies.
-
-## Inputs
-
-- Your test goal.
-- A local agent project or managed-agent definition.
-- An existing task, if one exists.
-
-## Outputs
-
-- The selected Pome workflow.
-- The next required input or action.
-- A handoff to the applicable Pome skill.
-
-## Basic use path
-
-1. Ask to test your agent with Pome.
-2. State whether the agent runs locally or as a managed agent.
-3. Provide the project or agent definition.
-4. Follow the selected registration, authoring, verification, or run workflow.
-
-The skill instructions are in [`SKILL.md`](./SKILL.md).
+A local project uses the CLI registration path. A managed agent with no local project uses the hosted intake path.

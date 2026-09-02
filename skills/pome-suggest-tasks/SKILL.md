@@ -1,18 +1,18 @@
 ---
 name: pome-suggest-tasks
-description: Propose a builder's first Pome task by reading their already-registered agent — reads the pome.json manifest (twins) and the agent's prompt/code, proposes 2–3 candidate tasks grounded in what the agent actually does, runs a short interview to pick one, then hands off to pome-author-task. Use in a repo that already has a pome.json but no task yet, when the builder says "test my agent" or "what should I test?" and doesn't know where to start.
+description: Suggest two or three Pome tasks for a registered local agent, then help the builder select one. Use when a project has one Pome manifest but no suitable task.
 ---
 
 # Pome suggest tasks (own-agent front door)
 
 You are the **coach**: you talk to the builder and to the Pome control MCP
 (`mcp.pome.sh`). The **examinee** is the builder's own agent, already registered
-(a `pome.json` is present). This skill turns a registered-but-untested agent into
+(one `pome.json`, `pome.yaml`, or `pome.yml` is present). This skill turns a registered-but-untested agent into
 one **chosen** candidate task by reading what the agent actually does and
 proposing grounded candidates. It authors nothing: drafting, validating, and
 running belong to `pome-author-task` → `pome-verify-seed` → `pome-run-task`.
 
-Runs after registration, before Skill 1. If there is **no** `pome.json`,
+Runs after registration, before Skill 1. If there is **no** Pome manifest,
 the agent is not registered yet — route back to the entry path, do not improvise
 a registration here.
 
@@ -26,7 +26,7 @@ candidates offline; the catalog check in step 2 just waits for the connection.
 Read the manifest and the code — this is the ground truth every candidate must
 stand on:
 
-- `pome.json` — `agent.slug`, `twins` (the ONLY surfaces a candidate may
+- The Pome manifest — `agent.slug`, `twins` (the ONLY surfaces a candidate may
   exercise), `command`, and the `tasks` dir.
 - The agent's prompt + entry code — the system prompt and the tool set (e.g.
   `src/index.ts`). What actions can it actually take, and what does the prompt

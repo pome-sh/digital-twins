@@ -24,6 +24,7 @@ Treat each `mcp_servers[].bearer` value as a credential. Store it only in the ma
 | `examinee_launch` field | Managed-agent configuration |
 | --- | --- |
 | `network` | Runtime network policy and allowed hosts. |
+| `env` | Complete process environment for the examinee. Copy every entry. |
 | `env_packages` | Runtime packages. |
 | `mcp_servers[]` | One MCP tool set for each entry. |
 | `mcp_permission_policy` | Permission policy for every Pome MCP tool set. |
@@ -38,15 +39,16 @@ Do not infer omitted policy. Follow the returned launch data.
 
 1. Create the managed runtime environment.
 2. Apply `network.mode` and `network.allowed_hosts` without expansion.
-3. Install only the packages in `env_packages`.
-4. Create one managed bearer credential for each MCP server URL.
-5. Create one MCP tool set for each `mcp_servers` entry.
-6. Apply `mcp_permission_policy` to every Pome MCP tool set.
-7. Remove internet tools when the launch response requires closed-book operation.
-8. Create per-run memory according to `memory_policy`.
-9. Create the managed agent with the registered model and instructions.
-10. Create a session with the returned `initial_events`.
-11. Send `examinee_task.prompt` as the task input.
+3. Copy the complete `examinee_launch.env` block into the runtime environment.
+4. Install only the packages in `env_packages`.
+5. Create one managed bearer credential for each MCP server URL.
+6. Create one MCP tool set for each `mcp_servers` entry.
+7. Apply `mcp_permission_policy` to every Pome MCP tool set.
+8. Remove `web_search`, `web_fetch`, and other internet tools.
+9. Create per-run memory according to `memory_policy`.
+10. Create the managed agent with the registered model and instructions.
+11. Create a session with the returned `initial_events`.
+12. Send `examinee_task.prompt` as the task input.
 
 Do not place bearer values in the agent definition, task text, command history, or output.
 
@@ -58,5 +60,3 @@ Do not place bearer values in the agent definition, task text, command history, 
 4. Call `finalize_run(session_id)` immediately.
 5. Use the Pome `session_id`, not the managed-agent session identifier.
 6. Finalize before you remove the managed session.
-
-Output: Control returns to `pome-run-task` with a finalized Pome run.
