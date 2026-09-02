@@ -2,7 +2,7 @@
 
 <img src="./assets/pome-logo.svg" alt="Pome" width="76" height="76" />
 
-# Pome digital twins
+# Pome Digital Twins
 
 **Testing Infrastructure For AI Agents**
 
