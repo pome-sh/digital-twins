@@ -4,7 +4,7 @@
 
 # Pome digital twins
 
-**Test AI agents without changing live accounts.**
+**Testing Infrastructure For AI Agents**
 
 [![CI](https://github.com/pome-sh/digital-twins/actions/workflows/ci.yml/badge.svg)](https://github.com/pome-sh/digital-twins/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/%40pome-sh%2Fcli?label=%40pome-sh%2Fcli)](https://www.npmjs.com/package/@pome-sh/cli)
@@ -15,19 +15,11 @@
 
 </div>
 
-## What is Pome?
+## What are Pome Digital Twins?
 
-A digital twin is a stateful emulation of a real API. Each twin uses SQLite and starts from a known state.
+Digital twins are stateful simulated environments of a real API to test how AI agents behave in production. Your agent sends the same types of API and MCP requests that it sends in production and the digital twin records each request and state change on a tape for observability and evaluations.
 
-Your agent sends the same types of REST, GraphQL, and MCP requests that it sends in production. The twin records each request and state change on a tape that the agent does not control.
-
-You can reset the state and run the same task again. The starting state and deterministic checks stay fixed while the agent remains the variable.
-
-Each route has one of these fidelity levels:
-
-- `semantic`: The route implements and tests provider behavior.
-- `shape`: The response has the provider's shape, but behavior is limited.
-- `unsupported`: The twin returns `501` instead of reporting false success.
+The starting state and deterministic checks stay fixed while the agent remains the variable. Some common use cases include testing agent harness, reinforcement learning, and Post-training Agent Evaluations. 
 
 ## Supported twins
 
@@ -43,11 +35,23 @@ Pome includes 5 digital twins and 115 MCP tools. Each twin publishes a route-by-
 
 Pome compares supported behavior with the provider APIs each day. See [status.pome.sh](https://status.pome.sh) for current results.
 
+Each route has one of these fidelity levels:
+
+- `semantic`: The route implements and tests provider behavior.
+- `shape`: The response has the provider's shape.
+- `unsupported`: The twin returns `501`.
+
 ## Quick start
 
-You need Node.js 24 or later. Local runs do not require a Pome account or a provider account.
+You need Node.js >= 24.
 
-Run these commands in an empty directory:
+### CLI Installation
+```bash
+npm install -g @pome-sh/cli
+```
+This gives you the `pome` command.
+
+### Run an example agent
 
 ```bash
 npx @pome-sh/cli@latest init
@@ -57,30 +61,23 @@ npx @pome-sh/cli@latest inspect latest
 
 The run command starts a local twin, runs the example agent, and records the trace and state. It does not grade the run.
 
-Install the CLI globally if you want to use the `pome` command:
-
-```bash
-npm install -g @pome-sh/cli
-```
 
 ## Start one twin
 
-Start a local GitHub twin in the foreground:
+Start a local GitHub twin:
 
 ```bash
-npx @pome-sh/cli@latest twin start github
+pome twin start github
 ```
 
-The command prints the REST URL, MCP URL, and bearer token. It also writes these values to `.pome/twin-status.json`.
+This command prints the REST URL, MCP URL, and bearer token. It writes these values to `.pome/twin-status.json`.
 
-Create a seed when you need a different starting state:
+If you want a different starting state to test your agents, you can write a `seed.json` and configure the local digital twin.
 
 ```bash
 pome twin new-seed github --out seed.json
 pome twin start github --seed seed.json
 ```
-
-A seed replaces the default state. It does not merge with the default state.
 
 A single-twin seed contains that twin's fields. A multi-twin seed uses an object with one key for each twin.
 
