@@ -18,11 +18,11 @@ export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url
 export const AUTH_SECRET = "contract-suite-secret-0123456789abcdef";
 
 const ALL_TWINS = [
-  { name: "github", pkg: "packages/twin-github", dbEnv: "GITHUB_CLONE_DB", hostEnv: "GITHUB_CLONE_HOST" },
-  { name: "slack", pkg: "packages/twin-slack", dbEnv: "SLACK_CLONE_DB", hostEnv: "SLACK_CLONE_HOST" },
-  { name: "stripe", pkg: "packages/twin-stripe", dbEnv: "STRIPE_CLONE_DB", hostEnv: "STRIPE_CLONE_HOST" },
-  { name: "gmail", pkg: "packages/twin-gmail", dbEnv: "GMAIL_TWIN_DB", hostEnv: "GMAIL_TWIN_HOST" },
-  { name: "linear", pkg: "packages/twin-linear", dbEnv: "LINEAR_TWIN_DB", hostEnv: "LINEAR_TWIN_HOST" },
+  { name: "github", pkg: "packages/twin-github", dbEnv: "GITHUB_CLONE_DB", hostEnv: "GITHUB_CLONE_HOST", portEnv: "GITHUB_CLONE_PORT", noSeedEnv: "GITHUB_CLONE_NO_SEED" },
+  { name: "slack", pkg: "packages/twin-slack", dbEnv: "SLACK_CLONE_DB", hostEnv: "SLACK_CLONE_HOST", portEnv: "SLACK_CLONE_PORT", noSeedEnv: "SLACK_CLONE_NO_SEED" },
+  { name: "stripe", pkg: "packages/twin-stripe", dbEnv: "STRIPE_CLONE_DB", hostEnv: "STRIPE_CLONE_HOST", portEnv: "STRIPE_CLONE_PORT", noSeedEnv: "STRIPE_CLONE_NO_SEED" },
+  { name: "gmail", pkg: "packages/twin-gmail", dbEnv: "GMAIL_TWIN_DB", hostEnv: "GMAIL_TWIN_HOST", portEnv: "GMAIL_TWIN_PORT", noSeedEnv: "GMAIL_TWIN_NO_SEED" },
+  { name: "linear", pkg: "packages/twin-linear", dbEnv: "LINEAR_TWIN_DB", hostEnv: "LINEAR_TWIN_HOST", portEnv: "LINEAR_TWIN_PORT", noSeedEnv: "LINEAR_TWIN_NO_SEED" },
 ];
 
 // The suite can target an external built twin — e.g. a cloud-built
@@ -91,7 +91,7 @@ function twinCwd(twin) {
  * with cwd = the package root. Resolves once GET /healthz answers 200, which
  * the contract requires within 3 seconds of spawn.
  */
-export async function spawnTwin(twin, { env = {}, port: portIn, healthzDeadlineMs = twin.healthzDeadlineMs ?? 3_000 } = {}) {
+export async function spawnTwin(twin, { env = {}, port: portIn, providerPort = false, healthzDeadlineMs = twin.healthzDeadlineMs ?? 3_000 } = {}) {
   const port = portIn ?? (await freePort());
   const cwd = twinCwd(twin);
   // Plain `node` from PATH, never process.execPath: the contract is the cloud's
@@ -100,7 +100,7 @@ export async function spawnTwin(twin, { env = {}, port: portIn, healthzDeadlineM
     cwd,
     env: {
       ...process.env,
-      PORT: String(port),
+      ...(providerPort ? { [twin.portEnv]: String(port) } : { PORT: String(port) }),
       TWIN_AUTH_SECRET: AUTH_SECRET,
       [twin.dbEnv]: ":memory:",
       ...env,

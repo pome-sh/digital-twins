@@ -29,14 +29,6 @@ Pome maintainers change that pin.
 
 **Version 1.6.0**
 
-- The runtime includes `packages/wire` with its built `dist/`. Recorded on 2026-08-05.
-- Recorder events add `request_headers` and `tool`. Recorded on 2026-07-29.
-- The recorder records both Stripe x402 legs. Recorded on 2026-07-29.
-- Gmail adds named fault seeds. Recorded on 2026-07-24.
-- This contract adds Linear. Recorded on 2026-07-21.
-- This contract adds Gmail. Recorded on 2026-07-20.
-- Twins can generate a boot secret. Recorded on 2026-07-10.
-
 The black-box suite in [`contract/`](./contract/) verifies this version.
 
 ## Boot Contract
@@ -98,27 +90,34 @@ npm run build -w @pome-sh/sdk
 `@pome-sh/wire` resolves through `exports` to `./dist/index.js`.
 A plain Node.js start must load compiled JavaScript.
 
-The GHCR runtime image uses `node:24`.
-The Dockerfiles are the reference implementation of this dependency arrangement.
-
 ## Environment Interface
 
 | Variable | Meaning | Default |
 | --- | --- | --- |
-| `PORT` / `<TWIN>_CLONE_PORT` | Listen port | `3333` |
+| `PORT` | Listen port. This value takes precedence over the provider-specific port variable. | Twin-specific port |
+| `GITHUB_CLONE_PORT` | GitHub listen port | `3333` |
+| `SLACK_CLONE_PORT` | Slack listen port | `3333` |
+| `STRIPE_CLONE_PORT` | Stripe listen port | `3333` |
+| `GMAIL_TWIN_PORT` | Gmail listen port | `3336` |
+| `LINEAR_TWIN_PORT` | Linear listen port | `3337` |
 | `GITHUB_CLONE_HOST` / `SLACK_CLONE_HOST` / `STRIPE_CLONE_HOST` / `GMAIL_TWIN_HOST` / `LINEAR_TWIN_HOST` | Bind host | `127.0.0.1` |
 | `GITHUB_CLONE_DB` / `SLACK_CLONE_DB` / `STRIPE_CLONE_DB` / `GMAIL_TWIN_DB` / `LINEAR_TWIN_DB` | SQLite path or `:memory:` | Twin-specific data path |
-| `<TWIN>_CLONE_NO_SEED=1` | Do not apply the default seed at boot | Apply the seed |
+| `GITHUB_CLONE_NO_SEED=1` | Do not apply a GitHub seed at boot | Apply the seed |
+| `SLACK_CLONE_NO_SEED=1` | Do not apply a Slack seed at boot | Apply the seed |
+| `STRIPE_CLONE_NO_SEED=1` | Do not apply a Stripe seed at boot | Apply the seed |
+| `GMAIL_TWIN_NO_SEED=1` | Do not apply a Gmail seed at boot | Apply the seed |
+| `LINEAR_TWIN_NO_SEED=1` | Do not apply a Linear seed at boot | Apply the seed |
 | `POME_SEED_JSON` | Apply the supplied seed at boot | Apply the default seed |
+| `POME_RECORDER_EVENTS_PATH` | Write recorder events as NDJSON to this file | Store recorder events in memory |
 | `TWIN_AUTH_SECRET` | HS256 secret for session JWTs and provider-shaped tokens. A supplied value always wins. | Development fallback on loopback unless `NODE_ENV=production`. Generated and persisted on non-loopback hosts. |
 | `POME_TWIN_DATA_DIR` | Directory for the persisted boot secret at `<dir>/secret` | `.pome-data/<twin>` relative to the working directory |
 | `TWIN_ADMIN_TOKEN` | Use `X-Admin-Token` authentication for `/admin/*`. Compare the value with a timing-safe operation. | Check the loopback socket only |
 | `POME_RUN_ID` | Run ID on recorder events | `"spawn"` |
 | `POME_TWIN_VERSION` / `POME_TWIN_GIT_SHA` / `POME_TWIN_BUILD_TIME` | Values in the `/healthz` `runtime` object | `0.1.0` / `dev` / `dev` |
 | `SLACK_DETERMINISTIC_TS` | Use deterministic Slack message timestamps | Not set |
-| `GMAIL_TWIN_PORT` / `GMAIL_TWIN_NO_SEED=1` | Gmail port / do not apply the default seed | `3336` / apply the seed |
-| `LINEAR_TWIN_PORT` / `LINEAR_TWIN_NO_SEED=1` | Linear port / do not apply the default seed | `3337` / apply the seed |
 | `NODE_ENV=production` | Require strict secret handling. Reject unknown peer addresses at the admin gate. | Not set |
+
+A provider-specific no-seed variable takes precedence over `POME_SEED_JSON` and skips all boot seeding.
 
 ## Shared Control Plane
 
@@ -214,10 +213,8 @@ Unless a per-twin section defines an exception, an unknown session route must me
 
 ## Frozen Per-Twin Differences
 
-These values record behavior observed on 2026-07-07.
-Some values are under active review.
-Do not change a value as a side effect of a port.
-Change it only as a deliberate contract change.
+These differences are part of the contract.
+Change a value only as a deliberate contract change.
 
 | Surface | github | slack | stripe |
 | --- | --- | --- | --- |
@@ -238,9 +235,6 @@ Change it only as a deliberate contract change.
 
 ### Authentication Envelopes
 
-Live probes on 2026-08-13 established the four authentication rows.
-The probes sent an invalid bearer and no `Authorization` header.
-
 The vendors do not share one envelope.
 
 - GitHub sends `documentation_url` and a string `status`.
@@ -259,7 +253,6 @@ The Gmail and Linear authentication contracts are in their `FIDELITY.md` files a
 
 ## Frozen Body And Tape Behavior
 
-These values were probed on the pre-engine builds at `3cd86eb` on 2026-07-08.
 The contract suite checks every row.
 
 | Surface | github | slack | stripe |
@@ -271,25 +264,16 @@ The contract suite checks every row.
 | `/admin/seed` on the recorder tape | Recorded with `state_delta: null` | Recorded with `state_delta: null` | Not recorded |
 | `GET /x402/protected-resource` on the recorder tape | Not applicable | Not applicable | Record both the 402 challenge and paid retry. Set `state_mutation: false` on each. |
 
-The x402 middleware previously recorded neither resource leg.
-The payment middleware answered the challenge, and the resource used a bare handler.
-Thus, an unpaid attempt did not leave a trace.
-
 The middleware settlement calls remain separate rows.
 Each settlement row keeps its own delta.
 
 ## Gmail 1.2.0 Pins
 
-### Boot And Health
+### Boot, Identity, And Authentication
 
 - The packaged entry is `packages/twin-gmail/dist/src/server.js`.
-- `GET /healthz` must respond within the shared three-second limit.
-- The response must include `twin: "gmail"`.
-- The response must include `implementation: "gmail_twin"`.
-- The response must include `fidelity: "semantic"`.
-- The response must include `tools: 13`.
-
-### Identity And Authentication
+- `GET /healthz` must return within three seconds.
+- The response must include `twin: "gmail"`, `implementation: "gmail_twin"`, `fidelity: "semantic"`, and `tools: 13`.
 
 - The normalized `gmail_email` JWT claim is the session identity.
 - A missing local claim defaults to `pome-agent@pome-twin.test`.
@@ -300,7 +284,7 @@ Each settlement row keeps its own delta.
 - SID mismatches use the same envelope.
 - Raw JWTs without a bearer prefix are rejected.
 
-### Administration And Routes
+### Administration, Routes, And Gaps
 
 - `POST /admin/seed` must strictly validate the Gmail seed.
 - A successful seed must record one aggregate `{before,after}` state delta.
@@ -344,16 +328,11 @@ This additive feature does not change default behavior.
 
 ## Linear 1.3.0 Pins
 
-### Boot And Health
+### Boot, Identity, And Authentication
 
 - The packaged entry is `packages/twin-linear/dist/src/server.js`.
-- `GET /healthz` must respond within the shared three-second limit.
-- The response must include `twin: "linear"`.
-- The response must include `implementation: "linear_twin"`.
-- The response must include `fidelity: "semantic"`.
-- The response must include `tools: 22`.
-
-### Identity And Authentication
+- `GET /healthz` must return within three seconds.
+- The response must include `twin: "linear"`, `implementation: "linear_twin"`, `fidelity: "semantic"`, and `tools: 22`.
 
 - The normalized `linear_email` JWT claim is the session identity.
 - A missing local claim defaults to `admin@pome-twin.test`.
@@ -378,7 +357,7 @@ Authentication failures use Linear's GraphQL-shaped envelope.
 SID mismatches use the same envelope.
 The code is `errors[].extensions.code: "AUTHENTICATION_ERROR"`.
 
-### Administration And Routes
+### Administration, Routes, And Gaps
 
 - `POST /admin/seed` must strictly validate the Linear seed.
 - A successful seed must record one aggregate `{before,after}` state delta.
@@ -391,7 +370,7 @@ The code is `errors[].extensions.code: "AUTHENTICATION_ERROR"`.
 - An unknown root route returns 401 because the root session authentication wall responds first.
 
 The `list_documents`, `get_document`, and `save_document` MCP tools have semantic fidelity.
-The full Linear GraphQL tail remains a cold gap.
+Other Linear GraphQL operations remain unsupported.
 
 ## Verification
 
@@ -401,27 +380,19 @@ Run the packaged twin contract suite from the repository root:
 npm run test:contract
 ```
 
-The command builds these workspaces in dependency order:
-
-- `@pome-sh/wire`
-- `@pome-sh/sdk`
-- `@pome-sh/twin-github`
-- `@pome-sh/twin-slack`
-- `@pome-sh/twin-stripe`
-- `@pome-sh/twin-gmail`
-- `@pome-sh/twin-linear`
-
-The command discovers each direct `contract/*.test.mjs` file and runs it with `node --test`.
-It excludes only `contract/cli-start.test.mjs`.
-
-That test requires a built `cli/` workspace.
-CI runs it as a separate step.
-To run it locally after a build, use this command:
+The command builds the required workspaces and runs the contract tests. It excludes the CLI entry test. Run that test after you build the CLI:
 
 ```bash
 node --test contract/cli-start.test.mjs
 ```
 
-The suite has no runtime test dependency beyond Node.js APIs.
-It uses `node:test`, global `fetch`, and `node:crypto`.
-You can use the same suite with any built twin artifact, including a hosted build snapshot.
+Test an external built artifact directly with an absolute package path:
+
+```bash
+CONTRACT_TWIN_ONLY=github \
+CONTRACT_TWIN_PKG_ROOT=/absolute/path/to/twin-package \
+node --test contract/contract.test.mjs
+```
+
+Use the applicable twin name for `CONTRACT_TWIN_ONLY`.
+For Gmail, also include `contract/gmail-fault.test.mjs` in the `node --test` command.

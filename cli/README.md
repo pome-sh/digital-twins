@@ -26,7 +26,6 @@ Install the CLI globally:
 
 ```bash
 npm install -g @pome-sh/cli
-pome --help
 ```
 
 You can also run one command without a global installation:
@@ -57,12 +56,6 @@ Set `command` in `pome.json`, or pass `--agent <command>` to `pome run`.
 
 Hosted execution is the default for `pome run`.
 The command creates hosted sandboxes, runs the agent, uploads the artifacts, and prints the verdict.
-
-```bash
-pome login
-pome run tasks/01-bug-happy-path.md
-pome inspect latest
-```
 
 Use `POME_API_KEY` instead of `pome login` in CI.
 Use `-n <count>` to run a hosted trial group of 1 to 20 trials.
@@ -139,9 +132,6 @@ It does not merge with the default seed.
 | `pome twin start [name]` | Start a standalone local twin. |
 | `pome twin new-seed <name...>` | Print or write a starter seed file. |
 | `pome twin status` | Check the last standalone twin and print its connection values. |
-| `pome capture-server` | Run the internal model-call capture proxy. |
-
-Use `pome <command> --help` before you use advanced options.
 
 ## Environment Variables
 
@@ -232,10 +222,10 @@ A hosted verdict comes from Pome.
 | --- | --- |
 | `0` | The hosted verdict is `pass`. |
 | `1` | The hosted verdict is `fail` or `incomplete`. |
-| `2` | A twin, missing agent command, network, or orchestration error prevented a verdict. |
+| `2` | A twin, missing agent command, malformed task configuration, network, or orchestration error prevented a verdict. |
 | `3` | Authentication failed. |
 | `4` | The account exceeded a quota. |
-| `5` | The command input or task configuration is invalid. |
+| `5` | The CLI rejected the invocation during validation, for example because a path, option, or option combination is invalid. |
 
 For `pome run`, the task supplies the pass threshold.
 For `pome eval`, the pass threshold is `100`.
@@ -265,9 +255,9 @@ An incomplete trial also prevents exit `0`.
 | Code | Meaning |
 | --- | --- |
 | `0` | The agent completed and the CLI recorded the trace. This code is not a verdict. |
-| `2` | A local twin, missing agent command, or runner error prevented capture. |
+| `2` | A local twin, missing agent command, malformed task configuration, or runner error prevented capture. |
 | `3` | The agent failed, timed out, or failed its preflight. |
-| `5` | The command input or task configuration is invalid. |
+| `5` | The CLI rejected the invocation during validation, for example because a path, option, or option combination is invalid. |
 
 Do not use a local exit `0` as a CI quality gate.
 Run `pome eval <run-dir>` to request a verdict.

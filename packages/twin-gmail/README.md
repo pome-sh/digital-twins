@@ -74,6 +74,8 @@ The twin does not deliver mail over external SMTP. It does not implement Pub/Sub
 
 [`REFERENCE-DIVERGENCES.md`](REFERENCE-DIVERGENCES.md) records differences from the rejected reference implementation. [`LIMITS.md`](LIMITS.md) records request and state limits.
 
+[`CONTRACT.md`](../../CONTRACT.md) defines the shared boot and runtime requirements.
+
 ## Contributor commands
 
 Run package scripts from `packages/twin-gmail`:

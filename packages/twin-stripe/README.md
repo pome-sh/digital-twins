@@ -70,6 +70,8 @@ The settlement changes the PaymentIntent to `succeeded`, creates a charge, updat
 
 [`FIDELITY.md`](FIDELITY.md) lists every route and known difference. [`fidelity.inventory.json`](fidelity.inventory.json) contains the machine-readable inventory.
 
+[`CONTRACT.md`](../../CONTRACT.md) defines the shared boot and runtime requirements.
+
 ## Authentication
 
 The twin accepts two bearer forms:
@@ -125,17 +127,7 @@ curl -s -X POST http://127.0.0.1:3333/s/default/mcp/call \
 
 The buyer-agent example starts a local seller with `paymentMiddleware()`. The buyer handles a 402 challenge and sends an `X-PAYMENT` header. It then checks Stripe state.
 
-From the repository root, use two terminals:
-
-```bash
-# Terminal 1
-npm run dev -w @pome-sh/twin-stripe
-
-# Terminal 2
-npm start --prefix packages/twin-stripe/examples/buyer-agent
-```
-
-[`examples/buyer-agent/README.md`](examples/buyer-agent/README.md) lists its configuration variables.
+See [`examples/buyer-agent/README.md`](examples/buyer-agent/README.md) for the commands and configuration variables.
 
 ## Unsupported and limited behavior
 

@@ -1,10 +1,6 @@
 # `@pome-sh/sandbox-domains`
 
-`@pome-sh/sandbox-domains` exports the in-process domain layer for each Pome digital twin. It includes domain objects, SQLite openers, seed parsers, and check declarations.
-
-A digital twin emulates a provider API. A sandbox is a running container that hosts a twin. This package creates neither servers nor sandboxes.
-
-Despite its package name, this package only exposes twin domain code. It has no Hono app, HTTP routes, or MCP tool table.
+`@pome-sh/sandbox-domains` exports the in-process domain layer for each Pome digital twin. It includes domain objects, SQLite openers, seed parsers, and check declarations. It creates no sandbox and exposes no Hono app, HTTP routes, or MCP tool table.
 
 Use [`@pome-sh/checks`](../checks/) if you need declarations without runtime domain code.
 

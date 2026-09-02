@@ -51,6 +51,6 @@ Published packages declare `zod` as a peer dependency. Do not bundle it.
 
 [`cli/src/twin/registry.ts`](../cli/src/twin/registry.ts) defines the supported twin names, ports, seed parsers, versions, and boot functions.
 
-Each twin README documents its API surface and contributor commands. Each [`FIDELITY.md`](twin-github/FIDELITY.md) records measured behavior and known differences from the provider API.
+Each twin README documents its API surface and contributor commands. Each [`FIDELITY.md`](twin-github/FIDELITY.md) records surface fidelity levels and known differences from the provider API.
 
 All twins implement the shared [`CONTRACT.md`](../CONTRACT.md).

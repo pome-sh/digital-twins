@@ -106,6 +106,8 @@ A seed can add files for `files.list`, `files.info`, and `slack_read_file`:
 
 [`FIDELITY.md`](FIDELITY.md) records REST and MCP fidelity for each surface. [`fidelity.inventory.json`](fidelity.inventory.json) contains the machine-readable inventory.
 
+[`CONTRACT.md`](../../CONTRACT.md) defines the shared boot and runtime requirements.
+
 ## Contributor commands
 
 Run package scripts from `packages/twin-slack`:

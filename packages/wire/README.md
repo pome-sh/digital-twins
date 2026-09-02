@@ -65,7 +65,7 @@ return withCorrelation(id, () => handler(args));
 
 An adapter supplies `readFrameworkToolCallId`. The correlation module does not depend on an agent framework.
 
-This subpath is not on the root barrel because it initializes `AsyncLocalStorage` and patches `fetch`.
+This subpath is not on the root barrel because importing it creates an `AsyncLocalStorage` instance. The import does not patch `fetch`. Only `installCorrelationFetchHook()` patches `fetch`.
 
 ## Run completeness
 

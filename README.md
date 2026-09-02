@@ -31,7 +31,7 @@ Each route has one of these fidelity levels:
 
 ## Supported twins
 
-Pome includes 5 digital twins with 115 MCP tools and 263 REST and GraphQL surfaces.
+Pome includes 5 digital twins and 115 MCP tools. Each twin publishes a route-by-route fidelity record.
 
 | Twin | MCP tools | Main API coverage | Details |
 | --- | ---: | --- | --- |
@@ -55,7 +55,7 @@ npx @pome-sh/cli@latest run --local tasks/01-bug-happy-path.md
 npx @pome-sh/cli@latest inspect latest
 ```
 
-This command starts a local twin, runs the example agent, and records the trace and state. It does not grade the run.
+The run command starts a local twin, runs the example agent, and records the trace and state. It does not grade the run.
 
 Install the CLI globally if you want to use the `pome` command:
 
@@ -95,7 +95,7 @@ pome run --local tasks/example.md
 pome inspect latest
 ```
 
-You can score the recorded tape with your evaluator. You can also upload the run for a hosted Pome verdict:
+You can score the recorded tape with another evaluator. See the [integration guide](./integration-examples/shared/README.md) for Braintrust and LangSmith. You can also request a hosted Pome verdict:
 
 ```bash
 pome login
@@ -122,7 +122,7 @@ Use `pome tasks` to browse the bundled task library.
 
 ## Repository layout
 
-`@pome-sh/cli` contains the CLI and 5 twin runtimes with 115 MCP tools. Users do not install the twin packages separately.
+`@pome-sh/cli` contains the CLI and the twin runtimes. Users do not install the twin packages separately.
 
 The shared runtime provides HTTP routing, bearer authentication, MCP dispatch, recording, and SQLite state. Each twin adds its provider-specific domain behavior.
 
