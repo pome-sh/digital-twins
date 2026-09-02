@@ -1,286 +1,166 @@
-# Pome Twin: Stripe x402
+# `@pome-sh/twin-stripe`
 
-> **Internal package.** One of five twin runtimes in this repository (GitHub,
-> Stripe x402, Slack, Gmail, Linear). It is not separately installable — it
-> ships inside [`@pome-sh/cli`](../../cli/). To run it:
-> `npx @pome-sh/cli twin start stripe`.
->
-> The rest of this file is the engineering reference: HTTP/MCP surface, auth
-> shapes, known deviations, and the runtime contract pome-cloud's sandbox
-> images depend on.
+`@pome-sh/twin-stripe` is a stateful digital twin for Stripe payments and x402. It uses SQLite and exposes Stripe-shaped REST routes and 26 MCP tools.
 
-`@pome-sh/twin-stripe` is the only deterministic test double for **Stripe
-x402 machine payments**. Real Stripe sandbox doesn't auto-settle crypto
-deposits, the CDP facilitator settles on real Base, and `stripe-mock`
-has no x402 support — so without this twin there is nowhere to run agent
-tests against the x402 protocol that aren't either flaky, slow, or
-expensive. Today it ships **26 semantic REST routes + 26 MCP tools + the
-`paymentMiddleware()` Hono helper** (card and crypto PaymentIntents,
-customers, payment methods, refunds, charges, balance, events), plus 13
-shape-tier billing routes — all stateful, all tested, all loud about what
-they don't do.
+This package is private implementation code. It is bundled with [`@pome-sh/cli`](../../cli/) and is not a separate install surface.
 
-## Quickstart
-
-The fastest path is the hosted twin: log in to [pome.sh](https://pome.sh),
-click **Stripe x402** on the Twins page, and a per-session sandbox spawns
-in seconds. The dashboard hands you a `sk_test_pome_<sid>` API key + the
-twin URL. Skip ahead to [Auth](#auth--works-with-real-stripe-sdks) for
-how to wire your existing Stripe SDK.
-
-To run the twin yourself locally (e.g., in CI or against an offline
-agent), the zero-install path needs only Node ≥ 24:
+## Start the twin
 
 ```bash
-npx @pome-sh/cli twin start stripe      # starts on :3333
-curl http://127.0.0.1:3333/healthz
+npx @pome-sh/cli twin start stripe
+```
 
-# Real Stripe SDKs work via host override — they hit /v1/* directly
-# (no /s/:sid prefix) and the bearer alone resolves the session:
-#   new Stripe('sk_test_pome_default', { host: '127.0.0.1', port: 3333, protocol: 'http' })
-# Or curl the same root path:
+The twin listens on port `3333` by default.
+
+```bash
+curl http://127.0.0.1:3333/healthz
+```
+
+The default seed creates `sk_test_pome_default` for session `default`.
+
+## Stripe REST API
+
+Stripe SDKs can use the root `/v1/*` routes. The API key identifies the session.
+
+```ts
+import Stripe from "stripe";
+
+const stripe = new Stripe("sk_test_pome_default", {
+  host: "127.0.0.1",
+  port: 3333,
+  protocol: "http",
+});
+
+await stripe.paymentIntents.create({
+  amount: 1000,
+  currency: "usd",
+  payment_method_types: ["crypto"],
+  payment_method_options: {
+    crypto: { mode: "deposit", deposit_options: { networks: ["base"] } },
+  },
+});
+```
+
+The same handlers are available under `/s/:sid/v1/*`. On these routes, the URL `sid` must match the bearer token.
+
+Create and settle a crypto PaymentIntent with HTTP:
+
+```bash
 curl -s -X POST http://127.0.0.1:3333/v1/payment_intents \
   -H "Authorization: Bearer sk_test_pome_default" \
-  -H "Content-Type: application/json" \
-  -d '{"amount":1000,"currency":"usd","payment_method_types":["crypto"],"payment_method_options":{"crypto":{"mode":"deposit","deposit_options":{"networks":["base"]}}}}' \
-  | python3 -m json.tool
-```
+  -H 'content-type: application/json' \
+  -d '{"amount":1000,"currency":"usd","payment_method_types":["crypto"],"payment_method_options":{"crypto":{"mode":"deposit","deposit_options":{"networks":["base"]}}}}'
 
-You'll get back a real-shaped Stripe `PaymentIntent` in `requires_action`
-state with a Base USDC deposit address. Settle it with the test helper:
-
-```bash
-curl -s -X POST "http://127.0.0.1:3333/v1/test_helpers/payment_intents/<pi_id>/simulate_crypto_deposit" \
+curl -s -X POST \
+  http://127.0.0.1:3333/v1/test_helpers/payment_intents/<pi_id>/simulate_crypto_deposit \
   -H "Authorization: Bearer sk_test_pome_default" \
   -d '{}'
-# → status: succeeded, latest_charge: ch_..., balance updated, 5 events emitted
 ```
 
-The same routes are also mounted under `/s/:sid/v1/*` for path-routed
-deployments (e.g., the pome-cloud per-session proxy, where the `:sid`
-in the URL must match the bearer). Pick whichever shape your client
-prefers — they share handlers and produce identical responses.
+The settlement changes the PaymentIntent to `succeeded`, creates a charge, updates the balance, and emits events.
 
-## What ships today
+## Supported surface
 
-| Surface | Count | Tier |
-| --- | --- | --- |
-| REST routes under `/s/:sid/v1/*` (payments, customers, payment methods, refunds, charges, balance, events) | 26 | semantic |
-| Billing reads/writes (products, prices, subscriptions, invoice reads) | 13 | shape |
-| MCP tools (1:1 with stripe-node) | 26 | semantic |
-| `paymentMiddleware()` Hono helper | 1 | semantic |
-| Pome introspection (`_pome/{health,state,events}`) | 3 | n/a |
-| Admin (`/admin/{reset,seed}`, localhost-only) | 2 | n/a |
-| Named cold surfaces (checkout, payment links, setup intents, webhook endpoints) + anything else under `/v1/*` | many | **loud 501 with `fidelity:"unsupported"`** |
+| Surface | Count | Fidelity tier |
+| --- | ---: | --- |
+| Payment REST routes | 26 | Semantic |
+| Product, price, subscription, and invoice routes | 13 | Shape |
+| MCP tools | 26 | Semantic |
+| `paymentMiddleware()` | 1 | Semantic |
 
-See [FIDELITY.md](./FIDELITY.md) for the full route table and known
-deviations from real Stripe.
+[`FIDELITY.md`](FIDELITY.md) lists every route and known difference. [`fidelity.inventory.json`](fidelity.inventory.json) contains the machine-readable inventory.
 
-## Running the buyer agent demo
+[`CONTRACT.md`](../../CONTRACT.md) defines the shared boot and runtime requirements.
 
-From a repo checkout (contributor path):
+## Authentication
 
-```bash
-# Terminal 1
-npm run -w @pome-sh/twin-stripe dev
+The twin accepts two bearer forms:
 
-# Terminal 2
-npm start --prefix packages/twin-stripe/examples/buyer-agent
-```
-
-You'll see:
-
-```
-🛒 pome twin-stripe buyer-agent demo
-✓ got 402 challenge: pay 10000 USDC on eip155:84532 to 0x...
-✓ paid + got resource
-✓ twin reports 1 PI(s) with status=succeeded
-✓ twin emitted all 5 expected events
-✓ x402 buyer flow completed end-to-end
-```
-
-The seller is a Hono app with `paymentMiddleware()` mounted at
-`GET /paid`. The buyer hits it without an `X-PAYMENT` header (gets 402),
-then constructs a header against the deposit address and retries
-(gets 200).
-
-## Auth — works with real Stripe SDKs
-
-Two auth shapes are accepted:
-
-1. **Stripe-style API key** — `Authorization: Bearer sk_test_pome_<sid>`.
-   The default seed mints `sk_test_pome_default` so the standard Stripe
-   SDK constructor works unchanged:
-
-   ```ts
-   import Stripe from "stripe";
-   const stripe = new Stripe("sk_test_pome_default", {
-     host: "127.0.0.1",
-     port: 3333,
-     protocol: "http",
-   });
-   await stripe.paymentIntents.create({
-     amount: 1000,
-     currency: "usd",
-     payment_method_types: ["crypto"],
-     payment_method_options: {
-       crypto: { mode: "deposit", deposit_options: { networks: ["base"] } },
-     },
-   });
-   ```
-
-2. **Pome JWT** — `Authorization: Bearer <jwt>` where the JWT's `sid`
-   claim matches the URL's `/s/:sid/...`. Used by pome-cloud's
-   path-routed proxy.
-
-Either way, the resolved session id must match the `:sid` in the URL.
+- `sk_test_pome_<sid>` for Stripe SDK compatibility
+- a Pome JWT whose `sid` claim matches `/s/:sid`
 
 ## MCP
 
-26 tools available at `GET /s/:sid/mcp/tools`. Tool names match
-`stripe-node` method names so an agent's mental model translates 1:1:
+The JSON-RPC endpoint is `POST /s/:sid/mcp`. Legacy HTTP endpoints are available at `GET /s/:sid/mcp/tools`, `POST /s/:sid/mcp/tools/:name`, and `POST /s/:sid/mcp/call`.
 
-```
-create_payment_intent          create_customer
-retrieve_payment_intent        retrieve_customer
-list_payment_intents           update_customer
-update_payment_intent          delete_customer
-confirm_payment_intent         list_customers
-cancel_payment_intent          list_customer_payment_methods
-simulate_crypto_deposit        create_payment_method
-retrieve_charge                retrieve_payment_method
-list_charges                   attach_payment_method
-retrieve_balance               detach_payment_method
+[`fixtures/mcp-tools-list.raw.json`](fixtures/mcp-tools-list.raw.json) defines the served tool listing.
+
+The twin exposes these 26 tools:
+
+```text
+create_payment_intent
+retrieve_payment_intent
+list_payment_intents
+update_payment_intent
+confirm_payment_intent
+cancel_payment_intent
+simulate_crypto_deposit
+retrieve_charge
+list_charges
+retrieve_balance
 list_balance_transactions
 retrieve_event
 list_events
 create_refund
 retrieve_refund
 list_refunds
+create_customer
+retrieve_customer
+update_customer
+delete_customer
+list_customers
+list_customer_payment_methods
+create_payment_method
+retrieve_payment_method
+attach_payment_method
+detach_payment_method
 ```
-
-Call shapes:
 
 ```bash
 curl -s -X POST http://127.0.0.1:3333/s/default/mcp/call \
   -H "Authorization: Bearer sk_test_pome_default" \
   -H 'content-type: application/json' \
-  -d '{"tool":"create_payment_intent","arguments":{"amount":1000,"currency":"usd","payment_method_types":["crypto"],"payment_method_options":{"crypto":{"mode":"deposit","deposit_options":{"networks":["base"]}}}}}'
+  -d '{"tool":"create_payment_intent","arguments":{"amount":1000,"currency":"usd","payment_method_types":["crypto"]}}'
 ```
 
-## Runtime contract (for snapshot consumers)
+## x402 example
 
-`pome-cloud` builds a Vercel Sandbox snapshot from this package's signed source
-artifact. The following constraints must hold for that build to succeed and for
-the resulting snapshot to boot. Changing any of these is a breaking change for
-hosted; land the producer change here first, then open the cloud consumer PR
-that pins and verifies the new signed digest.
+The buyer-agent example starts a local seller with `paymentMiddleware()`. The buyer handles a 402 challenge and sends an `X-PAYMENT` header. It then checks Stripe state.
 
-### Build
+See [`examples/buyer-agent/README.md`](examples/buyer-agent/README.md) for the commands and configuration variables.
 
-- Package is `npm install`-able from `package.json` alone (no
-  `workspace:*` protocols, no package-manager-specific deps; no committed lockfile is
-  required, the snapshot build regenerates one on each rebuild).
-- `npm run build` exits 0 and emits `dist/src/server.js`.
-- Built output is loadable under Node 24 — the snapshot runs
-  `runtime: "node24"`. SQLite is the built-in `node:sqlite` (via the sdk's
-  `openTwinDatabase()`) — no native modules, no compiler toolchain.
+## Unsupported and limited behavior
 
-### Runtime
+The shape-tier billing routes preserve response structure but do not implement billing-cycle or invoice semantics.
 
-- Server entry: `node dist/src/server.js` (cwd = package root).
-- Listens on `:3333`.
-- Honors `STRIPE_CLONE_HOST=0.0.0.0` env (default `127.0.0.1` is
-  unreachable via Vercel Sandbox port forwarding).
-- `GET /healthz` returns 200 within ~3s of process start (the snapshot
-  build sleeps 3s after `node dist/src/server.js` before probing).
-- All admin routes (`/admin/*`) are localhost-only.
-- Bearer auth at `Authorization: Bearer <jwt>` or `Bearer sk_test_pome_<sid>`.
+Unsupported `/v1/*` routes return 501 with `fidelity: "unsupported"`. Named unsupported surfaces include Checkout Sessions, Payment Links, Setup Intents, and webhook endpoints.
 
-### Cloud consumer coordination
+Other recorded differences include:
 
-- Bumping any of the above = publish a signed twin digest and open the matching
-  `pome-cloud` consumer PR.
-- The cloud-side snapshot build script lives at
-  `pome-cloud/notes/build-twin-stripe-template.ts`.
-- The snapshot manifest at `pome-cloud/infra/twin-stripe-snapshot.json`
-  records the OSS git sha and signed OCI digest each snapshot was built from.
+- one API version: `2026-03-04.preview`
+- no EIP-3009 signature verification for x402 payloads
+- offset-based list pagination
+- synchronous crypto settlement
+- Base and USDC as the only deposit network and token
 
-## What it does NOT do
+See [`FIDELITY.md`](FIDELITY.md) for the complete record.
 
-Shape tier (faithful response shape, deliberately no billing semantics —
-no events emitted, no invoices minted, no billing-cycle arithmetic):
+## Contributor commands
 
-- Products, prices, subscriptions, invoice reads.
-
-Loud 501 with `fidelity: "unsupported"`:
-
-- Checkout sessions, payment links, setup intents, webhook endpoints —
-  named cold surfaces, test-backed.
-- All `/v1/shared_payment/*` (SPT) — deferred.
-- Webhook delivery loop — agents poll `GET /v1/events`.
-- Profiles, Connect, Issuing, Treasury, Tax, Climate, Identity — out forever
-  for this twin.
-
-Other deviations from real Stripe:
-
-- **Single API version.** Only `2026-03-04.preview` is served.
-- **No EIP-3009 signature verification on x402 payloads.** Agents that
-  send well-formed `X-PAYMENT` headers matching our payTo book + amount
-  succeed. Documented in `src/x402.ts` head comment.
-- **OFFSET-style list pagination** (Stripe uses cursor-based).
-- **Synchronous deposit settlement.** `simulate_crypto_deposit` flips
-  `requires_action → processing → succeeded` synchronously; no chain
-  delay simulation.
-- **Single deposit network** (Base) and **single token** (USDC). Tempo
-  + Solana from Stripe's matrix are deferred.
-
-## Local commands
-
-Contributor-only, from a repo checkout (these scripts are not part of any
-published package):
+Run package scripts from `packages/twin-stripe`:
 
 ```bash
-npm run dev                        # boot on :3333 with default seed
-npm run typecheck                  # tsc --noEmit
-npx vitest run --project twin-stripe  # vitest, 32 files / 237 tests
-npm run build                      # tsc → dist/src/server.js
-node dist/src/server.js            # production-shape boot
+npm run dev
+npm run seed
+npm run smoke
+npm run typecheck
+npm run fidelity:parity
+npm run build
+node dist/src/server.js
 ```
 
-## Use it as a Stripe test double in your tests
+Run this test command from the repository root:
 
-The cleanest way is to boot the twin from your test setup via the CLI; all
-it needs is Node ≥ 24:
-
-```ts
-// In your test setup
-import { spawn } from "node:child_process";
-
-const twin = spawn("npx", ["@pome-sh/cli", "twin", "start", "stripe"], {
-  env: { ...process.env, PORT: "3333", STRIPE_CLONE_DB: ":memory:" },
-});
-// wait for /healthz before running your suite
-
-// In your code under test
-import Stripe from "stripe";
-const stripe = new Stripe("sk_test_pome_default", {
-  host: "127.0.0.1", port: 3333, protocol: "http",
-});
-
-// Run your agent. Assert against the twin's recorder:
-const events = await fetch("http://127.0.0.1:3333/s/default/_pome/events").then(r => r.json());
-// or against the twin's domain state:
-const state = await fetch("http://127.0.0.1:3333/s/default/_pome/state").then(r => r.json());
+```bash
+npx vitest run --project twin-stripe
 ```
-
-Test against the **state of the world after the agent ran**, not byte-
-for-byte response shapes. PI numbers, IDs, timestamps, and SHAs are
-deterministic-enough for tests but not identical to real Stripe.
-
-## Pome Cloud (twin selector)
-
-The hosted dashboard exposes a **Stripe x402** button next to GitHub.
-Clicking it spawns a per-session Vercel Sandbox running this exact package.
-The agent in your session sees the same surface this README describes; URLs
-are path-routed (`https://twins.pome.sh/s/<sid>/...`).

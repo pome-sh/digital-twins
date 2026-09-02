@@ -1,134 +1,109 @@
-# `pr-summary-agent` — bundled Pome example
+# pr-summary-agent
 
-A small [Claude Agent SDK](https://docs.claude.com/en/agent-sdk/typescript)
-agent that summarizes pull requests against a local GitHub-shaped Pome twin. For
-each open PR it reads the title, body, changed files, and unified diff, then
-posts a single structured comment: **what changed**, **why**, **risk**, and a
-short **review checklist**.
+This example uses the Claude Agent SDK and the GitHub twin MCP API. It writes one summary comment for each open pull request.
 
-Where `triage-agent` triages issues, this shows the same Claude Agent SDK + MCP
-shape applied to pull requests — and how to source the Claude API key from
-**Infisical or your local environment**.
+Each summary describes the change, its purpose, its risk, and a review checklist. The agent compares base and head file contents.
 
-## Prerequisites
+## Task
 
-- A running Pome twin on `http://127.0.0.1:3333` — start one with
-  `npx @pome-sh/cli twin start github` (only Node ≥ 24 required). It prints
-  the twin URL and a ready-minted `POME_AUTH_TOKEN` on boot.
-- Node.js 24+ and npm 11.5+.
-- An Anthropic API key for the agent loop — from your environment **or**
-  Infisical (see below).
+[`tasks/01-summarize-prs.md`](tasks/01-summarize-prs.md) contains two pull requests in `acme/widgets`.
+
+- PR #1 adds an optional `discount` parameter to pricing code.
+- PR #2 changes only the repository README.
+
+The agent must summarize both pull requests without merging or changing code.
+
+## Requirements
+
+- Node.js 24 or later
+- The `pome` CLI
+- An Anthropic API key
+- A Pome login for hosted runs
+
+The agent reads `ANTHROPIC_API_KEY` first. If it is absent, the agent requests the key from the Infisical CLI.
 
 ## Install
 
+Run these commands from the repository root:
+
 ```bash
 cd agent-examples/pr-summary-agent
-npm install
+npm ci
+npm run typecheck
 ```
 
-This package is intentionally **not** part of the root npm workspace — that
-keeps the Claude Agent SDK out of the monorepo install for everyone who isn't
-running the example.
+## Configure The API Key
 
-## Claude API key — Infisical or local
-
-The agent resolves `ANTHROPIC_API_KEY` in this order:
-
-1. **Local env** — `ANTHROPIC_API_KEY` if it is already set.
-2. **Infisical** — otherwise it runs `infisical secrets get ANTHROPIC_API_KEY
-   --plain` via the CLI.
-
-So either of these works:
+Use a local variable:
 
 ```bash
-# Local
 export ANTHROPIC_API_KEY=sk-ant-...
-npm run start
-
-# Infisical — store ANTHROPIC_API_KEY in your project, then either:
-infisical run -- npm run start          # injects all secrets as env vars
-npm run start                           # agent fetches the secret via the CLI
 ```
 
-Infisical lookups honor `INFISICAL_ENV` (default `dev`),
-`INFISICAL_PROJECT_ID`, and `POME_INFISICAL_SECRET_NAME` (default
-`ANTHROPIC_API_KEY`).
-
-## Identity (`pome.json`)
-
-This example ships a committed [`pome.json`](./pome.json) manifest carrying the
-portable `agent.slug` (`pr-summary-agent`) and `framework: "claude-agent-sdk"` —
-no agent id. On a hosted `pome run` the CLI resolves that slug to an `agt_` id
-under **your** team and caches it in the gitignored `.pome/` dir, so a fork
-self-onboards onto your own dashboard with nothing sensitive committed. Task
-files live under [`tasks/`](./tasks/), referenced by the manifest's `tasks` key.
-
-## Run (standalone, against `pome twin start`)
+Or use Infisical:
 
 ```bash
-# 1. In another terminal — start the GitHub twin:
-npx @pome-sh/cli twin start github
-# it prints POME_AUTH_TOKEN=… (a ready-minted bearer JWT)
-
-# 2. From this directory (Claude key from env or Infisical, see above):
-export POME_AUTH_TOKEN=…            # paste from the twin start output
-npm run start
+infisical run -- pome run tasks/01-summarize-prs.md
 ```
 
-The agent's auth comes from **env only** — it never reads the twin's on-disk
-state. Instead of pasting the token, you can export the same
-`TWIN_AUTH_SECRET` (≥ 32 chars) in both terminals before starting the twin;
-the agent then mints its own bearer JWT (`sid: "standalone"`, matching the
-`/s/standalone` session `pome twin start` serves) and talks to the twin's MCP
-at `http://127.0.0.1:3333/s/standalone/mcp`.
-
-By default it summarizes open PRs in `acme/api`. Point it at another repo with
-`POME_REPO_OWNER` / `POME_REPO_NAME`, or override the whole task with
-`POME_TASK`.
-
-## Run (under the Pome CLI evaluator)
-
-The CLI evaluator boots its own twin on a random port, seeds it from the
-task file, mints its own JWT, and passes the URL + token to the agent via
-env (`POME_GITHUB_MCP_URL`, `POME_AUTH_TOKEN`, `POME_TASK`):
+Without `infisical run`, the agent runs this lookup:
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...    # or run under `infisical run -- ...`
-
-# from this directory, with the CLI repo checked out beside `pome`
-npm run --cwd ../../../cli dev -- run \
-  ../pome/agent-examples/pr-summary-agent/tasks/01-summarize-prs.md \
-  --agent "npm run --cwd $(pwd) start"
+infisical secrets get ANTHROPIC_API_KEY --plain --env=dev
 ```
 
-A passing run prints `PASS Summarize open pull requests (widgets)` and writes a
-trace under `runs/<task-slug>/<run-id>/`.
+## Run
 
-## What this example shows
+```bash
+pome login
+pome run tasks/01-summarize-prs.md
+```
 
-| Concept | Where in the code |
-| --- | --- |
-| Claude Agent SDK + in-process MCP tools | `src/index.ts` — `createSdkMcpServer`, `tool()` |
-| Wrapping PR endpoints (`list_pull_requests`, `pull_request_read`, `get_file_contents`, …) | `src/index.ts` — `buildTwinTools` |
-| Calling the twin's MCP surface (`POST /s/:sid/mcp/call`) | `src/index.ts` — `TwinMcpClient` |
-| Claude key from Infisical or local env | `src/index.ts` — `resolveAnthropicKey` |
-| Env-only twin auth (token pass-through or local JWT mint) | `src/index.ts` — `resolveAuthToken` |
-| Pome CLI compatibility (`POME_TASK`, `POME_GITHUB_MCP_URL`, `POME_AUTH_TOKEN`, `POME_PREFLIGHT`) | `src/index.ts` — env reads + `preflight` |
+To capture one local run:
+
+```bash
+pome run --local tasks/01-summarize-prs.md
+```
+
+## Run Against A Standalone Twin
+
+Start the GitHub twin in the first terminal. Copy its `POME_AUTH_TOKEN`, then start the agent in the second terminal.
+
+```bash
+# terminal 1
+npx @pome-sh/cli twin start github \
+  --seed tasks/01-summarize-prs.seed.json
+
+# terminal 2, from agent-examples/pr-summary-agent
+export POME_AUTH_TOKEN=...
+export ANTHROPIC_API_KEY=sk-ant-...
+export POME_REPO_NAME=widgets
+npm start
+```
+
+The supplied seed contains the two pull requests in `acme/widgets`.
 
 ## Configuration
 
-All optional. Defaults match `npx @pome-sh/cli twin start github`.
-
-| Env var | Default | Purpose |
+| Variable | Default | Use |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | resolved from Infisical if unset | Used by the Claude Agent SDK. |
-| `INFISICAL_ENV` | `dev` | Infisical environment slug for the key lookup. |
-| `INFISICAL_PROJECT_ID` | — | Infisical project ID (if not inferred from `.infisical.json`). |
-| `POME_INFISICAL_SECRET_NAME` | `ANTHROPIC_API_KEY` | Secret name to fetch from Infisical. |
-| `POME_GITHUB_MCP_URL` | `http://127.0.0.1:3333/s/standalone/mcp` | Twin MCP endpoint. Pome CLI sets this automatically. |
-| `POME_AUTH_TOKEN` | — | Pre-minted bearer JWT. `pome twin start` prints one; Pome CLI sets it automatically. When unset, the agent mints its own from `TWIN_AUTH_SECRET`. |
-| `POME_TASK` | bundled PR-summary prompt | Override the agent's task. Pome CLI sets this from the task file. |
-| `POME_TWIN_BASE_URL` | `http://127.0.0.1:3333` | Used to derive the MCP URL when `POME_GITHUB_MCP_URL` is unset. |
-| `POME_TWIN_SID` | `standalone` | Used to derive the MCP URL when `POME_GITHUB_MCP_URL` is unset. |
-| `POME_REPO_OWNER` / `POME_REPO_NAME` | `acme` / `api` | Override the default repo named in the bundled task. |
-| `TWIN_AUTH_SECRET` | — | The secret the twin was started with. Used to mint the JWT locally when `POME_AUTH_TOKEN` is unset. |
+| `ANTHROPIC_API_KEY` | Infisical lookup | Authenticate the Claude Agent SDK. |
+| `POME_PR_SUMMARY_MODEL` | Claude CLI default | Request a Claude model or alias. |
+| `INFISICAL_ENV` | `dev` | Select the Infisical environment slug. |
+| `INFISICAL_PROJECT_ID` | unset | Select the Infisical project. |
+| `POME_INFISICAL_SECRET_NAME` | `ANTHROPIC_API_KEY` | Select the Infisical secret. |
+| `POME_GITHUB_MCP_URL` | standalone MCP URL | Select the GitHub twin MCP endpoint. |
+| `POME_AUTH_TOKEN` | unset | Authenticate with a token from Pome. |
+| `TWIN_AUTH_SECRET` | unset | Mint a standalone token when `POME_AUTH_TOKEN` is absent. |
+| `POME_TASK` | bundled summary instruction | Replace the agent instruction. |
+| `POME_REPO_OWNER` | `acme` | Set the default repository owner. |
+| `POME_REPO_NAME` | `api` | Set the default repository name. |
+
+For `pome run`, add each custom variable that you set to `POME_AGENT_ENV_ALLOWLIST`.
+This includes `POME_PR_SUMMARY_MODEL` and the three Infisical variables above.
+
+## Troubleshooting
+
+- If key lookup fails, export `ANTHROPIC_API_KEY` or authenticate the Infisical CLI.
+- If twin authentication fails, use the token from the current twin process.
+- If a requested model changes, read the printed `model:` line.

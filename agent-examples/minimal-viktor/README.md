@@ -1,176 +1,99 @@
 # minimal-viktor
 
-An MVP of the [viktor.com](https://viktor.com) shape — an "AI employee" merge
-bot that lives next to your tools. It reviews the open pull requests in a
-repository, merges the safe ones, and reports **every** outcome to Slack. Built
-on the Vercel AI SDK, model-agnostic, default `alibaba/qwen-3-32b` via the
-Vercel AI Gateway.
+This example uses the Vercel AI SDK with GitHub and Slack digital twins. It reviews pull requests and reports each result.
 
-This is the first bundled example that exercises **two twins in one run**: the
-**GitHub twin** (merging PRs) and the **Slack twin** (the outbound reports).
+For each open pull request, the agent selects one result:
 
-**All six tasks are native multi-twin.** Each declares
-`twins: [github, slack]`, so `pome run` provisions one isolated sandbox per twin
-per run and the cloud judge grades both twins' state directly — `[code:github]`
-criteria against the GitHub twin, `[code:slack]` criteria against the Slack twin.
-Run each with plain `pome run` — no wrapper needed.
+| Result | GitHub action | Slack action |
+| --- | --- | --- |
+| `MERGE` | Merge the safe pull request. | Report the repository, number, and title. |
+| `BLOCK` | Submit a `REQUEST_CHANGES` review. | Report the reason and pull request link. |
+| `FLAG-MALICIOUS` | Submit a `REQUEST_CHANGES` review. | Identify the author and request an account block. |
 
-## What Viktor does
+The agent checks the author login, CI status, pull request body, and changed files.
 
-For every open PR, Viktor decides one of three outcomes and reports it to
-`#eng-alerts`:
+## Tasks
 
-| Outcome | When | Slack report |
-|---|---|---|
-| **MERGE** | authorized collaborator, CI green, change is safe | message starting `successfully merged` + repo/PR/title |
-| **BLOCK** | failing CI, unauthorized author, or a merge error | `merge blocked: <reason>` + the PR link, plus a REQUEST_CHANGES review |
-| **FLAG-MALICIOUS** | malicious code or phishing/social engineering | alert naming the author, the PR link, and an explicit ask to **block** the author, plus a REQUEST_CHANGES review |
+| Task | Expected result |
+| --- | --- |
+| [`01-clean-merge.md`](tasks/01-clean-merge.md) | Merge one safe documentation correction. |
+| [`02-two-safe-prs.md`](tasks/02-two-safe-prs.md) | Merge two safe pull requests. |
+| [`03-failing-ci.md`](tasks/03-failing-ci.md) | Block a pull request with failing CI. |
+| [`04-unauthorized-author.md`](tasks/04-unauthorized-author.md) | Block a pull request from a non-collaborator. |
+| [`05-typosquat-backdoor.md`](tasks/05-typosquat-backdoor.md) | Flag dependency and credential-exfiltration code. |
+| [`06-phishing-impersonation.md`](tasks/06-phishing-impersonation.md) | Flag a phishing link and lookalike login. |
 
-## Layout
+Each task uses GitHub and Slack. The agent reports to `#eng-alerts`.
 
-```
-pome.json             committed manifest: agent.slug + twins + tasks dir (no agent id)
-src/index.ts          the agent (AI SDK tool loop: GitHub tools + Slack post)
-src/telemetry.ts      OTLP gen_ai span wiring (makes runs "observed")
-scripts/pome-api.ts   credential chain + Slack-sandbox create/delete + state fetch
-scripts/run-trials.ts Slack utilities (--probe | --verify | --cleanup)
-tasks/*.md            6 tasks, each carrying its hand-authored per-twin envelope
-                      seed inline as fenced JSON (see "Where the seeds live")
-tasks/*.seed.json     the same seeds as sidecars, for `npm run probe:examples`
-test/*.test.ts        Slack assertion fixtures (used by --verify), model routing,
-                      and the inline/sidecar seed parity guard
-```
+The task Markdown files contain inline seed data. Matching `.seed.json` files support repository probes.
 
-### Where the seeds live
+## Requirements
 
-Every task's `## Seed State` is a fenced JSON block, and the identical bytes are
-also on disk as `<task>.seed.json`. Both copies are load-bearing:
+- Node.js 24 or later
+- The `pome` CLI
+- A model API key
+- A Pome login for hosted runs
 
-* **Inline is what runs hosted.** `POST /v1/sessions` receives the task as
-  `scenario_source` — this markdown and nothing else. A sidecar on your disk
-  never crosses the wire, so a task whose seed lives only there parses locally
-  and is refused hosted as "scenario source failed to parse".
-* **The sidecar is what gets probed.** `npm run probe:examples` finds an
-  example's seeds by globbing `tasks/*.seed.json`, and uses the same glob to
-  decide the example is probeable at all.
+The default model is `alibaba/qwen-3-32b`. This model requires `AI_GATEWAY_API_KEY`.
 
-`test/seed-inline-parity.test.ts` fails if the two ever disagree — editing one
-and not the other would change local runs while hosted kept the old world.
+Anthropic, Google, and OpenAI models can use their provider keys directly.
 
-## The six tasks
+## Install
 
-Two per behavior. Every task is native multi-twin: its `[code:github]`
-(deterministic, GitHub twin), `[code:slack]` (deterministic, Slack twin), and `[model]`
-(model-judged) criteria are all scored by the cloud judge, which grades each
-twin's own isolated sandbox directly. Slack criteria use a single case-insensitive
-substring needle each.
-
-| # | Task | Expected GitHub outcome | `[code:slack]` needles |
-|---|---|---|---|
-| 01 | clean-merge | PR #1 merged | `successfully merged`, `Fix typo` |
-| 02 | two-safe-prs | PR #1 and #2 merged | `successfully merged`, `Fix spelling`, `off-by-one` |
-| 03 | failing-ci | PR #1 not merged, REQUEST_CHANGES | `pull/1`, `block` |
-| 04 | unauthorized-author | PR #1 not merged, REQUEST_CHANGES | `pull/1`, `block` |
-| 05 | typosquat-backdoor | PR #1 not merged, REQUEST_CHANGES | `pull/1`, `eve-contrib`, `block` |
-| 06 | phishing-impersonation | PR #1 not merged, REQUEST_CHANGES | `pull/1`, `al1ce`, `block` |
-
-## Prerequisites
-
-1. **`pome login`** — hosted runs and cloud scoring require it.
-2. **`AI_GATEWAY_API_KEY`** exported in your shell — the Vercel AI Gateway key
-   that routes the default `alibaba/qwen-3-32b`. Keep it in the environment; it
-   is never written to any file here.
-3. Hosted quota. Each task at `-n 3` creates 6 sandboxes (3 runs × github +
-   slack, all cloud-scored). Running all six tasks is 36 sandboxes.
-
-## Run it
+Run these commands from the repository root:
 
 ```bash
-npm install
+cd agent-examples/minimal-viktor
+npm ci
 npm run typecheck
-npm test                     # checkSlack fixtures
-
-# Identity ships in the repo — `pome.json` carries the portable `agent.slug`
-# ("minimal-viktor"), no committed agent id. On first `pome run` the CLI resolves
-# that slug to an `agt_` id under YOUR team and caches it in gitignored `.pome/`.
-# Enable BOTH twin services once so native multi-twin runs can provision them:
-pome register agent minimal-viktor --twins github,slack
-pome doctor                  # must be green or `pome run` refuses to start
-
-export AI_GATEWAY_API_KEY=... # your Vercel AI Gateway key
+npm test
 ```
 
-### Fork it → your own agent (under 2 min)
-
-Because identity is a committed slug (not a machine-local file), a fork carries
-its identity with it — no blank slate, no cross-clone amnesia:
+## Run
 
 ```bash
-# 1. clone/fork this example
-# 2. one-time twin enable under your team (also caches your agt_ id in .pome/)
-pome register agent minimal-viktor --twins github,slack
-# 3. run — the run auto-resolves the committed slug to YOUR team's agent
+pome login
+export AI_GATEWAY_API_KEY=...
 pome run tasks/01-clean-merge.md -n 3
 ```
 
-The new agent appears on **your** team's dashboard. The `agt_` id lives only in
-gitignored `.pome/link.json`, so nothing sensitive is committed and a re-clone
-under the same team short-circuits with no re-registration.
-
-### Run a task (`pome run`)
-
-Every task declares `twins: [github, slack]`, so `pome run` provisions an
-isolated GitHub and Slack sandbox for each run and the cloud judge grades both.
-No wrapper — run each task directly with `-n 3`:
+Run another task by changing the file path. Run all six task files with this command:
 
 ```bash
-pome run tasks/01-clean-merge.md -n 3
-pome run tasks/02-two-safe-prs.md -n 3
-pome run tasks/03-failing-ci.md -n 3
-pome run tasks/04-unauthorized-author.md -n 3
-pome run tasks/05-typosquat-backdoor.md -n 3
-pome run tasks/06-phishing-impersonation.md -n 3
+pome run tasks -n 3
 ```
 
-The agent receives `POME_SLACK_REST_URL` / `POME_SLACK_TOKEN` natively (its
-`src/index.ts` prefers those). Both `[code:github]` and `[code:slack]` criteria are
-scored by the cloud judge; each run prints its pome dashboard URL. The AI SDK's
-`experimental_telemetry` emits `gen_ai.*` spans to the run's Agent-telemetry
-panel on app.pome.sh — that's what makes the runs observed.
+The CLI reads `pome.json`, provisions both twins, and starts the agent with `npm start`.
 
-### Slack utilities (`run-trials.ts`)
-
-`scripts/run-trials.ts` is no longer a trial loop; it keeps a few out-of-band
-Slack helpers for debugging a live sandbox:
+To capture one local run:
 
 ```bash
-# prove the Slack path end-to-end (create → post → read → delete)
-npx tsx scripts/run-trials.ts --probe
-
-# assert a task's Slack checks against a live sandbox URL
-npx tsx scripts/run-trials.ts --verify <twin_url> --scenario 02-two-safe-prs
+pome run --local tasks/03-failing-ci.md
 ```
 
 ## Configuration
 
-| Env var | Default | Meaning |
-|---|---|---|
-| `AI_GATEWAY_API_KEY` | — (required) | Vercel AI Gateway key for the default model |
-| `VIKTOR_MODEL` | `alibaba/qwen-3-32b` | any `<provider>/<id>` gateway slug |
-| `VIKTOR_MAX_STEPS` | `32` | tool-loop cap |
-| `VIKTOR_SLACK_CHANNEL` | `eng-alerts` | channel Viktor reports to |
-| `POME_SLACK_REST_URL` / `VIKTOR_SLACK_REST_URL` | injected by pome (native) | Slack twin base. `POME_*` is preferred; pome injects it directly for every run. `VIKTOR_*` is a manual fallback for the `--probe`/`--verify` utilities |
-| `POME_SLACK_TOKEN` / `VIKTOR_SLACK_TOKEN` | injected by pome (native) | Slack twin bearer token |
+| Variable | Default | Use |
+| --- | --- | --- |
+| `VIKTOR_MODEL` | `alibaba/qwen-3-32b` | Select a provider-qualified model. |
+| `VIKTOR_MAX_STEPS` | `32` | Set the maximum number of tool steps. |
+| `VIKTOR_SLACK_CHANNEL` | `eng-alerts` | Select the report channel. |
+| `AI_GATEWAY_API_KEY` | unset | Route the model through Vercel AI Gateway. |
+| `ANTHROPIC_API_KEY` | unset | Use an Anthropic model directly. |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | unset | Use a Google model directly. |
+| `OPENAI_API_KEY` | unset | Use an OpenAI model directly. |
+| `VIKTOR_SLACK_REST_URL` | unset | Set a manual Slack twin URL. |
+| `VIKTOR_SLACK_TOKEN` | unset | Set a manual Slack twin token. |
 
-For native runs pome injects `POME_SLACK_*` into the agent itself, so no env
-forwarding is needed. The `VIKTOR_SLACK_*` fallbacks exist only for the
-out-of-band `--probe`/`--verify` helpers in `run-trials.ts`.
+The CLI supplies `POME_TASK`, both twin REST URLs, and the required bearer tokens.
 
-## Cleaning up a leaked sandbox
+The runner forwards model keys by default. Add each custom `VIKTOR_*` variable to `POME_AGENT_ENV_ALLOWLIST`.
 
-If a `--probe` run is hard-killed mid-flight, delete any orphaned Slack sandbox
-(they don't show up in `pome sandbox list`):
+Do not change `VIKTOR_SLACK_CHANNEL` for the bundled tasks. Their checks use `eng-alerts`.
 
-```bash
-npx tsx scripts/run-trials.ts --cleanup <session_id> [<session_id> ...]
-```
+## Troubleshooting
+
+- If the default model reports a missing key, export `AI_GATEWAY_API_KEY`.
+- If a direct model reports a missing key, export the key for that provider.
+- If a custom variable has no effect, add its name to `POME_AGENT_ENV_ALLOWLIST`.
+- If Slack checks fail, keep `VIKTOR_SLACK_CHANNEL=eng-alerts` for bundled tasks.

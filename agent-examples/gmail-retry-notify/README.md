@@ -1,88 +1,80 @@
 # gmail-retry-notify
 
-A model-driven Gmail notification agent (Vercel AI SDK, REST) that must send an
-announcement to five recipients while the Gmail twin throttles it partway
-through. **Failure class: retry / partial failure.**
+This example uses the Vercel AI SDK and the Gmail twin REST API. It sends one announcement to five recipients.
 
-This is the retry/partial-failure entry in the Pome example curriculum. Each
-example teaches exactly one failure class with a failing baseline and a
-one-line fix.
+The task tests retry behavior after partial delivery.
 
-## What breaks
+## Task
 
-The task seeds the Gmail twin with a named `rate-limited` fault on
-`messages.send`: the first two sends succeed, the next three return **HTTP 429
-`RESOURCE_EXHAUSTED`**, then sends recover. A naive agent sends each recipient
-once, hits 429 on the later ones, and stops — leaving those teammates unsent
-(partial failure) or falsely reporting "all sent". Worse, an agent that reacts
-by re-sending the whole batch duplicates the recipients that already went out
-(the Gmail twin does not dedupe across separate send calls).
+[`tasks/01-throttled-send.md`](tasks/01-throttled-send.md) configures a `rate-limited` fault on `messages.send`.
 
-The named fault is a reusable twin primitive — any task can seed
-`faults: [{ "name": "rate-limited", ... }]`; the name is the teaching
-vocabulary.
+1. The first two send requests succeed.
+2. The next three send requests return HTTP 429.
+3. Later send requests can succeed.
 
-## Run the failing baseline
+The correct agent retries only failed recipients. It does not send another message to a recipient after a successful send.
 
-Prerequisites: Node ≥ 24, `ANTHROPIC_API_KEY` set, and a logged-in `pome` CLI
-(`pome login`). Then, from this directory:
+The source currently selects `RETRY_RULE_V1`. This baseline tells the model to try each recipient once.
+
+Select `RETRY_RULE_V2` in `src/index.ts` to test bounded retries and accurate delivery reporting:
+
+```ts
+const RETRY_RULE = RETRY_RULE_V2;
+```
+
+See [`VERIFICATION.md`](VERIFICATION.md) for recorded measurements.
+
+## Requirements
+
+- Node.js 24 or later
+- The `pome` CLI
+- An Anthropic API key or Vercel AI Gateway key
+- A Pome login for hosted runs
+
+The default model is `anthropic/claude-opus-4-8`.
+
+## Install
+
+Run these commands from the repository root:
 
 ```bash
+cd agent-examples/gmail-retry-notify
 npm ci
-pome run tasks/01-throttled-send.md -n 3
+npm run typecheck
 ```
 
-The agent ships red: `src/index.ts` uses `RETRY_RULE_V1` ("send each recipient
-once"). Expected: the trial table FAILS — fewer than five recipients delivered
-and/or a false "all sent" summary.
-
-<!-- BASELINE-REPORT: filled from the real red run in VERIFICATION.md -->
-
-## Read the report
-
-Open the run link printed by `pome run`. The failing criteria show which
-recipients never received the announcement and, for the `[model]` criterion,
-where the summary overclaimed delivery.
-
-## The fix
-
-One line in `src/index.ts`:
-
-```diff
--const RETRY_RULE = RETRY_RULE_V1; // ← green variant: change to RETRY_RULE_V2
-+const RETRY_RULE = RETRY_RULE_V2; // ← green variant: change to RETRY_RULE_V2
-```
-
-`RETRY_RULE_V2` tells the agent to back off and retry **only the recipients
-that failed**, never re-sending a success, and to report the true delivery
-state.
-
-## Re-run green
+## Run
 
 ```bash
-pome run tasks/01-throttled-send.md -n 3
+pome login
+export ANTHROPIC_API_KEY=sk-ant-...
+pome run tasks/01-throttled-send.md
 ```
 
-Expected: all five recipients delivered exactly once, no duplicates, honest
-summary — every criterion passes.
+The task configuration requests three hosted trials. Use `-n <count>` to override that value.
 
-<!-- GREEN-REPORT: filled from the real green run in VERIFICATION.md -->
+To capture one local run:
 
-See [`VERIFICATION.md`](./VERIFICATION.md) for the measured red vs green results.
+```bash
+pome run --local tasks/01-throttled-send.md
+```
 
-## Customize
+## Configuration
 
-- Tune the fault in `tasks/01-throttled-send.seed.json`: `succeedFirst`,
-  `throttleFor`, `retryAfterSeconds`.
-- Point the same `rate-limited` fault at your own task's mailbox to test your
-  own agent's retry handling.
-- Swap the model with `GMAIL_AGENT_MODEL` (e.g. a smaller model that may not
-  recover even with the V2 rule).
+| Variable | Default | Use |
+| --- | --- | --- |
+| `GMAIL_AGENT_MODEL` | `anthropic/claude-opus-4-8` | Select the model. |
+| `GMAIL_AGENT_MAX_STEPS` | `30` | Set the maximum number of tool steps. |
+| `AI_GATEWAY_API_KEY` | unset | Route the model through Vercel AI Gateway. |
+| `ANTHROPIC_API_KEY` | unset | Use Anthropic directly when no gateway key exists. |
 
-## If your baseline passes / your fix fails
+The CLI supplies `POME_TASK`, `POME_GMAIL_REST_URL`, `POME_AUTH_TOKEN`, and `POME_GMAIL_TOKEN`.
 
-Model runs are nondeterministic. If the red baseline (V1) occasionally passes,
-raise `throttleFor` in the seed so more sends are throttled, or increase `-n`.
-If the green fix (V2) occasionally fails, raise the retry budget in
-`RETRY_RULE_V2` or lower `throttleFor`. The `runs: 3` trial count in the task
-config is there because reliability is part of the lesson.
+For `pome run`, add `GMAIL_AGENT_MODEL` or `GMAIL_AGENT_MAX_STEPS` to `POME_AGENT_ENV_ALLOWLIST` when you set it.
+
+## Troubleshooting
+
+- If some recipients receive no message, check which retry rule is selected.
+- If recipients receive duplicate messages, retry only the failed send request.
+- If authentication fails, export `ANTHROPIC_API_KEY` or `AI_GATEWAY_API_KEY`.
+- If a custom variable has no effect, add its name to `POME_AGENT_ENV_ALLOWLIST`.

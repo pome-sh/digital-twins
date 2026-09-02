@@ -42,8 +42,11 @@ Then call `run_task(task_id, agent_id, agent_version, group_id)` (the
 `expires_at`, `agent_token`, `examinee_task` (the prompt + twins the examinee
 sees — no criteria), and `examinee_launch` (the full launch spec).
 
+Before launch, show `eval_cost` to the builder and ask for confirmation. Do not
+launch the examinee until the builder confirms the cost.
+
 **`agent_version` on every run.** Read it from the manifest's `agent.version`
-(`pome.json`); if the builder declares none, ask for one before the first run
+field. If the builder declares none, ask for one before the first run
 rather than sending nothing. It is the label the run declares itself to be, and
 it is what keeps one version's trials from being averaged with another's — the
 dashboard partitions run-sets by `(agent, task, agent_version)`. Never
@@ -136,7 +139,7 @@ re-verified as a fair exam before it counts. Then:
 
    **Bump `agent_version` too, and say so to the builder.** The edited prompt is
    a different agent, so the rerun declares a different version — have the
-   builder set it in `pome.json` (`agent.version`), or agree one with them and
+   builder set `agent.version` in the Pome manifest, or agree one with them and
    pass it. A fresh `group_id` alone is not enough: the reliability page also
    partitions the *implicit* run-set by declared version, and the verdict strip
    asserts "same agent, same prompt" over a run-set. Rerun the fix as `v1` and

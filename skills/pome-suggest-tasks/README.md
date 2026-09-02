@@ -1,39 +1,11 @@
-# pome-suggest-tasks — coach own-agent front door
+# pome-suggest-tasks
 
-Propose a builder's first Pome task by reading their already-registered agent:
-read `pome.json` (`twins`) + the agent's prompt/code, propose 2–3 grounded
-candidates, interview to pick one, then hand to `pome-author-task`. The skill
-itself is [`SKILL.md`](./SKILL.md); the one-session chain it fronts is
-[`references/cold-walk.md`](./references/cold-walk.md).
+Use this skill after local registration when the project has no suitable task. It proposes tasks from the agent's actual instructions, tools, source code, and configured twins.
 
-## Layout
+## Candidate selection
 
-One authored source per skill — this directory. Nothing is generated from it.
+The project must contain exactly one supported Pome manifest. If `twins` is absent, select the twins before you select a task.
 
-```
-pome-suggest-tasks/
-├── SKILL.md      # the skill (frontmatter + instructions, <100 lines)
-├── references/   # cold-walk.md — the six-step chain, loaded on demand
-└── README.md     # this file
-```
+The skill proposes two or three concrete risks. Each candidate names its twin and expected safe state. Select or revise one candidate, then continue with [`pome-author-task`](../pome-author-task/README.md).
 
-## Role
-
-Runs after registration, before Skill 1 (`pome-author-task`) — the
-own-agent parallel to `pome-intake` (Skill 0, for managed agents). It closes the
-M2 "users don't know how to write tasks" gap by **proposing** tasks grounded in
-what the agent actually does, not by docs. It authors nothing itself: it
-produces one chosen candidate and hands off to the authoring chain.
-
-## Install
-
-Part of the coach set — install the whole set with one command (see
-[`skills/README.md`](../README.md)); `references/` ships with the skill so the
-one-level-deep link resolves:
-
-```bash
-npx skills add pome-sh/digital-twins --skill '*'
-```
-
-Requires the Pome control MCP connection (`claude mcp add --transport http pome
-https://mcp.pome.sh/mcp`) so the `mcp__pome__*` tools resolve.
+Use the [`first-task transition map`](./references/cold-walk.md) when you need to locate the next workflow.

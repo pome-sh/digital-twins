@@ -1,65 +1,18 @@
-# M2 cold walk — registration → first own-agent report
+# First task path
 
-The one-session journey `pome-suggest-tasks` fronts. Each step lists **input ·
-what the coach does · expected artifact**. The two human checkpoints are marked
-⚑; every other step is automatic on the happy path. A step stops for the builder
-ONLY on the failure named in its row — no founder rescue otherwise (Done-when #3).
+Use this transition map to move a local project to its first graded report. Follow the linked guide for each procedure.
 
-1. **Registration** (upstream — not this skill)
-   - Input: a foreign repo with the agent's code.
-   - Coach: confirm the agent is registered via the **CLI** — a local repo, so
-     `pome register agent`, **not** MCP `register_agent` (see the pome router's
-     "One register verb"): a `pome.json` (with `twins`) and a populated
-     `.pome/link.json` are present. This skill only verifies the manifest is
-     there and enters the chain.
-   - Artifact: `pome.json` + `.pome/link.json` at the repo root; an `agent_id`
-     on the platform.
-   - Stops if: no `pome.json` → route back to the entry path.
+## Transition map
 
-2. **Suggestion** (`pome-suggest-tasks`)
-   - Input: `pome.json` + the agent's prompt/code; empty `tasks/` and empty
-     `list_tasks`.
-   - Coach: read the agent, propose 2–3 grounded candidates.
-   - Artifact: 2–3 one-line candidates — each fear · twin · bad/good end-state.
+The project must contain exactly one manifest: `pome.json`, `pome.yaml`, or `pome.yml`. If none exists, run `pome init --bare`. If more than one exists, remove the duplicate manifest before you continue.
 
-3. ⚑ **Pick** (checkpoint 1 — still `pome-suggest-tasks`)
-   - Input: the candidate list.
-   - Coach: short interview — the builder picks or refines one.
-   - Artifact: one chosen candidate (prompt + fear + twin + bad/good end-state).
+| Current state | Required transition | Next guide |
+| --- | --- | --- |
+| One valid manifest, agent not registered | Set the agent command. Set twins if the GitHub default is not correct. Run `pome login` and `pome register agent <name>`. | [`pome-suggest-tasks`](../README.md) |
+| Registered agent, no suitable task | Select one risk grounded in the configured agent. | [`pome-suggest-tasks`](../README.md) |
+| Candidate selected | Write, validate, and save the task. | [`pome-author-task`](../../pome-author-task/README.md) |
+| Task saved | Verify the initial state and criterion intent. | [`pome-verify-seed`](../../pome-verify-seed/README.md) |
+| Seed verified | Run the agent and read the hosted report. | [`pome-run-task`](../../pome-run-task/README.md) |
+| Valid criterion failed | Correct the agent. Keep the task unchanged. | [`pome-run-task`](../../pome-run-task/README.md) |
 
-4. **Authoring** (`pome-author-task`)
-   - Input: the chosen candidate.
-   - Coach: write the task markdown into the repo's `tasks/` dir (the source of
-     truth), `validate_task`, dry-run `verify_seed`, `evaluate_criteria`, then
-     `save_task` to publish that file to the catalog (ADR-019 decision 3: file
-     first, catalog follows — never the reverse).
-   - Artifact: a committed `tasks/<NN>-….md` source file plus its published
-     catalog entry (`task_id`).
-   - Stops if: `validate_task` errors or a `code` criterion is `unmatched` → fix
-     with the builder, never save blind.
-
-5. **Verified seed** (`pome-verify-seed`)
-   - Input: the saved task.
-   - Coach: judge the seed a fair exam — it boots, matches the prompt, and a
-     positive discriminator carries the signal.
-   - Artifact: verdict **HEALTHY seed**.
-   - Stops if: BROKEN / unfair → fix the seed or restate criteria, then
-     re-verify (never weaken the exam to pass it).
-
-6. **Run** (`pome-run-task`)
-   - Input: the verified task + `agent_id`.
-   - Coach: `run_task` mints the session, launch the examinee via the REST
-     launcher (preflighted), `finalize_run` the instant it idles.
-   - Artifact: a finalized `run_id` with a score, graded off the live twin tape.
-   - Stops if: the run comes back red → hand the fix prompt to the builder, who
-     edits the **examinee's** prompt (never the task), then re-run only what
-     failed.
-
-7. ⚑ **Report** (checkpoint 2 — still `pome-run-task`)
-   - Input: `run_id`.
-   - Coach: `get_report`, narrate the Score /100 + criteria + dashboard link.
-   - Artifact: the **first own-agent finalized report** (Done-when #2).
-
-**Pass criterion for the whole walk (Done-when #3):** a builder starts at a fresh
-registered repo and reaches step 7 in one session, the coach stopping only at the
-two ⚑ checkpoints and any genuine failure above — no founder help.
+Stop at any failed transition. Correct its reported cause before you continue.

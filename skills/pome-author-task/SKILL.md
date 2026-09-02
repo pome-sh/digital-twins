@@ -12,7 +12,8 @@ written into the repo's `tasks/` dir as the source of truth, then published to
 the team catalog. It authors — it never runs the test (that is a later skill).
 
 A task is one markdown document: `## Prompt` + `## Success Criteria` (with
-`[code]`/`[model]` criteria) + optional `## Config` / `## Seed State`. The full
+`[code]`/`[model]` criteria) + required `## Config` for hosted authoring +
+optional `## Seed State`. The full
 grammar lives in [`references/task-format.md`](references/task-format.md)
 — read it before drafting; do not reproduce it here.
 
@@ -87,7 +88,7 @@ author a check that needs the live internet; seed the world instead.
 ## 3. Draft the task — into the repo, not a scratch file
 
 Write the task markdown straight into the manifest's tasks directory
-(`pome.json`'s `tasks` key, default `tasks/`) — **the repo file is the source
+(the `tasks` key, default `tasks/`) — **the repo file is the source
 of truth**: committable, reviewable, and the exact document `save_task` later
 publishes. Name it `<NN>-<kebab-fear>.md`, following the files already in that
 directory (`02-injection-issue-body.md`) and picking the next free number.
@@ -139,9 +140,8 @@ in the closed set fits — but `save_task` refuses one that binds to no check
 rather than persisting a criterion that would silently leave the score
 denominator.
 
-Give every fear both: a `[code]` on what changed, a `[model]` on why. The retired
-`D` / `P` letter-markers are rejected by the parser with a migration hint — always
-author in `code` / `model`. Multi-twin rule: every `[code]` needs a twin tag
+Use `[code]` for state and `[model]` when reasoning is part of the task.
+For a multi-twin task, every `[code]` needs a twin tag
 (`[code:github]`); a bare `[model]` attributes to the primary twin. See the
 reference for tags, seed shapes, and config.
 
@@ -155,19 +155,18 @@ Never save blind. Run, in order, on the `tasks/` file you just wrote:
    may shout `BROKEN seed`). Triage each one by intent — never auto-fix:
    - **Guard criterion** (a do-no-harm negative like `PR #1 is not merged`)
      passes at seed *by construction* — that is fine, keep it. But a guard
-     cannot distinguish a working agent from one that did nothing: make sure
-     at least one positive criterion is NOT passing at seed and carries the
-     signal.
+     is excluded from normal scoring unless it is `always-scored`. An
+     all-negative task can use intentional `always-scored` guards. Other tasks
+     need at least one positive criterion that is not passing at seed.
    - **Pre-satisfied discriminator** (a check that was meant to detect the
      agent's work) grades nothing: weaken the seed or restate the criterion.
-   - A task whose criteria ALL pass at seed is genuinely broken.
+   - A task whose criteria all pass at seed is broken unless it is an
+     intentional all-negative task with `always-scored` guards.
 3. `evaluate_criteria` — dry-runs the criteria against the booted twin. Any
    `code` criterion that comes back `unmatched` has no predicate — restate it to
    a known phrase or move that outcome to `model`.
 
-Loop until validation is clean, no criterion is `unmatched`, and every
-seed-passing criterion is an intentional guard backed by a positive
-discriminator.
+Repeat until validation succeeds and every criterion binds.
 
 ## 5. Publish to the catalog
 

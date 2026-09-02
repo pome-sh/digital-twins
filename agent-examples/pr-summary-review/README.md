@@ -1,126 +1,98 @@
-# `pr-summary-review` — bundled Pome example
+# pr-summary-review
 
-A [Claude Agent SDK](https://docs.claude.com/en/agent-sdk/typescript) agent that
-both **summarizes** and **reviews** pull requests against a local GitHub-shaped
-Pome twin. For each open PR it reads the title, body, changed files, and unified
-diff, then:
+This example uses the Claude Agent SDK and the GitHub twin MCP API. It summarizes and reviews open pull requests.
 
-1. Posts a structured summary comment (**what changed / why / risk / review
-   checklist**).
-2. Submits a formal review verdict — **APPROVE**, **COMMENT**, or
-   **REQUEST_CHANGES** — grounded in the diff.
+For each pull request, the agent posts one summary and one formal review. It does not merge or change code.
 
-It approves only clearly-safe changes, requests changes when the diff contains a
-real defect (a bug, a removed safety check, a hardcoded secret), and never
-merges or modifies code.
-
-This builds on `pr-summary-agent` (summary only) by adding a formal review
-verdict via the twin's `pull_request_review_write` surface. The Claude API key
-is sourced from **Infisical or your local environment**.
-
-## Prerequisites
-
-- A running Pome twin (the Pome CLI boots its own per run; for standalone use,
-  start one with `npx @pome-sh/cli twin start github` — it prints a
-  ready-minted `POME_AUTH_TOKEN` on boot).
-- Node.js 24+ and npm 11.5+.
-- An Anthropic API key — from your environment **or** Infisical (see below).
-
-## Install
-
-```bash
-cd agent-examples/pr-summary-review
-npm install
-```
-
-## Claude API key — Infisical or local
-
-The agent resolves `ANTHROPIC_API_KEY` in this order:
-
-1. **Local env** — `ANTHROPIC_API_KEY` if it is already set.
-2. **Infisical** — otherwise it runs `infisical secrets get ANTHROPIC_API_KEY
-   --plain` via the CLI.
-
-```bash
-# Local
-export ANTHROPIC_API_KEY=sk-ant-...
-
-# Infisical — store the key in your project, then either:
-infisical run -- pome run tasks/01-clean-prs.md   # injects all secrets as env vars
-# ...or let the agent fetch it via the CLI (needs `infisical init` / login)
-```
-
-Infisical lookups honor `INFISICAL_ENV` (default `dev`), `INFISICAL_PROJECT_ID`,
-and `POME_INFISICAL_SECRET_NAME` (default `ANTHROPIC_API_KEY`).
-
-## Identity (`pome.json`) and hosted registration
-
-Identity ships in the repo — the committed [`pome.json`](./pome.json) manifest
-carries the portable `agent.slug` (`pr-summary-review`) and
-`framework: "claude-agent-sdk"`, with **no** agent id. On the first hosted
-`pome run` the CLI resolves that slug to an `agt_` id under **your** team and
-caches it in gitignored `.pome/link.json`, so a fork self-onboards onto your own
-dashboard with nothing sensitive committed.
-
-To resolve it ahead of time (or re-resolve after a team switch):
-
-```bash
-# after `pome login`
-pome register agent pr-summary-review
-```
-
-This resolves the committed slug to a cloud agent under your team and caches the
-id in gitignored `.pome/link.json`; runs are then attributed to it on the
-dashboard.
+The review event is `APPROVE`, `COMMENT`, or `REQUEST_CHANGES`.
 
 ## Tasks
 
-Three hand-authored tasks live under [`tasks/`](./tasks/), each with a full
-`.seed.json` fixture:
+| Task | Expected review behavior |
+| --- | --- |
+| [`01-clean-prs.md`](tasks/01-clean-prs.md) | Do not request changes for two safe pull requests. |
+| [`02-buggy-pr.md`](tasks/02-buggy-pr.md) | Request changes for a broken accumulation loop. |
+| [`03-risky-pr.md`](tasks/03-risky-pr.md) | Request changes for a hardcoded secret and removed validation. |
 
-| Task | What it exercises | Expected verdict(s) |
-| --- | --- | --- |
-| `01-clean-prs.md` | Two benign PRs (a backwards-compatible feature + a docs change) | APPROVE / COMMENT — never REQUEST_CHANGES |
-| `02-buggy-pr.md` | A PR that breaks `total()` by replacing `+=` with `=` (mislabeled "no behavior change") | REQUEST_CHANGES, naming the accumulation bug |
-| `03-risky-pr.md` | A PR that hardcodes a live-looking secret and removes empty-token validation | REQUEST_CHANGES, flagging both |
+The agent compares each changed file on the base and head branches before it submits a review.
+
+## Requirements
+
+- Node.js 24 or later
+- The `pome` CLI
+- An Anthropic API key
+- A Pome login for hosted runs
+
+The agent reads `ANTHROPIC_API_KEY` first. If it is absent, the agent requests the key from the Infisical CLI.
+
+## Install
+
+Run these commands from the repository root:
+
+```bash
+cd agent-examples/pr-summary-review
+npm ci
+npm run typecheck
+```
+
+## Configure The API Key
+
+Use a local variable:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Or use Infisical:
+
+```bash
+infisical run -- pome run tasks/01-clean-prs.md
+```
+
+The direct Infisical lookup uses `INFISICAL_ENV`, `INFISICAL_PROJECT_ID`, and `POME_INFISICAL_SECRET_NAME`.
 
 ## Run
 
 ```bash
-# one task
+pome login
 pome run tasks/01-clean-prs.md
+pome run tasks/02-buggy-pr.md
+pome run tasks/03-risky-pr.md
+```
 
-# all three (directory)
+Run all task files with this command:
+
+```bash
 pome run tasks
 ```
 
-`pome run` boots its own twin on a random port, seeds it from the task's
-`.seed.json`, mints the JWT, and injects `POME_GITHUB_MCP_URL` /
-`POME_AUTH_TOKEN` / `POME_TASK`. Hosted scoring requires `pome login`; add
-`--local` to capture a trace without scoring.
+To capture one local run:
 
-## What this example shows
-
-| Concept | Where in the code |
-| --- | --- |
-| Claude Agent SDK + in-process MCP tools | `src/index.ts` — `createSdkMcpServer`, `tool()` |
-| Summarize + formal review verdict (`pull_request_review_write`) | `src/index.ts` — `buildTwinTools` (`submit_pull_request_review`) |
-| Reconstructing the diff from file contents (`get_file_contents` on base + head) | `src/index.ts` — `buildTwinTools` |
-| Claude key from Infisical or local env | `src/index.ts` — `resolveAnthropicKey` |
-| Pome CLI compatibility (`POME_TASK`, `POME_GITHUB_MCP_URL`, `POME_AUTH_TOKEN`, `POME_PREFLIGHT`) | `src/index.ts` — env reads + `preflight` |
+```bash
+pome run --local tasks/02-buggy-pr.md
+```
 
 ## Configuration
 
-All optional. Defaults match `npx @pome-sh/cli twin start github`.
-
-| Env var | Default | Purpose |
+| Variable | Default | Use |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | resolved from Infisical if unset | Used by the Claude Agent SDK. |
-| `INFISICAL_ENV` | `dev` | Infisical environment slug for the key lookup. |
-| `INFISICAL_PROJECT_ID` | — | Infisical project ID (if not inferred from `.infisical.json`). |
-| `POME_INFISICAL_SECRET_NAME` | `ANTHROPIC_API_KEY` | Secret name to fetch from Infisical. |
-| `POME_GITHUB_MCP_URL` | `http://127.0.0.1:3333/s/standalone/mcp` | Twin MCP endpoint. Pome CLI sets this automatically. |
-| `POME_AUTH_TOKEN` | — | Pre-minted bearer JWT. `pome twin start` prints one; Pome CLI sets it automatically. When unset, the agent mints its own from `TWIN_AUTH_SECRET`. |
-| `POME_TASK` | bundled summarize+review prompt | Override the agent's task. Pome CLI sets this from the task file. |
-| `POME_REPO_OWNER` / `POME_REPO_NAME` | `acme` / `api` | Override the default repo named in the bundled task. |
-| `TWIN_AUTH_SECRET` | — | The secret the twin was started with. Used to mint the JWT locally when `POME_AUTH_TOKEN` is unset. |
+| `ANTHROPIC_API_KEY` | Infisical lookup | Authenticate the Claude Agent SDK. |
+| `POME_PR_REVIEW_MODEL` | Claude CLI default | Request a Claude model or alias. |
+| `INFISICAL_ENV` | `dev` | Select the Infisical environment slug. |
+| `INFISICAL_PROJECT_ID` | unset | Select the Infisical project. |
+| `POME_INFISICAL_SECRET_NAME` | `ANTHROPIC_API_KEY` | Select the Infisical secret. |
+| `POME_GITHUB_MCP_URL` | standalone MCP URL | Select the GitHub twin MCP endpoint. |
+| `POME_AUTH_TOKEN` | unset | Authenticate with a token from Pome. |
+| `TWIN_AUTH_SECRET` | unset | Mint a standalone token when `POME_AUTH_TOKEN` is absent. |
+| `POME_TASK` | bundled review instruction | Replace the agent instruction. |
+| `POME_REPO_OWNER` | `acme` | Set the default repository owner. |
+| `POME_REPO_NAME` | `api` | Set the default repository name. |
+
+For `pome run`, add each custom variable that you set to `POME_AGENT_ENV_ALLOWLIST`.
+This includes `POME_PR_REVIEW_MODEL` and the three Infisical variables above.
+
+## Troubleshooting
+
+- If key lookup fails, export `ANTHROPIC_API_KEY` or authenticate the Infisical CLI.
+- If a pull request has no review, inspect the agent output for a failed twin tool call.
+- If a requested model changes, read the printed `model:` line.
