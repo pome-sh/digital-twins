@@ -65,21 +65,21 @@
   },
   "license": "Apache-2.0",
   "dependencies": {
-    "@hono/node-server": "^2.1.0",
+    "@hono/node-server": "^2.1.1",
     "@pome-sh/sdk": "*",
     "@pome-sh/wire": "*",
-    "hono": "^4.13.0",
-    "zod": "^4.4.3"
+    "hono": "^4.13.5",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@types/node": "^26.1.2",
-    "stripe": "22.3.2",
-    "tsx": "^4.23.5",
+    "@types/node": "^26.4.1",
+    "stripe": "22.6.1",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=24.20.0"
   }
 }

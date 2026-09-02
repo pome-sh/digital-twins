@@ -6,7 +6,7 @@
     "packages/*",
     "cli"
   ],
-  "packageManager": "npm@11.5.1",
+  "packageManager": "npm@11.19.1",
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "vitest run",
@@ -36,17 +36,17 @@
     "gate:sandbox-domains-manifest": "node scripts/ci/check-sandbox-domains-tarball.mjs --manifest-only"
   },
   "engines": {
-    "node": ">=24",
-    "npm": ">=11.5.1"
+    "node": ">=24.20.0",
+    "npm": ">=11.19.1"
   },
   "devDependencies": {
-    "knip": "^6.31.0",
+    "knip": "^6.34.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "overrides": {
-    "hono": "^4.13.0",
-    "fast-uri": "^3.1.5",
-    "esbuild": "^0.28.1"
+    "hono": "^4.13.5",
+    "fast-uri": "^3.1.6",
+    "esbuild": "^0.28.2"
   }
 }

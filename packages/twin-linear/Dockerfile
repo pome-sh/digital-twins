@@ -1,5 +1,5 @@
 # Build context is the monorepo root so npm ci uses the committed workspace lock.
-FROM node:26-bookworm@sha256:219fc9da91e7f29a9f32290ff598cdf8886fd68f421ff515c8f93434da39a271 AS build
+FROM node:26.8.1-bookworm@sha256:9f94d34c787165dca03b74e5bf9c3bf90e8de79b19aa3d87fe1fa1694bf75c89 AS build
 WORKDIR /repo
 COPY package.json package-lock.json ./
 # `cli/` is a workspace member (its manifest is in the lockfile), so npm ci
@@ -18,7 +18,7 @@ RUN npm run build -w @pome-sh/twin-linear
 RUN rm -rf node_modules packages/*/node_modules \
   && npm ci --omit=dev -w @pome-sh/twin-linear
 
-FROM node:26-trixie-slim@sha256:715e55e4b84e4bb0ff48e49b398a848f08e55daed8eb6a0ea1839ae53bc57583 AS runtime
+FROM node:26.8.1-trixie-slim@sha256:c0753125a3789977aefe869cbebccf70e3cfd7ea84ca48547458f02e4f1d7146 AS runtime
 WORKDIR /repo
 ENV NODE_ENV=production
 ENV LINEAR_TWIN_HOST=0.0.0.0

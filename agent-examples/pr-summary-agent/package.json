@@ -9,17 +9,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.221",
-    "hono": "^4.13.0",
-    "zod": "^4.4.3"
+    "@anthropic-ai/claude-agent-sdk": "^0.3.258",
+    "hono": "^4.13.5",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^25.9.5",
-    "tsx": "^4.23.5",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=24.20.0"
   },
   "overrides": {
     "@modelcontextprotocol/sdk": "1.30.0"

@@ -62,11 +62,11 @@
   },
   "dependencies": {
     "@pome-sh/wire": "*",
-    "hono": "^4.13.0",
-    "zod": "^4.4.3"
+    "hono": "^4.13.5",
+    "zod": "^4.5.4"
   },
   "peerDependencies": {
-    "@hono/node-server": "^2.0.8"
+    "@hono/node-server": "^2.1.1"
   },
   "peerDependenciesMeta": {
     "@hono/node-server": {
@@ -74,13 +74,13 @@
     }
   },
   "devDependencies": {
-    "@hono/node-server": "^2.1.0",
-    "@types/node": "^26.1.2",
-    "tsx": "^4.23.5",
+    "@hono/node-server": "^2.1.1",
+    "@types/node": "^26.4.1",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=24.20.0"
   }
 }
