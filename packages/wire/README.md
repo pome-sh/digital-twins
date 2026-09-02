@@ -2,39 +2,30 @@
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# @pome-sh/wire
+# `@pome-sh/wire`
 
-The trace surface every Pome process agrees on — Zod schemas and TypeScript
-types for recorder events, the OpenTelemetry extension of that union, secret
-redaction, and framework-agnostic tool-call correlation. The `pome` CLI, the twin
-engine (`@pome-sh/sdk`), the first-party twins and the Claude adapter all speak
-this vocabulary; the wire format is the contract, not any one library.
+`@pome-sh/wire` defines trace data shared across Pome processes. It contains Zod schemas, TypeScript types, secret redaction, OpenTelemetry mappings, and tool-call correlation.
 
-Internal infrastructure, published two ways and installed by end users through
-neither:
+This package is published only to GitHub Packages at `npm.pkg.github.com`. It is not published to npm.
 
-- **Bundled** — the CLI and the Claude adapter inline it into their single
-  bundles (`cli/tsup.config.ts` `noExternal`), and the twin images copy its
-  built `dist/`. Both declare it as a `devDependency` at `"*"`, so no published
-  npm tarball has an `@pome-sh/wire` dependency and nothing on npmjs resolves
-  it. This is how every consumer *inside this repo* gets it.
-- **Published to GitHub Packages** (`npm.pkg.github.com`, not npmjs) as an
-  independently versioned artifact, for consumers in *other repositories* —
-  today that means `pome-sh/pome-cloud`, which needs the same trace vocabulary
-  and must not fork a second copy of these Zod schemas. Reading it requires a
-  GitHub token; it is not an end-user install surface and has no public API
-  promise.
+The CLI bundles this package. End users do not install it or need GitHub Packages credentials. Other Pome repositories use the published package.
 
-## What is NOT here
+`zod` is a peer dependency.
 
-Sessions, tasks, runs, the `/v1` REST surface, error envelopes and the
-`pome.json` manifest are the cloud control-plane contract, not the wire trace
-surface. They live in [`cli/src/contract/`](../../cli/src/contract).
-GitHub's sandbox access-control catalog lives in
-[`packages/twin-github/src/access-control.ts`](../twin-github/src/access-control.ts),
-next to the tools it describes.
+## Scope
 
-## Usage
+The package contains:
+
+- recorder event schemas, including `TwinHttpEvent`
+- secret redaction
+- OpenTelemetry event schemas and mappings
+- tool-call correlation helpers
+- run-completeness helpers
+- `trace-contract.json`, which describes the recorder event kinds
+
+Sessions, tasks, runs, API error envelopes, and the `pome.json` schema are not part of the trace format. Those definitions remain in [`cli/src/contract/`](../../cli/src/contract/).
+
+## Use
 
 ```ts
 import { recorderEventSchema, redactSecrets } from "@pome-sh/wire";
@@ -44,52 +35,58 @@ const event = recorderEventSchema.parse(row);
 const safe = redactSecrets(JSON.stringify(event));
 ```
 
-Subpath exports: `recorder-events`, `otel`, `otel/fixtures`, `redaction`, and
-`correlation`. `zod` (^4.1.13) is a peer dependency.
+Available subpaths are:
 
-## `@pome-sh/wire/correlation`
+- `./recorder-events`
+- `./otel`
+- `./otel/fixtures`
+- `./redaction`
+- `./correlation`
+- `./run-completeness`
 
-The agent-side half of tool-call correlation, with no agent framework in it.
-A twin records one `TwinHttpEvent` per inbound request; for that row to
-name the tool call that caused it, the agent side has to stamp the id on an
-outgoing header. This module is that mechanism: an `AsyncLocalStorage` store —
-which is what makes it race-proof when several tool calls run concurrently — plus
-a `globalThis.fetch` patch gated on both that store and an origin allowlist, so
-only configured twin origins ever see the header and the framework's own traffic
-(api.anthropic.com) passes through untouched.
+## Correlation
+
+`@pome-sh/wire/correlation` associates an outbound request with the agent tool call that caused it.
+
+The module stores the tool-call ID in `AsyncLocalStorage`. Its fetch hook adds `x-pome-correlation-id` only to configured twin origins.
 
 ```ts
 import {
+  generateToolCallId,
   installCorrelationFetchHook,
   withCorrelation,
-  generateToolCallId,
 } from "@pome-sh/wire/correlation";
 
-installCorrelationFetchHook({ twinHosts: ["http://127.0.0.1:3333"] }); // once, at init
+installCorrelationFetchHook({ twinHosts: ["http://127.0.0.1:3333"] });
 
-// at each tool invocation the framework dispatches
 const id = readFrameworkToolCallId(call) ?? generateToolCallId();
 return withCorrelation(id, () => handler(args));
 ```
 
-`readFrameworkToolCallId` is the only framework-shaped line, and it is all an
-adapter owns: the Claude Agent SDK puts the id on an MCP
-`_meta["claudecode/toolUseId"]` key, the Vercel AI SDK exposes `toolCallId` on
-the tool-call part, LangGraph on the `ToolCall`. None of them needs to re-derive
-the store or the fetch patch.
+An adapter supplies `readFrameworkToolCallId`. The correlation module does not depend on an agent framework.
 
-Subpath-only, not on the root barrel: importing it constructs an
-`AsyncLocalStorage`, and no twin, the sdk or the CLI is the agent side of this
-protocol.
+This subpath is not on the root barrel because it initializes `AsyncLocalStorage` and patches `fetch`.
 
-## trace-contract.json
+## Run completeness
 
-The machine-readable descriptor of this package's trace surface. Its
-`eventKinds` map is enumerated from the zod event union at emit time and lists
-the wire fixture backing each kind — adding a union member without a fixture
-fails `npm run check:trace-contract -w @pome-sh/wire` (see
-`test/fixtures/v1/README.md`).
+`@pome-sh/wire/run-completeness` exports shared values and predicates for criterion results:
 
-## License
+- `PRE_SATISFIED_REASON`
+- `ADVISORY_SCORE_STATE`
+- `ABSTAINED_SCORE_STATE`
+- `tallyCriteriaResults`
+- `isIncompleteTally`
 
-Apache-2.0.
+This subpath is not on the root barrel because twins do not evaluate completed runs.
+
+## Trace contract
+
+[`trace-contract.json`](trace-contract.json) lists each recorder event kind and its fixture.
+
+Run this check after a recorder schema change:
+
+```bash
+npm run check:trace-contract -w @pome-sh/wire
+```
+
+License: Apache-2.0.

@@ -1,162 +1,97 @@
 # `@pome-sh/twin-linear`
 
-> **Internal package.** One of five twin runtimes in this repository (GitHub,
-> Stripe x402, Slack, Gmail, Linear). It is not separately installable — it
-> ships inside [`@pome-sh/cli`](../../cli/). To run it:
-> `npx @pome-sh/cli twin start linear`.
->
-> The rest of this file is the engineering reference: frozen auth identity, MCP
-> tool set, named gaps, limits, and the runtime contract pome-cloud's sandbox
-> images depend on.
+`@pome-sh/twin-linear` is a stateful digital twin of the Linear API. It stores data in SQLite and exposes GraphQL, OAuth, and 22 MCP tools.
 
-Deterministic Linear-shaped twin for agent testing (Pome).
+This package is private implementation code. It is bundled with [`@pome-sh/cli`](../../cli/) and is not a separate install surface.
 
-It implements the deterministic
-SQLite workspace model, strict seed/reset APIs, GraphQL + OAuth surfaces,
-bounded semantic state export, recording projection, and the captured
-twenty-two-tool first-party MCP contract (Gate 0 launch + Gate-1 Wave 4).
-
-## Auth identity (frozen)
-
-| Item | Value |
-| --- | --- |
-| Claim | `linear_email` on the Pome session JWT |
-| Default local email | `admin@pome-twin.test` |
-| Agent token env | `POME_LINEAR_TOKEN` (alias of `POME_AUTH_TOKEN`) |
-| Seeded personal token | `lin_test_admin` (resolved via `resolveCredential`) |
-| Provider token prefix | `lin_pome_` |
-| Bearer | Pome session JWT, seeded Linear tokens, or `lin_pome_*` |
-
-Pome owns hosted authentication. Local runs also accept DB-backed Linear API
-tokens from the seed for official-client parity.
-
-## Gate 0 / Gate-1 artifacts
-
-| Path | Role |
-| --- | --- |
-| [`fixtures/graphql-surface.json`](fixtures/graphql-surface.json) | Frozen GraphQL query/mutation/OAuth operation floor |
-| [`fixtures/mcp-tools-list.*.json`](fixtures/) | The 22-tool MCP listing this twin serves, and its provenance. Names are Linear-documented; schemas are twin-owned |
-| [`fidelity.inventory.json`](fidelity.inventory.json) | Heat × fidelity × evidence for every launch MCP/GraphQL row |
-| [`REFERENCE-DIVERGENCES.md`](REFERENCE-DIVERGENCES.md) | Emulate rejected; never an oracle |
-| [`LIMITS.md`](LIMITS.md) | Seed/GraphQL/MCP/state-export caps |
-
-See [`fixtures/README.md`](fixtures/README.md) for capture provenance.
-
-## Launch MCP tools (exactly 22)
-
-`list_issues`, `get_issue`, `save_issue`, `list_comments`, `save_comment`,
-`delete_comment`, `list_teams`, `get_team`, `list_users`, `get_user`,
-`list_issue_statuses`, `get_issue_status`, `list_issue_labels`,
-`create_issue_label`, `list_projects`, `get_project`, `save_project`,
-`list_cycles`, `search_documentation`, `list_documents`, `get_document`,
-`save_document`.
-
-These 22 are a **curated Gate-1 subset** of the official Linear MCP surface
-(which currently exposes ~50+ tools); order and names are frozen to match it
-(`save_*` upserts). Everything outside the subset is a named gap below, not a
-silent success. GraphQL still exposes `issueCreate`/`issueUpdate` for SDK
-parity.
-
-## Named gaps (not fake success)
-
-MCP tool families outside the 22-tool Gate-1 subset are not implemented:
-
-- Initiatives (`*_initiative*`), milestones (`*_milestone`), releases
-  (`*_release*`), attachments (`*_attachment*`), git diffs / PR review
-  (`*_diff*`, `merge_diff`, `submit_diff_review`), status updates
-  (`*_status_update`), agent skills (`*_agent_skill*`), and
-  `list_project_labels`
-- Implemented tools still omit some real parameters (e.g. `save_issue`
-  omits `milestone` / dueDate via MCP; `save_document` omits initiative parents)
-- Full Linear GraphQL schema tail — loud unsupported / 501
-- External webhook delivery beyond logged attempts
-
-## Non-goals
-
-- Live Linear network calls
-- Expanding MCP beyond the frozen 22-tool Gate-1 set without a new ruling
-- Hosted product enablement (see [`HOSTED.md`](HOSTED.md))
-
-## Limits
-
-See [`LIMITS.md`](LIMITS.md). Defaults/maxima are pinned in
-`fidelity.inventory.json` `performanceBudgets`.
-
-## Stateful parity with other first-party twins
-
-Linear follows the same SDK chassis as GitHub / Slack / Stripe / Gmail:
-
-| Capability | Linear | Notes vs peers |
-| --- | --- | --- |
-| `defineTwin` + SQLite domain | yes | Same `@pome-sh/sdk` boot path |
-| `/_pome/state` | yes | Bounded collection rows |
-| `/_pome/events` + durable recorder | yes | `recordingProjection` redacts secrets |
-| `/admin/reset` + `/admin/seed` | yes | Reports `state_delta` |
-| MCP + GraphQL on one domain | yes | `LinearDomain` |
-| Session identity claim | `linear_email` | Peers use provider-shaped claims |
-| Root session mount | yes | `mountSessionAtRoot: true` |
-
-## Runtime contract (for snapshot consumers)
-
-`pome-cloud` builds a Vercel Sandbox snapshot from this package's signed source
-artifact. The following constraints must hold for that build to succeed and for
-the resulting snapshot to boot. Changing any of these is a breaking change for
-hosted; land the producer change here first, then open the cloud consumer PR
-that pins and verifies the new signed digest.
-
-### Build
-
-- Package is `npm install`-able from `package.json` alone (no `workspace:*`
-  protocols, no package-manager-specific deps; no committed lockfile is required, the snapshot
-  build regenerates one on each rebuild)
-- `npm run build` exits 0 and emits `dist/src/server.js`
-- Built output is loadable under Node 24 — the snapshot runs `runtime: "node24"`.
-  SQLite is the built-in `node:sqlite` (via the sdk's `openTwinDatabase()`) —
-  no native modules, no compiler toolchain.
-
-### Runtime
-
-- Server entry: `node dist/src/server.js` (cwd = package root)
-- Listens on `:3337` by default (`LINEAR_TWIN_PORT`, then the native default)
-- **Hosted normalizes the port to `PORT=3333`.** The server honors the `PORT`
-  env var first (`PORT` → `LINEAR_TWIN_PORT` → `3337`); the pome-cloud
-  control-plane sets `PORT=3333` at spawn for every twin, so the native `3337`
-  default is only used for standalone local runs.
-- Honors `LINEAR_TWIN_HOST=0.0.0.0` env (default `127.0.0.1` is unreachable via
-  Vercel Sandbox port forwarding)
-- Boots via a manual `@hono/node-server` path (not the SDK `serve()` helper),
-  with graceful `SIGINT`/`SIGTERM` handlers that flush and close the recorder
-  store before exit
-- Serves GraphQL at `/graphql` (in addition to the session MCP surface)
-- `GET /healthz` returns 200 within ~3s of process start (the snapshot build
-  sleeps 3s after `node dist/src/server.js` before probing)
-- Seed via `POME_SEED_JSON` (strict Linear seed schema; `LINEAR_TWIN_NO_SEED=1`
-  boots empty)
-- Bearer auth at `Authorization: Bearer <jwt>` — Pome session JWT, seeded Linear
-  tokens, or `lin_pome_*` provider tokens
-
-### Cloud consumer coordination
-
-- Bumping any of the above = publish a signed twin digest and open the matching
-  `pome-cloud` consumer PR.
-
-## Development
-
-Contributor-only, from a repo checkout:
-
-```bash
-npx vitest run --project twin-linear
-npm run typecheck -w @pome-sh/twin-linear
-npm run fidelity:parity -w @pome-sh/twin-linear
-```
-
-## CLI
+## Start the twin
 
 ```bash
 npx @pome-sh/cli twin start linear
-# prints POME_LINEAR_REST_URL, POME_LINEAR_MCP_URL, POME_AUTH_TOKEN,
-# and the identical POME_LINEAR_TOKEN alias
 ```
 
-Use `pome tasks linear --copy` for the issue-triage and comment+label
-tasks. Hosted rollout is gated separately; see [`HOSTED.md`](HOSTED.md).
+The default port is `3337`. The command prints `POME_LINEAR_REST_URL`, `POME_LINEAR_MCP_URL`, `POME_AUTH_TOKEN`, and `POME_LINEAR_TOKEN`.
+
+```bash
+curl http://127.0.0.1:3337/healthz
+```
+
+## Authentication
+
+Pome session JWTs use the `linear_email` claim. The default email is `admin@pome-twin.test`.
+
+Local runs also accept seeded Linear credentials. The default seed includes the personal token `lin_test_admin`. Provider-shaped tokens use the `lin_pome_` prefix.
+
+## API
+
+The twin serves GraphQL at `/graphql` and `/s/:sid/graphql`. MCP is also available at the root and below `/s/:sid`.
+
+Public OAuth routes use `/oauth/authorize`, `/oauth/authorize/callback`, `/oauth/token`, and `/oauth/revoke`.
+
+The MCP endpoint is `POST /s/:sid/mcp`. It implements stateless Streamable HTTP and exposes these tools:
+
+```text
+list_issues
+get_issue
+save_issue
+list_comments
+save_comment
+delete_comment
+list_teams
+get_team
+list_users
+get_user
+list_issue_statuses
+get_issue_status
+list_issue_labels
+create_issue_label
+list_projects
+get_project
+save_project
+list_cycles
+search_documentation
+list_documents
+get_document
+save_document
+```
+
+The names, descriptions, and advertised schemas come from [`fixtures/mcp-tools-list.raw.json`](fixtures/mcp-tools-list.raw.json). Twin validators define the accepted inputs. `save_*` tools create or update records.
+
+## Unsupported surfaces
+
+The twin does not expose MCP tools for these families:
+
+- initiatives, milestones, releases, and status updates
+- attachments
+- Git diffs and pull-request reviews
+- agent skills
+- project labels
+
+Some exposed tools omit provider parameters. For example, `save_issue` omits milestone and due-date inputs through MCP.
+
+Unsupported GraphQL operations return a clear unsupported response. External webhook delivery is not implemented.
+
+## Fidelity and limits
+
+[`FIDELITY.md`](FIDELITY.md) records GraphQL and MCP fidelity. [`fidelity.inventory.json`](fidelity.inventory.json) contains the machine-readable inventory.
+
+[`REFERENCE-DIVERGENCES.md`](REFERENCE-DIVERGENCES.md) records differences from the rejected reference implementation. [`LIMITS.md`](LIMITS.md) records seed, GraphQL, MCP, and state limits.
+
+## Contributor commands
+
+Run package scripts from `packages/twin-linear`:
+
+```bash
+npm run dev
+npm run typecheck
+npm run fidelity:parity
+npm run gate:mcp-fixture
+```
+
+Run this test command from the repository root:
+
+```bash
+npx vitest run --project twin-linear
+```
+
+To update the captured MCP listing, use the repository capture process. Do not edit the tool table in TypeScript.

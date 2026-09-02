@@ -1,173 +1,85 @@
-# Pome Twin: GitHub
+# `@pome-sh/twin-github`
 
-> **Internal package.** One of five twin runtimes in this repository (GitHub,
-> Stripe x402, Slack, Gmail, Linear). It is not separately installable — it
-> ships inside [`@pome-sh/cli`](../../cli/). To run it:
-> `npx @pome-sh/cli twin start github`.
->
-> The rest of this file is the engineering reference: HTTP/MCP surface, seed
-> shape, and the runtime contract pome-cloud's sandbox images depend on.
+`@pome-sh/twin-github` is a stateful digital twin of the GitHub API. It stores data in SQLite and exposes GitHub-shaped REST routes and 36 MCP tools.
 
-`@pome-sh/twin-github` is a local, stateful GitHub twin for agent testing. It exposes GitHub-shaped REST routes plus a 36-tool MCP-style API backed by the same SQLite domain services.
+This package is private implementation code. It is bundled with [`@pome-sh/cli`](../../cli/) and is not a separate install surface.
 
-## Quickstart
-
-```bash
-npx @pome-sh/cli twin start github   # http://127.0.0.1:3333, prints the MCP URL + POME_AUTH_TOKEN
-curl http://127.0.0.1:3333/healthz
-```
-
-To run it from a repo checkout instead (contributors), see
-[Local commands](#local-commands) below.
-
-GitHub-shaped REST + MCP routes live under `/s/:sid/*` and require a
-bearer token whose `sid` claim matches the URL `:sid`. `/healthz` and
-`/admin/*` stay at the root (admin is localhost-only).
-
-`npx @pome-sh/cli twin start github` already prints a usable `POME_AUTH_TOKEN`.
-To mint one by hand against a self-booted server:
-
-```bash
-# Mint a token (32-char minimum secret recommended; use the SAME secret as the server)
-TOKEN=$(node -e "import('hono/jwt').then(m => m.sign({ sid: 'demo', team_id: 'tm_1', exp: Math.floor(Date.now()/1000)+3600 }, process.env.TWIN_AUTH_SECRET).then(t => console.log(t)))")
-
-# Public health probe — no auth
-curl http://127.0.0.1:3333/healthz
-
-# Session-scoped routes — auth required, sid in path must equal sid in claim
-curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3333/s/demo/repos/acme/api/issues/1
-curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3333/s/demo/mcp/tools
-
-curl -s -X POST http://127.0.0.1:3333/s/demo/mcp/call \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'content-type: application/json' \
-  -d '{"tool":"search_repositories","arguments":{"query":"acme"}}'
-```
-
-The default seed creates:
-
-- `acme/api`
-- default branch `main`
-- files `README.md` and `src/index.ts`
-- labels `bug`, `feature`, and `question`
-- issue `#1`, titled `500 error on POST /orders after deploy`
-- users/orgs `acme`, `alice`, `bob`, and `pome-agent`
-
-## APIs
-
-- REST base URL: `http://127.0.0.1:3333`
-- **Real MCP (JSON-RPC, Streamable HTTP, stateless):** `POST /s/:sid/mcp`
-  — speaks the protocol the `@modelcontextprotocol/sdk` `Client` +
-  `StreamableHTTPClientTransport` expect (`initialize`, `tools/list`,
-  `tools/call`, `ping`, `notifications/*`). 36 tools exposed via
-  `tools/list` with camelCase `inputSchema`.
-- Per-tool HTTP routes, which answer with the upstream status code rather than a JSON-RPC envelope. The fidelity harness scores parity through them:
-  - `GET  /s/:sid/mcp/tools` — returns `{ tools: [{ name, description, input_schema }, ...] }`
-  - `POST /s/:sid/mcp/tools/:name` — body is the tool's arguments object
-  - `POST /s/:sid/mcp/call` — body `{ tool, arguments }`
-
-All session-scoped REST and MCP routes require a bearer token whose `sid`
-claim matches the path. Mutating operations write to SQLite inside transactions
-and append to `audit_log`.
-
-### Connecting from `@modelcontextprotocol/sdk` or the Anthropic Agent SDK
-
-```ts
-// Anthropic claude-agent-sdk mcpServers config
-mcpServers: {
-  github: {
-    type: "http",
-    url: `${TWIN_BASE_URL}/s/${sid}/mcp`,
-    headers: { Authorization: `Bearer ${token}` }
-  }
-}
-```
-
-The endpoint is stateless: each POST is independent; no `Mcp-Session-Id`
-round-trip, no SSE. `GET` and `DELETE` on `/s/:sid/mcp` return 405. The
-bearer-auth contract is unchanged — the JWT `sid` claim (or
-`ghp_pome_<sid>_<hmac>` PAT) still has to match the path's `:sid`.
-
-### Tracing parity
-
-Every `tools/call` reaching `/s/:sid/mcp` produces one recorder event whose
-`request_body` is `{ tool, arguments }` and whose `response_body` is the raw
-domain return — identical to what `POST /s/:sid/mcp/call` records. The
-only intentional difference is `path` (`request_headers` also differs, but
-that's a fact about the two callers — the MCP SDK client vs a plain-fetch
-HTTP caller — not about the twin). Run `npm run validate:mcp` to print the
-side-by-side diff; the same command runs in CI's heavy suite.
-
-## Runtime contract (for snapshot consumers)
-
-`pome-cloud` builds a Vercel Sandbox snapshot from this package's signed source
-artifact. The following constraints must hold for that build to succeed and for
-the resulting snapshot to boot. Changing any of these is a breaking change for
-hosted; land the producer change here first, then open the cloud consumer PR
-that pins and verifies the new signed digest.
-
-### Build
-
-- Package is `npm install`-able from `package.json` alone (no `workspace:*`
-  protocols, no package-manager-specific deps; no committed lockfile is required, the snapshot
-  build regenerates one on each rebuild)
-- `npm run build` exits 0 and emits `dist/src/server.js`
-- Built output is loadable under Node 24 — the snapshot runs `runtime: "node24"`.
-  SQLite is the built-in `node:sqlite` (via the sdk's
-  `openTwinDatabase()`) — no native modules, no compiler toolchain.
-
-### Runtime
-
-- Server entry: `node dist/src/server.js` (cwd = package root)
-- Listens on `:3333`
-- Honors `GITHUB_CLONE_HOST=0.0.0.0` env (default `127.0.0.1` is unreachable
-  via Vercel Sandbox port forwarding)
-- `GET /healthz` returns 200 within ~3s of process start (the snapshot build
-  sleeps 3s after `node dist/src/server.js` before probing)
-- All admin routes are localhost-only (`/admin/*`)
-- Bearer auth at `Authorization: Bearer <jwt>` — engine mechanism (`@pome-sh/sdk`), shape pinned in `src/twin.ts`
-
-### Cloud consumer coordination
-
-- Bumping any of the above = publish a signed twin digest and open the matching
-  `pome-cloud` consumer PR.
-- The cloud-side snapshot build script lives at
-  `pome-cloud/notes/build-twin-github-template.ts`
-- The snapshot manifest at `pome-cloud/infra/twin-github-snapshot.json`
-  records the OSS git sha and signed OCI digest each snapshot was built from.
-
-## Review harness
-
-The side-by-side review uses three tests:
-
-- `functional-pr-flow`: create repo, create branch, write file, open PR, approve PR, merge PR, read merged file.
-- `negative-fidelity`: missing file must fail, creating a file must succeed, stale update with the wrong `sha` must fail.
-- `concurrency-stress`: eight concurrent writes to the same file path; exactly one create should win and the final file should be readable.
-
-Run against local:
-
-```bash
-PORT=3333 GITHUB_CLONE_DB=.github_clone/review-harness.db npm run dev
-REVIEW_TARGET=local npm run review:harness
-```
-
-Keep agent assertions behavior-based: compare invariants (PR merged, stale `sha` rejected), not hard-coded IDs or SHAs.
-
-## Use In A New Project
-
-1. Start the twin:
+## Start the twin
 
 ```bash
 npx @pome-sh/cli twin start github
 ```
 
-2. Reset or seed state before each run:
+The command starts the twin in the foreground. It prints these client values:
+
+- `POME_GITHUB_REST_URL`
+- `POME_GITHUB_MCP_URL`
+- `POME_AUTH_TOKEN`
+
+Check the server from another terminal:
 
 ```bash
-curl -X POST http://127.0.0.1:3333/admin/reset
+curl http://127.0.0.1:3333/healthz
 ```
 
-For a project-specific seed, post JSON to `/admin/seed`:
+The default seed contains the `acme/api` repository, its `main` branch, files, labels, users, and issue `#1`.
+
+## API
+
+Session routes use `/s/:sid/*`. The bearer token must contain the same `sid` as the URL.
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /healthz` | Unauthenticated process health |
+| `POST /s/:sid/mcp` | Stateless MCP over Streamable HTTP |
+| `GET /s/:sid/mcp/tools` | Legacy HTTP tool listing |
+| `POST /s/:sid/mcp/tools/:name` | Legacy per-tool HTTP call |
+| `POST /s/:sid/mcp/call` | Legacy call with `{ tool, arguments }` |
+| `GET /s/:sid/_pome/state` | Redacted domain state |
+| `GET /s/:sid/_pome/events` | Recorded events |
+| `POST /admin/reset` | Reset state through the admin gate |
+| `POST /admin/seed` | Apply a seed through the admin gate |
+
+The MCP endpoint supports `initialize`, `tools/list`, `tools/call`, `ping`, and notifications. It does not use MCP session IDs or SSE.
+
+[`fixtures/mcp-tools-list.raw.json`](fixtures/mcp-tools-list.raw.json) defines the served tool listing.
+
+Use the values printed by the CLI:
+
+```bash
+export POME_GITHUB_REST_URL=http://127.0.0.1:3333/s/standalone
+export POME_AUTH_TOKEN='<token printed by pome twin start>'
+
+curl -H "Authorization: Bearer $POME_AUTH_TOKEN" \
+  "$POME_GITHUB_REST_URL/repos/acme/api/issues/1"
+
+curl -s -X POST "$POME_GITHUB_REST_URL/mcp/call" \
+  -H "Authorization: Bearer $POME_AUTH_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"tool":"search_repositories","arguments":{"query":"acme"}}'
+```
+
+An MCP client can use the JSON-RPC endpoint directly:
+
+```ts
+mcpServers: {
+  github: {
+    type: "http",
+    url: `${TWIN_BASE_URL}/s/${sid}/mcp`,
+    headers: { Authorization: `Bearer ${token}` },
+  },
+}
+```
+
+## Seed data
+
+Pass a seed file to the CLI:
+
+```bash
+npx @pome-sh/cli twin start github --seed ./github-seed.json
+```
+
+You can also apply a seed through the local admin route:
 
 ```bash
 curl -s -X POST http://127.0.0.1:3333/admin/seed \
@@ -181,117 +93,56 @@ curl -s -X POST http://127.0.0.1:3333/admin/seed \
       {
         "owner": "my-org",
         "name": "my-app",
-        "description": "Repository under test",
         "default_branch": "main",
         "collaborators": ["agent-user"],
-        "labels": [
-          { "name": "bug", "color": "d73a4a", "description": "Something is broken" }
-        ],
         "files": [
-          { "path": "README.md", "content": "# My App\n" },
-          { "path": "src/index.ts", "content": "export const ok = true;\n" }
-        ],
-        "milestones": [
-          { "number": 1, "title": "v1.0", "description": "Ship checkout", "due_on": "2026-09-30T00:00:00Z" }
-        ],
-        "tags": [{ "name": "v1.0.0", "target": "main" }],
-        "releases": [
-          { "tag_name": "v1.0.0", "name": "v1.0.0", "body": "First cut.", "author": "agent-user" }
+          { "path": "README.md", "content": "# My App\n" }
         ],
         "issues": [
-          {
-            "number": 1,
-            "title": "Fix checkout error",
-            "body": "Users see a 500 after submitting checkout.",
-            "labels": ["bug"],
-            "assignees": [],
-            "comments": [
-              { "body": "Reproduced on staging.", "author": "agent-user" }
-            ]
-          }
+          { "number": 1, "title": "Fix checkout error", "labels": [], "assignees": [] }
         ]
       }
     ]
   }'
 ```
 
-Notes on the less obvious fields:
+Seeded issue and pull-request numbers share one repository counter. A tag target can be a branch name or commit SHA.
 
-- **`milestones[].number`, `issues[].number`, `pull_requests[].number`** are
-  honored when given. Issues and pull requests draw from ONE per-repo counter,
-  so two seeded issues put the first seeded PR at `#3`.
-- **`tags[].target`** is any ref the twin resolves — a branch name or a SHA —
-  and defaults to the default branch's head. A `releases[]` entry whose
-  `tag_name` matches a seeded tag reuses it; one whose tag is not seeded mints
-  it from `target_commitish`.
-- **`comments[]`** is the conversation timeline, and it hangs off a
-  `pull_requests[]` entry as readily as an `issues[]` one — GitHub serves both
-  through `/issues/:number/comments`. The inline review surface is
-  `pull_requests[].review_comments[]`, whose `path` must name a file the pull
-  request changes and whose `line` must exist in it.
-- **`author` / `assignees` / `collaborators`** logins that are not in `users[]`
-  are created as plain users rather than rejected.
+GitHub creates missing author, assignee, and collaborator logins as users. Review-comment paths and lines must refer to changed files.
 
-3. Give your agent these inputs:
+## Fidelity
 
-- `POME_GITHUB_REST_URL=http://127.0.0.1:3333`
-- `POME_GITHUB_MCP_URL=http://127.0.0.1:3333/s/demo/mcp`
-- `GITHUB_MCP_TOKEN=<JWT whose sid claim is demo>`
-- task text that names the exact repo, branch, issue, file, or PR it should touch
-- the expected actor, usually `pome-agent`
-- whether it should use REST or MCP
+[`FIDELITY.md`](FIDELITY.md) records MCP and REST fidelity, measured differences, and evidence. [`fidelity.inventory.json`](fidelity.inventory.json) contains the machine-readable inventory.
 
-4. Keep agent assertions behavior-based:
+Tests should assert final behavior instead of generated identifiers. For example, assert that a pull request merged and that its file exists on `main`.
 
-- good: "PR was merged and `claude-agent.txt` exists on `main`"
-- good: "wrong `sha` update fails"
-- bad: "PR number is exactly `1`"
-- bad: "commit SHA equals this hard-coded value"
+## Runtime contract for snapshot consumers
 
-## Claude Agent Example
+[`CONTRACT.md`](../../CONTRACT.md) defines the entry point, environment variables, health response, authentication, and shared routes.
 
-`examples/claude-github-agent.ts` is a tiny Claude-powered GitHub agent. It reads `ANTHROPIC_API_KEY` and optional `ANTHROPIC_MODEL` from the process environment.
+Treat a change to that contract as breaking. Update the contract and its black-box tests in the same pull request.
 
-Run against local:
+Pome maintainers must then publish a signed twin artifact. They must also update and verify the matching `pome-cloud` pin.
+
+## Contributor commands
+
+Run package scripts from `packages/twin-github`:
 
 ```bash
-GITHUB_MCP_URL=http://127.0.0.1:3333/s/demo/mcp npm run agent:claude -- \
-  "Create a branch, push claude-agent.txt, open a pull request, approve it, and merge it in acme/api."
-```
-
-The example captures the PR number returned by `create_pull_request` and reuses it for review and merge calls.
-
-## Local commands
-
-Contributor-only, from a repo checkout (these scripts are not part of any
-published package):
-
-```bash
-npm run dev          # boot this twin on :3333 from source
-npm run seed         # seed the local DB
+npm run dev
+npm run seed
 npm run typecheck
-npx vitest run --project twin-github
 npm run smoke
 npm run fidelity:parity
-npm run validate:mcp # prints the JSON-RPC / per-tool-route parity diff
+npm run validate:mcp
 npm run review:harness
 npm run agent:claude
 ```
 
-`npm run capture:fixtures` uses `gh api` to refresh sanitized response-shape fixtures when GitHub CLI auth is available.
-
-## Pome CLI entry point
-
-The user-facing `pome` CLI lives at [`cli/`](../../cli/) in this repo and is the
-only supported way to run this twin:
+Run this test command from the repository root:
 
 ```bash
-npx @pome-sh/cli twin start github --port 3333
+npx vitest run --project twin-github
 ```
 
-The command prints:
-
-```bash
-POME_GITHUB_REST_URL=http://127.0.0.1:3333
-POME_GITHUB_MCP_URL=http://127.0.0.1:3333/s/<sid>/mcp
-```
+`npm run capture:fixtures` refreshes sanitized GitHub response fixtures. It requires GitHub CLI authentication.
