@@ -41,8 +41,6 @@ npm test
 
 ## Run With Pome
 
-By default, `pome run` uses hosted digital twins and returns hosted grading results.
-
 ```bash
 pome login
 export ANTHROPIC_API_KEY=sk-ant-...
@@ -60,21 +58,15 @@ POME_AGENT_ENV_ALLOWLIST=POME_TRIAGE_BASELINE \
 pome run tasks/02-injection-issue-body.md
 ```
 
-To capture one local run, use `--local`:
+To capture one local run:
 
 ```bash
 pome run --local tasks/01-triage-acme-issues.md
 ```
 
-The local command writes trace and state files under `runs/<task-slug>/<run-id>/`. It does not grade the run or create a verdict.
-
-Do not use `-n` with `--local`.
-
 ## Run Against A Standalone Twin
 
-1. Start the GitHub twin in the first terminal.
-2. Copy the printed `POME_AUTH_TOKEN` value.
-3. Start the agent in the second terminal.
+Start the GitHub twin in the first terminal. Copy its `POME_AUTH_TOKEN`, then start the agent in the second terminal.
 
 ```bash
 # terminal 1
@@ -109,4 +101,3 @@ For `pome run`, add `POME_TRIAGE_MODEL` or `POME_TRIAGE_BASELINE` to `POME_AGENT
 - If twin authentication fails, copy the token from the current `pome twin start` process.
 - If a requested model changes, read the printed `model:` line. The Claude runtime selects the final model.
 - If the vulnerable prompt does not close the issue, run more hosted trials. Model behavior can vary.
-- If a local run has no score, this is correct. Local runs capture data only.

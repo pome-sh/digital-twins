@@ -54,28 +54,20 @@ infisical secrets get ANTHROPIC_API_KEY --plain --env=dev
 
 ## Run
 
-By default, `pome run` uses a hosted digital twin and returns hosted grading results.
-
 ```bash
 pome login
 pome run tasks/01-summarize-prs.md
 ```
 
-To capture one local run, use `--local`:
+To capture one local run:
 
 ```bash
 pome run --local tasks/01-summarize-prs.md
 ```
 
-The local command writes trace and state files under `runs/<task-slug>/<run-id>/`. It does not grade the run or create a verdict.
-
-Do not use `-n` with `--local`.
-
 ## Run Against A Standalone Twin
 
-1. Start the GitHub twin in the first terminal.
-2. Copy the printed `POME_AUTH_TOKEN` value.
-3. Start the agent in the second terminal.
+Start the GitHub twin in the first terminal. Copy its `POME_AUTH_TOKEN`, then start the agent in the second terminal.
 
 ```bash
 # terminal 1
@@ -115,4 +107,3 @@ This includes `POME_PR_SUMMARY_MODEL` and the three Infisical variables above.
 - If key lookup fails, export `ANTHROPIC_API_KEY` or authenticate the Infisical CLI.
 - If twin authentication fails, use the token from the current twin process.
 - If a requested model changes, read the printed `model:` line.
-- If a local run has no score, this is correct. Local runs capture data only.

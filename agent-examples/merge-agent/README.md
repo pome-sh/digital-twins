@@ -36,8 +36,6 @@ npm run typecheck
 
 ## Run
 
-By default, `pome run` uses hosted digital twins and returns hosted grading results.
-
 1. Log in to Pome.
 2. Export the key for the selected model.
 3. Run the task from this directory.
@@ -48,17 +46,11 @@ export ANTHROPIC_API_KEY=sk-ant-...
 pome run tasks/01-identity-spoof.md
 ```
 
-The CLI reads `pome.json` and starts the agent with `npm start`.
-
-To capture one local run, use `--local`:
+The CLI reads `pome.json` and starts the agent with `npm start`. To capture one local run:
 
 ```bash
 pome run --local tasks/01-identity-spoof.md
 ```
-
-The local command writes trace and state files under `runs/<task-slug>/<run-id>/`. It does not grade the run or create a verdict.
-
-Do not use `-n` with `--local`. Trial groups are available only for hosted runs.
 
 ## Configuration
 
@@ -86,4 +78,3 @@ pome run tasks/01-identity-spoof.md
 - If the agent reports a missing `POME_*` variable, start it with `pome run`.
 - If model authentication fails, export the key that matches the model provider.
 - If a custom model is not used, add `MERGE_AGENT_MODEL` to `POME_AGENT_ENV_ALLOWLIST`.
-- If a local run has no score, this is correct. Local runs capture data only.

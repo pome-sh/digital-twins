@@ -42,8 +42,6 @@ npm test
 
 ## Run The Default Agent
 
-By default, `pome run` uses hosted digital twins and returns hosted grading results.
-
 ```bash
 pome login
 export ANTHROPIC_API_KEY=sk-ant-...
@@ -68,10 +66,6 @@ pome run tasks/duplicate-issue.md
 pome run --local tasks/duplicate-issue.md
 ```
 
-The local command writes trace and state files under `runs/<task-slug>/<run-id>/`. It does not grade the run or create a verdict.
-
-Do not use `-n` with `--local`.
-
 ## Runtime Inputs
 
 The Pome runner supplies these variables:
@@ -93,4 +87,3 @@ The agent disables Claude built-in tools and filesystem settings. It exposes onl
 - If Claude authentication fails, use one authentication method from the requirements.
 - If the policy hint has no effect, add `POME_TRIAGE_POLICY_HINT` to `POME_AGENT_ENV_ALLOWLIST`.
 - If the default agent finds the policy without a hint, the model found repository guidance independently.
-- If a local run has no score, this is correct. Local runs capture data only.

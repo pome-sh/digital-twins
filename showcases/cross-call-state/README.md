@@ -2,23 +2,19 @@
 
 # Cross-call state
 
-This procedure demonstrates two properties of a local GitHub digital twin.
+Run the automated check from the repository root:
 
-1. One twin process retains state across calls.
-2. A second twin process has separate state and a separate tape.
+```bash
+./showcases/cross-call-state/verify.sh
+```
 
-## Prerequisites
+One local GitHub digital twin retains three writes across calls. A second process keeps untouched state, its own tape, and separate credentials. The script ends with `PASS` when every assertion holds.
 
-- Node.js 24 or later
-- npm and `npx`
-- `curl` and `jq`
-- Three terminal windows
+See the [showcase prerequisites](../README.md) before running it.
 
-Ports `3333` and `3334` must be available.
+## Optional Manual Check
 
-## Prepare The Directories
-
-In the first terminal, run these commands from an empty parent directory.
+Use three terminals. Ports `3333` and `3334` must be available. From an empty parent directory, prepare separate working directories:
 
 ```bash
 mkdir pome-cross-call-state
@@ -26,180 +22,81 @@ cd pome-cross-call-state
 mkdir twin-a twin-b
 ```
 
-Keep this terminal in `pome-cross-call-state`.
-
-## Start Twin A
-
-In the second terminal, enter `pome-cross-call-state`.
-Then start twin A.
+Start twin A in the second terminal and leave it running:
 
 ```bash
-cd twin-a
+cd pome-cross-call-state/twin-a
 GITHUB_CLONE_DB=.pome/github.db \
   npx -y @pome-sh/cli@latest twin start github --port 3333
 ```
 
-Keep this command active.
-The output must include these lines.
-
-```text
-Pome github twin listening at http://127.0.0.1:3333/s/standalone
-POME_GITHUB_REST_URL=http://127.0.0.1:3333/s/standalone
-Ctrl-C to stop.
-```
-
-The command also writes `twin-a/.pome/twin-status.json`.
-
-## Check The Initial State
-
-In the first terminal, read the URL from the status file.
-Read the token from the same file.
+From `pome-cross-call-state` in the first terminal, read the URL and token, then inspect the initial issue:
 
 ```bash
 A=$(jq -r .rest_url twin-a/.pome/twin-status.json)
 AK="Authorization: Bearer $(jq -r .auth_token twin-a/.pome/twin-status.json)"
-
 curl -s -H "$AK" "$A/repos/acme/api/issues/1" \
-  | jq '{state, comments, assignees: [.assignees[].login]}'
+  | jq -c '{state, comments, assignees: [.assignees[].login]}'
 ```
 
 Checkpoint:
 
 ```json
-{
-  "state": "open",
-  "comments": 0,
-  "assignees": []
-}
+{"state":"open","comments":0,"assignees":[]}
 ```
 
-## Change Twin A
-
-Add one comment.
+Add a comment, assign `alice`, and close the issue:
 
 ```bash
 curl -s -X POST -H "$AK" -H 'Content-Type: application/json' \
   -d '{"body":"Repro: POST /orders returns 500 without currency."}' \
   -o /dev/null -w '%{http_code}\n' \
   "$A/repos/acme/api/issues/1/comments"
-```
-
-The status must be `201`.
-
-Read the comment through the comments endpoint.
-
-```bash
-curl -s -H "$AK" "$A/repos/acme/api/issues/1/comments" \
-  | jq -r '.[] | "\(.user.login): \(.body)"'
-```
-
-Checkpoint:
-
-```text
-pome-agent: Repro: POST /orders returns 500 without currency.
-```
-
-Assign `alice`.
-Then close the issue.
-
-```bash
 curl -s -X POST -H "$AK" -H 'Content-Type: application/json' \
   -d '{"assignees":["alice"]}' -o /dev/null -w '%{http_code}\n' \
   "$A/repos/acme/api/issues/1/assignees"
-
 curl -s -X PATCH -H "$AK" -H 'Content-Type: application/json' \
   -d '{"state":"closed"}' -o /dev/null -w '%{http_code}\n' \
   "$A/repos/acme/api/issues/1"
-```
-
-The statuses must be `201` and `200`.
-
-Read the issue again.
-
-```bash
 curl -s -H "$AK" "$A/repos/acme/api/issues/1" \
-  | jq '{state, comments, assignees: [.assignees[].login]}'
-```
-
-Checkpoint:
-
-```json
-{
-  "state": "closed",
-  "comments": 1,
-  "assignees": [
-    "alice"
-  ]
-}
-```
-
-This response proves that one process retained all three writes.
-
-## Inspect Tape A
-
-Save the tape.
-Then inspect its ordered events.
-
-```bash
-curl -s -H "$AK" "$A/_pome/events" > tape-a.json
-jq -r '.[] | [.method, .status, .state_mutation, (.tool // "-")] | @tsv' \
-  tape-a.json
+  | jq -c '{state, comments, assignees: [.assignees[].login]}'
 ```
 
 Checkpoint:
 
 ```text
-GET	200	false	-
-POST	201	true	add_issue_comment
-GET	200	false	-
-POST	201	true	-
-PATCH	200	true	-
-GET	200	false	-
+201
+201
+200
+{"state":"closed","comments":1,"assignees":["alice"]}
 ```
 
-Inspect the state change for the assignment.
+The tape must contain the three mutations in order and the assignment delta:
 
 ```bash
-jq -c '.[] | select(.path | endswith("/assignees"))
-  | .state_delta | {before: .before.assignees, after: .after.assignees}' \
-  tape-a.json
+curl -s -H "$AK" "$A/_pome/events" > tape-a.json
+jq -c '{
+  methods: [.[] | select(.state_mutation) | .method],
+  assignment: ([.[] | select(.path | endswith("/assignees"))][0].state_delta
+    | {before: .before.assignees, after: .after.assignees})
+}' tape-a.json
 ```
 
 Checkpoint:
 
 ```json
-{"before":[],"after":["alice"]}
+{"methods":["POST","POST","PATCH"],"assignment":{"before":[],"after":["alice"]}}
 ```
 
-## Start Twin B
-
-In the third terminal, enter `pome-cross-call-state`.
-Then start twin B.
+Start twin B in the third terminal and leave both processes running:
 
 ```bash
-cd twin-b
+cd pome-cross-call-state/twin-b
 GITHUB_CLONE_DB=.pome/github.db \
   npx -y @pome-sh/cli@latest twin start github --port 3334
 ```
 
-Keep this command active.
-Wait for this line.
-
-```text
-Pome github twin listening at http://127.0.0.1:3334/s/standalone
-```
-
-## Prove Process Isolation
-
-In the first terminal, read twin B's URL.
-Read twin B's token from the same file.
-
-```bash
-B=$(jq -r .rest_url twin-b/.pome/twin-status.json)
-BK="Authorization: Bearer $(jq -r .auth_token twin-b/.pome/twin-status.json)"
-```
-
-Read the same issue from both running processes.
+From the first terminal, compare both processes and inspect twin B's tape:
 
 ```bash
 for d in twin-a twin-b; do
@@ -209,80 +106,22 @@ for d in twin-a twin-b; do
     | jq -c --arg twin "$d" \
       '{$twin,state,comments,assignees:[.assignees[].login]}'
 done
-```
 
-Checkpoint:
-
-```json
-{"twin":"twin-a","state":"closed","comments":1,"assignees":["alice"]}
-{"twin":"twin-b","state":"open","comments":0,"assignees":[]}
-```
-
-Both processes remain active during this check.
-Twin B did not receive twin A's writes.
-
-Confirm that each process uses a different database file.
-
-```bash
-test -f twin-a/.pome/github.db && \
-  test -f twin-b/.pome/github.db && \
-  printf 'two database files exist\n'
-```
-
-Checkpoint:
-
-```text
-two database files exist
-```
-
-Save twin B's tape.
-Then check its mutations.
-Check its request authority.
-
-```bash
-curl -s -H "$BK" "$B/_pome/events" > tape-b.json
-jq '[.[] | select(.state_mutation)] | length' tape-b.json
-jq -r '[.[].request_headers.host] | unique[]' tape-b.json
-```
-
-Checkpoint:
-
-```text
-0
-127.0.0.1:3334
-```
-
-Twin B's tape contains no state mutation from twin A.
-
-Use twin A's token with twin B.
-
-```bash
+B=$(jq -r .rest_url twin-b/.pome/twin-status.json)
+BK="Authorization: Bearer $(jq -r .auth_token twin-b/.pome/twin-status.json)"
+curl -s -H "$BK" "$B/_pome/events" \
+  | jq '[.[] | select(.state_mutation)] | length'
 curl -s -o /dev/null -w '%{http_code}\n' -H "$AK" \
   "$B/repos/acme/api/issues/1"
 ```
 
-The status must be `401`.
+Checkpoint:
 
-## Clean Up
-
-Press `Ctrl-C` in the twin A terminal.
-Press `Ctrl-C` in the twin B terminal.
-
-In the first terminal, remove the procedure directory.
-
-```bash
-cd ..
-rm -rf pome-cross-call-state
+```text
+{"twin":"twin-a","state":"closed","comments":1,"assignees":["alice"]}
+{"twin":"twin-b","state":"open","comments":0,"assignees":[]}
+0
+401
 ```
 
-## Run The Automated Check
-
-From the repository root, run this command.
-
-```bash
-./showcases/cross-call-state/verify.sh
-```
-
-The script starts two twins on available ports.
-It verifies retained state, process isolation, separate tapes, and separate credentials.
-It stops both processes and removes its temporary files.
+Both database files must also exist at `twin-a/.pome/github.db` and `twin-b/.pome/github.db`. Stop both twins with `Ctrl-C`, then remove `pome-cross-call-state`.

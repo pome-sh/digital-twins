@@ -71,8 +71,6 @@ npm test
 
 ## Run
 
-By default, `pome run` uses hosted digital twins and returns hosted grading results.
-
 ```bash
 pome login
 export ANTHROPIC_API_KEY=...
@@ -85,15 +83,11 @@ Run all six task files with this command:
 pome run tasks -n 3
 ```
 
-To capture one local run, use `--local` with one task file:
+To capture one local run:
 
 ```bash
 pome run --local tasks/03-failing-ci.md
 ```
-
-The local command writes trace and state files under `runs/<task-slug>/<run-id>/`. It does not grade the run or create a verdict.
-
-Do not use `-n` with `--local`.
 
 ## Configuration
 
@@ -121,4 +115,3 @@ Do not change `VIKTOR_SLACK_CHANNEL` for the bundled tasks. Their checks use `en
 - If `BLOCK` or `FLAG` has no Slack message, check `MIRROR_EVERY_OUTCOME`.
 - If a custom variable has no effect, add its name to `POME_AGENT_ENV_ALLOWLIST`.
 - If Slack checks fail, keep `VIKTOR_SLACK_CHANNEL=eng-alerts` for bundled tasks.
-- If a local run has no score, this is correct. Local runs capture data only.

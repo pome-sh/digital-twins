@@ -45,8 +45,6 @@ npm run typecheck
 
 ## Run
 
-By default, `pome run` uses a hosted digital twin and returns hosted grading results.
-
 ```bash
 pome login
 export ANTHROPIC_API_KEY=sk-ant-...
@@ -55,15 +53,11 @@ pome run tasks/01-throttled-send.md
 
 The task configuration requests three hosted trials. Use `-n <count>` to override that value.
 
-To capture one local run, use `--local`:
+To capture one local run:
 
 ```bash
 pome run --local tasks/01-throttled-send.md
 ```
-
-The local command writes trace and state files under `runs/<task-slug>/<run-id>/`. It does not grade the run or create a verdict.
-
-Do not use `-n` with `--local`.
 
 ## Configuration
 
@@ -84,4 +78,3 @@ For `pome run`, add `GMAIL_AGENT_MODEL` or `GMAIL_AGENT_MAX_STEPS` to `POME_AGEN
 - If recipients receive duplicate messages, retry only the failed send request.
 - If authentication fails, export `ANTHROPIC_API_KEY` or `AI_GATEWAY_API_KEY`.
 - If a custom variable has no effect, add its name to `POME_AGENT_ENV_ALLOWLIST`.
-- If a local run has no score, this is correct. Local runs capture data only.
