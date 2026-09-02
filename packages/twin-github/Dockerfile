@@ -1,7 +1,7 @@
 # Build context is the monorepo root. This lets the image use the committed
 # workspace lockfile with npm ci instead of resolving dependencies from a
 # standalone package context.
-FROM node:24-bookworm@sha256:c35698d36238c69451c7e7a5951dd5c9b11c3e45884c918059c94c4a8be969b1 AS build
+FROM node:24.20.0-bookworm@sha256:9137a20e25879e0b557227b57e3ee4e9af4bde29eb3db66134cd1723e84f830b AS build
 WORKDIR /repo
 COPY package.json package-lock.json ./
 # `cli/` is a workspace member (its manifest is in the lockfile), so npm ci
@@ -24,7 +24,7 @@ RUN npm run build -w @pome-sh/twin-github
 RUN rm -rf node_modules packages/*/node_modules \
   && npm ci --omit=dev -w @pome-sh/twin-github
 
-FROM node:24-trixie-slim@sha256:9022946fb57e6fb6a2503931470deba4b49db02bfc8f587f93007fd33ef54415 AS runtime
+FROM node:24.20.0-trixie-slim@sha256:50c3b2f6988dfc307b86e5301d69611af31f4789bdf232863b07d3b02fe55ae0 AS runtime
 WORKDIR /repo
 ENV NODE_ENV=production
 ENV GITHUB_CLONE_HOST=0.0.0.0

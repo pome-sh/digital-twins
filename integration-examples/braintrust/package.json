@@ -11,22 +11,22 @@
     "task:write": "tsx scripts/write-task.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.105",
+    "@ai-sdk/anthropic": "^3.0.116",
     "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.221.0",
-    "@opentelemetry/resources": "^2.10.0",
-    "@opentelemetry/sdk-trace-node": "^2.10.0",
-    "ai": "^6.0.241",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
+    "@opentelemetry/resources": "^2.11.0",
+    "@opentelemetry/sdk-trace-node": "^2.11.0",
+    "ai": "^6.0.275",
     "braintrust": "^3.29.0",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^25.9.5",
-    "tsx": "^4.23.5",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=24.20.0"
   }
 }

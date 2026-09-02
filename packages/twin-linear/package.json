@@ -47,18 +47,18 @@
     "fidelity:parity": "tsx scripts/fidelity-parity.ts"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.0",
+    "@hono/node-server": "^2.1.1",
     "@pome-sh/sdk": "*",
-    "graphql": "^16.11.0",
-    "hono": "^4.13.0",
-    "zod": "^4.4.3"
+    "graphql": "^16.14.2",
+    "hono": "^4.13.5",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@linear/sdk": "^55.0.0",
-    "@types/node": "^26.1.2",
-    "tsx": "^4.23.5",
+    "@linear/sdk": "^55.2.1",
+    "@types/node": "^26.4.1",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "keywords": [
     "linear",
@@ -80,6 +80,6 @@
   },
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=24"
+    "node": ">=24.20.0"
   }
 }
