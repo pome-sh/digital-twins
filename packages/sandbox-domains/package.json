@@ -88,7 +88,7 @@
     "@types/node": "^26.1.2",
     "tsup": "^8.5.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10",
+    "vitest": "^4.1.11",
     "zod": "^4.4.3"
   },
   "engines": {
