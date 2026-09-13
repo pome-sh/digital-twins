@@ -50,7 +50,7 @@
     "@hono/node-server": "^2.1.0",
     "@pome-sh/sdk": "*",
     "graphql": "^16.11.0",
-    "hono": "^4.13.0",
+    "hono": "^4.13.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {
