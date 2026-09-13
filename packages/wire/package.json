@@ -65,15 +65,15 @@
     "check:trace-contract": "node scripts/emit-trace-contract.mjs --check"
   },
   "peerDependencies": {
-    "zod": "^4.1.13"
+    "zod": "^4.6.4"
   },
   "devDependencies": {
-    "@types/node": "^26.1.0",
+    "@types/node": "^26.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10",
-    "zod": "^4.1.13"
+    "zod": "^4.6.4"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=24.21.0"
   }
 }

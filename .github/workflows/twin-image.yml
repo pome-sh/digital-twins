@@ -170,8 +170,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-      - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -243,7 +243,7 @@ jobs:
       # attempt count, and the fatal last attempt.
       - name: Generate image SBOM (attempt 1 of 3)
         id: sbom_1
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         continue-on-error: true
         with:
           image: twin-${{ matrix.twin }}:scan
@@ -258,7 +258,7 @@ jobs:
       - name: Generate image SBOM (attempt 2 of 3)
         id: sbom_2
         if: ${{ steps.sbom_1.outcome == 'failure' }}
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         continue-on-error: true
         with:
           image: twin-${{ matrix.twin }}:scan
@@ -274,7 +274,7 @@ jobs:
       - name: Generate image SBOM (attempt 3 of 3)
         id: sbom_3
         if: ${{ steps.sbom_1.outcome == 'failure' && steps.sbom_2.outcome == 'failure' }}
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         with:
           image: twin-${{ matrix.twin }}:scan
           format: spdx-json
@@ -320,7 +320,7 @@ jobs:
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         continue-on-error: true
         with:
-          cosign-release: 'v2.6.4'
+          cosign-release: 'v2.6.5'
       - name: Back off before cosign install attempt 2
         if: ${{ github.event_name != 'pull_request' && steps.cosign_install_1.outcome == 'failure' }}
         run: |
@@ -332,7 +332,7 @@ jobs:
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         continue-on-error: true
         with:
-          cosign-release: 'v2.6.4'
+          cosign-release: 'v2.6.5'
       - name: Back off before cosign install attempt 3
         if: ${{ github.event_name != 'pull_request' && steps.cosign_install_1.outcome == 'failure' && steps.cosign_install_2.outcome == 'failure' }}
         run: |
@@ -345,7 +345,7 @@ jobs:
         if: ${{ github.event_name != 'pull_request' && steps.cosign_install_1.outcome == 'failure' && steps.cosign_install_2.outcome == 'failure' }}
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
-          cosign-release: 'v2.6.4'
+          cosign-release: 'v2.6.5'
       - name: Name the CDN that failed the cosign install
         if: ${{ failure() && steps.cosign_install_3.outcome == 'failure' }}
         run: |
