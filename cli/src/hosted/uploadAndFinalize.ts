@@ -26,7 +26,6 @@ export type UploadClient = Pick<
   HostedClient,
   | "requestEventsUploadUrl"
   | "requestStateUploadUrl"
-  | "requestSignalsUploadUrl"
   | "requestMetaUploadUrl"
 >;
 
@@ -34,9 +33,6 @@ export interface RunBlobs {
   eventsJsonl: string;
   stateInitialJson: string;
   stateFinalJson: string;
-  /** Pre-redacted JSONL. Empty / whitespace-only skips the signals upload
-   *  entirely so cloud doesn't allocate storage for "{}" payloads (F0-4 / L7). */
-  signalsJsonl: string;
   /** D18.1 — the run's meta.json (spec_version + twin_versions + the rest of
    *  writeRunArtifactsCore's payload), as written to / read from disk. */
   metaJson: string;
@@ -55,7 +51,6 @@ export interface UploadedBlobKeys {
   eventsKey: string | null;
   stateInitialKey: string | null;
   stateFinalKey: string | null;
-  signalsKey: string | null;
   /** Multi-twin (M3): per-twin state storage keys, keyed by twin id. Each entry
    *  carries at least one uploaded key (empty entries are dropped so the
    *  finalize contract's ">=1 key per entry" invariant holds). Undefined when
@@ -66,7 +61,7 @@ export interface UploadedBlobKeys {
    *  control plane 404s meta-upload-url). Never distinguished from any other
    *  failure — same best-effort contract as every other blob here.
    *
-   *  NOT threaded onto /finalize (unlike the state / signals keys): the cloud
+   *  NOT threaded onto /finalize (unlike the state keys): the cloud
    *  contract auto-discovers meta.json by the conventional session-prefixed
    *  path — see uploadRunBlobs and uploadMeta below. Returned only so callers
    *  and tests can observe whether the upload happened. */
@@ -113,18 +108,17 @@ async function putBlob(
 }
 
 /**
- * Upload events.jsonl + state blobs + adapter signals.jsonl to cloud storage
- * in parallel. /finalize defaults the trace storage key to the conventional
+ * Upload events.jsonl + state blobs to cloud storage in parallel. /finalize
+ * defaults the trace storage key to the conventional
  * `team-<>/session-<>/events.jsonl` path, so cloud's judge finds the trace
- * without an explicit override. State blobs and signals have no conventional
- * fallback today — without an explicit override the judge sees "{}" for
- * state files and skips the adapter-rich correlator (F0-4 / L7).
+ * without an explicit override. State blobs have no conventional fallback
+ * today — without an explicit override the judge sees "{}" for state files.
  * meta.json (D18.1/D18.6) DOES have a conventional fallback: cloud finalize
  * auto-discovers it at `team-<>/session-<>/meta.json`, so its key is uploaded
  * to that path and never threaded onto /finalize (see uploadMeta below).
- * All four uploads are best-effort: any failure leaves the corresponding
- * blob missing (`null` key), the judge still runs against whatever it does
- * have, and the dashboard handles nulls gracefully.
+ * Uploads are best-effort: any failure leaves the corresponding blob missing
+ * (`null` key), the judge still runs against whatever it does have, and the
+ * dashboard handles nulls gracefully.
  */
 export async function uploadRunBlobs(
   client: UploadClient,
@@ -146,32 +140,6 @@ export async function uploadRunBlobs(
         `[pome] events.jsonl upload skipped (${
           err instanceof Error ? err.message : String(err)
         }); continuing with events_jsonl_url=null`,
-      );
-      return null;
-    }
-  }
-
-  // F0-4 / L7 — upload adapter signals if the agent emitted any. When the
-  // payload is empty (no withPome() wrap, or no hooks fired), skip the
-  // upload entirely.
-  async function uploadSignals(): Promise<string | null> {
-    try {
-      if (blobs.signalsJsonl.trim().length === 0) {
-        return null;
-      }
-      const upload = await client.requestSignalsUploadUrl(sessionId);
-      const ok = await putBlob(
-        upload.url,
-        blobs.signalsJsonl,
-        "application/x-ndjson",
-        "signals.jsonl",
-      );
-      return ok ? upload.key : null;
-    } catch (err) {
-      console.warn(
-        `[pome] signals.jsonl upload skipped (${
-          err instanceof Error ? err.message : String(err)
-        }); continuing with signals_storage_key=null`,
       );
       return null;
     }
@@ -262,7 +230,7 @@ export async function uploadRunBlobs(
   // /finalize AUTO-DISCOVERS the blob at that same conventional path (it
   // downloads it unconditionally when no explicit override is given — see
   // pome-cloud services/finalize-run.ts, which defaults `metaStorageKey` to
-  // the conventional path). So — unlike the state / signals keys — the
+  // the conventional path). So — unlike the state keys — the
   // returned meta key is deliberately NOT threaded onto the /finalize body:
   // uploading to the conventional path is the whole contract. There is no
   // `meta_storage_key` finalize field to null out.
@@ -292,10 +260,9 @@ export async function uploadRunBlobs(
     }
   }
 
-  const [eventsKey, stateKeys, signalsKey, metaKey] = await Promise.all([
+  const [eventsKey, stateKeys, metaKey] = await Promise.all([
     uploadEvents(),
     uploadStates(),
-    uploadSignals(),
     uploadMeta(),
   ]);
 
@@ -305,7 +272,6 @@ export async function uploadRunBlobs(
     stateFinalKey: stateKeys.finalKey,
     perTwinStateKeys: stateKeys.perTwinStateKeys,
     metaKey,
-    signalsKey,
   };
 }
 
