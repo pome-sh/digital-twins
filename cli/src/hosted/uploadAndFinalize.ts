@@ -73,8 +73,8 @@ export interface UploadedBlobKeys {
 // body contains certain literal keys (e.g. an admin-flag key present in slack
 // twin state exports), which silently drops per-twin state uploads and makes
 // their criteria skip as state_missing. Gzipped bodies sail past the rule.
-// One code path here so every caller (events, per-twin state, signals,
-// meta.json) inherits it; the cloud's blob readers transparently gunzip via
+// One code path here so every caller (events, per-twin state, meta.json)
+// inherits it; the cloud's blob readers transparently gunzip via
 // the content-encoding header (shipped in the paired reader release before
 // this CLI change is released).
 async function putBlob(
