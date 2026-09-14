@@ -35,9 +35,6 @@ const stub = vi.hoisted(() => {
           state_final: { url: "https://signed.example/sf", key: "k/sf.json" },
         };
       },
-      async requestSignalsUploadUrl() {
-        return { url: "https://signed.example/sig", key: "k/sig.jsonl" };
-      },
       async requestMetaUploadUrl() {
         return { url: "https://signed.example/meta", key: "k/meta.json" };
       },
