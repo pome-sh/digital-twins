@@ -29,8 +29,6 @@ const STATE_INITIAL_URL = "https://signed.example/put-state-initial";
 const STATE_FINAL_URL = "https://signed.example/put-state-final";
 const STATE_INITIAL_KEY = `team-tm_x/session-${FAKE_SESSION_ID}/state_initial.json`;
 const STATE_FINAL_KEY = `team-tm_x/session-${FAKE_SESSION_ID}/state_final.json`;
-const SIGNALS_URL = "https://signed.example/put-signals";
-const SIGNALS_KEY = `team-tm_x/session-${FAKE_SESSION_ID}/signals.jsonl`;
 const META_URL = "https://signed.example/put-meta";
 const META_KEY = `team-tm_x/session-${FAKE_SESSION_ID}/meta.json`;
 
@@ -132,9 +130,6 @@ function makeEvalClient({
         state_final: { url: STATE_FINAL_URL, key: STATE_FINAL_KEY },
       };
     },
-    async requestSignalsUploadUrl() {
-      return { url: SIGNALS_URL, key: SIGNALS_KEY };
-    },
     async requestMetaUploadUrl() {
       return { url: META_URL, key: META_KEY };
     },
@@ -187,19 +182,11 @@ describe("pome eval run-dir validation", () => {
     await rm(tmp, { recursive: true, force: true });
   });
 
-  it("accepts a complete run dir (signals.jsonl absent → null)", async () => {
+  it("accepts a complete run dir", async () => {
     const runDir = await writeRunDir(tmp);
     const artifacts = await readRunDirArtifacts(runDir);
     expect(artifacts.meta.scenario).toBe("01-bug-happy-path");
     expect(artifacts.eventsJsonl).toContain('"TwinHttpEvent"');
-    expect(artifacts.signalsJsonl).toBeNull();
-  });
-
-  it("reads signals.jsonl when present", async () => {
-    const runDir = await writeRunDir(tmp);
-    await writeFile(join(runDir, "signals.jsonl"), '{"kind":"HookEvent","event_id":"hk_1"}\n');
-    const artifacts = await readRunDirArtifacts(runDir);
-    expect(artifacts.signalsJsonl).toContain('"HookEvent"');
   });
 
   it("nonexistent run dir → named usage error", async () => {
@@ -252,13 +239,6 @@ describe("pome eval run-dir validation", () => {
     );
   });
 
-  it("corrupt signals.jsonl → error naming signals.jsonl", async () => {
-    const runDir = await writeRunDir(tmp);
-    await writeFile(join(runDir, "signals.jsonl"), "garbage{\n");
-    await expect(readRunDirArtifacts(runDir)).rejects.toThrow(
-      /signals\.jsonl is corrupt — line 1/,
-    );
-  });
 });
 
 describe("pome eval meta parsing + identity derivation", () => {
@@ -350,7 +330,6 @@ describe("pome eval upload + finalize flow", () => {
     expect(calls.create).toEqual([
       { agent: "triage-bot", taskName: "01-bug-happy-path" },
     ]);
-    // events/state/meta blobs all PUT to their signed URLs (no signals.jsonl).
     expect(putUrls().sort()).toEqual(
       [EVENTS_URL, STATE_FINAL_URL, STATE_INITIAL_URL, META_URL].sort(),
     );
@@ -367,7 +346,6 @@ describe("pome eval upload + finalize flow", () => {
     expect(input.traceStorageKey).toBe(EVENTS_KEY);
     expect(input.stateInitialStorageKey).toBe(STATE_INITIAL_KEY);
     expect(input.stateFinalStorageKey).toBe(STATE_FINAL_KEY);
-    expect(input.signalsStorageKey).toBeUndefined();
 
     // Cloud verdict surfaces untouched.
     expect(result.score.satisfaction).toBe(100);
@@ -379,27 +357,6 @@ describe("pome eval upload + finalize flow", () => {
     // verdict is EPHEMERAL: NO score.json is written next to the trace.
     expect(existsSync(join(runDir, "eval-session.json"))).toBe(true);
     expect(existsSync(join(runDir, "score.json"))).toBe(false);
-  });
-
-  it("uploads signals.jsonl and forwards signalsStorageKey when present", async () => {
-    const runDir = await writeRunDir(tmp);
-    await writeFile(
-      join(runDir, "signals.jsonl"),
-      '{"kind":"HookEvent","event_id":"hk_1"}\n',
-    );
-    const { client, calls } = makeEvalClient();
-    const { putUrls } = mockPutFetch();
-
-    await runEval({
-      runDir,
-      agent: "triage-bot",
-      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
-      client,
-      projectConfig: null,
-    });
-
-    expect(putUrls()).toContain(SIGNALS_URL);
-    expect(calls.finalize[0]!.input.signalsStorageKey).toBe(SIGNALS_KEY);
   });
 
   it("sub-threshold cloud score → exitCode 1, score surfaced verbatim", async () => {

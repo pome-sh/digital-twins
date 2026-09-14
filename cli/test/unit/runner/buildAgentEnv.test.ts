@@ -23,7 +23,6 @@ const ENV_SCAFFOLD = {
   runId: "ses_old",
   artifactsDir: "runs",
   slug: "scn",
-  signalsPath: "/tmp/signals.jsonl",
 } as const;
 
 /** Reproduce the env origin/main produced for a single-twin github session — the
@@ -45,7 +44,6 @@ function originMainEnv(session: CreateSessionResponse): Record<string, string> {
     POME_AUTH_TOKEN: session.agent_token,
     POME_RUN_ID: runId,
     POME_ARTIFACTS_DIR: `runs/scn/${runId}`,
-    POME_ADAPTER_SIGNALS_PATH: ENV_SCAFFOLD.signalsPath,
   };
 }
 

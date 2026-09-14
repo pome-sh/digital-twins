@@ -40,7 +40,6 @@ describe("uploadRunBlobs — gzip blob uploads", () => {
     eventsJsonl: '{"kind":"TwinHttpEvent","twin":"slack"}\n',
     stateInitialJson: "{}",
     stateFinalJson: "{}",
-    signalsJsonl: "",
     metaJson: '{"spec_version":1,"is_admin":true}',
   };
 
@@ -63,9 +62,6 @@ describe("uploadRunBlobs — gzip blob uploads", () => {
         throw new HostedOrchError("not stubbed");
       },
       requestStateUploadUrl: async () => {
-        throw new HostedOrchError("not stubbed");
-      },
-      requestSignalsUploadUrl: async () => {
         throw new HostedOrchError("not stubbed");
       },
       requestMetaUploadUrl: async () => ({
@@ -100,7 +96,6 @@ describe("uploadRunBlobs — meta.json (D18.1)", () => {
     eventsJsonl: '{"kind":"TwinHttpEvent"}\n',
     stateInitialJson: "{}",
     stateFinalJson: "{}",
-    signalsJsonl: "",
     metaJson: '{"spec_version":1}',
   };
 
@@ -110,9 +105,6 @@ describe("uploadRunBlobs — meta.json (D18.1)", () => {
         throw new HostedOrchError("not stubbed");
       },
       requestStateUploadUrl: async () => {
-        throw new HostedOrchError("not stubbed");
-      },
-      requestSignalsUploadUrl: async () => {
         throw new HostedOrchError("not stubbed");
       },
       requestMetaUploadUrl: async () => {

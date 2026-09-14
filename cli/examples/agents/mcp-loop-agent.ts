@@ -24,7 +24,6 @@ import {
 import {
   preflightModel,
   preflightModelMessage,
-  resolveLlmHost,
   resolveModel,
 } from "../../src/scaffolds/mcp-loop/providers.js";
 
@@ -56,11 +55,6 @@ async function main() {
     mcp,
     task: contract.task,
     system,
-    signalsPath: contract.signalsPath,
-    // The verbatim slug is the LlmCallEvent.model label + the Tier-2 pricing
-    // key; host is the synthetic source for the emitted LLM-usage rows.
-    modelId: contract.model,
-    host: resolveLlmHost(contract.model, process.env),
   });
 
   console.log(
