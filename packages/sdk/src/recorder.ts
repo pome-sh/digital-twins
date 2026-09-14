@@ -165,13 +165,11 @@ export const POME_RECORDER_EVENTS_PATH = "POME_RECORDER_EVENTS_PATH";
  * for crash-streamed events.
  *
  * `parent_event_id` is null here and that is not a stub: the twin runs in its
- * own process and legitimately cannot know the `event_id` of the agent-side
- * `ToolUseEvent` that caused the call. What it DOES carry is the causing tool's
- * id, arriving on `x-pome-correlation-id` and persisted as `correlation_id`
- * (always) and `tool_call_id` (when the twin pins `stampToolCallId`). Since
- * That header holds the SDK's real `toolu_…`, so the parent is resolvable
- * — and `mergeAdapterSignalsIntoEvents` in the CLI resolves it, because that is
- * the one place that sees both this tape and the adapter's signals.
+ * own process and cannot know an agent-side event id. What it DOES carry is
+ * the causing tool's id, arriving on `x-pome-correlation-id` and persisted as
+ * `correlation_id` (always) and `tool_call_id` (when the twin pins
+ * `stampToolCallId`). Downstream correlators that see both this tape and a
+ * tool-use row can join on that id; this writer does not invent a parent.
  */
 export function toTwinHttpEventRow(
   event: RecorderEvent
