@@ -15,6 +15,16 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
+## Unreleased (patch)
+
+**`pome twin start` writes `.pome/twin-status.json` owner-only** (F-1800). The
+file carries the twin's bearer JWT and was written 0644; it is now 0600 in a
+0700 directory, and an older 0644 file is chmod'ed on the next start. The
+bundled twin runtime also stops serving the public dev secret and stops
+admitting peerless admin calls without an explicit opt-in (F-1801, F-1804);
+`twin start` and `run --local` set their own secret, so nothing changes for a
+CLI user — see `@pome-sh/sandbox-domains` for what a library consumer must do.
+
 ## 0.43.0 — 2026-09-01
 
 **`pome demo` and the hidden `pome demo-agent` are removed** (F-1718). Both

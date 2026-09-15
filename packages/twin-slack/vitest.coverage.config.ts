@@ -10,6 +10,9 @@ export default defineConfig({
     env: {
       TWIN_AUTH_SECRET: "test-secret-32-chars-minimum-length",
       SLACK_DETERMINISTIC_TS: "1",
+      // In-process app.request() has no socket peer; the admin gate refuses it
+      // without this opt-in (F-1804). Mirrors the root vitest.config.ts.
+      TWIN_ADMIN_ALLOW_NO_PEER: "1",
     },
     coverage: {
       provider: "v8",

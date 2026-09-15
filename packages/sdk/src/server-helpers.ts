@@ -9,6 +9,7 @@ import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { RESERVED_SESSION_PREFIXES, type ToolSpec, type TwinDefinition } from "./index.js";
+import { DEV_SECRETS_OPT_IN } from "./auth.js";
 import { UnknownToolError } from "./errors.js";
 
 export class TwinBootError extends Error {
@@ -41,7 +42,9 @@ export function isLoopbackHost(value: string): boolean {
 /**
  * Self-generate `TWIN_AUTH_SECRET` on first boot. An env-injected
  * secret always wins (pome-cloud injects per-tenant secrets — that contract
- * is untouched), and loopback binds keep the dev-fallback path. Otherwise
+ * is untouched). A loopback bind gets a per-process secret, printed once and
+ * never persisted (F-1801: it used to boot with none and let the engine fall
+ * back to the public dev string at request time). Otherwise
  * the secret persisted at the compose-era contract location
  * `.pome-data/<twin>/secret` (cwd-relative; `POME_TWIN_DATA_DIR` overrides
  * the directory) is reused, or a fresh 32-byte hex secret is generated,
@@ -54,7 +57,17 @@ export function isLoopbackHost(value: string): boolean {
  */
 export function ensureTwinAuthSecret(twin: string, host: string): void {
   if (process.env.TWIN_AUTH_SECRET) return;
-  if (isLoopbackHost(host)) return;
+  if (isLoopbackHost(host)) {
+    // Loopback stays the zero-config path; only the key stops being public.
+    // The public string is still available, but only by saying so.
+    if (process.env[DEV_SECRETS_OPT_IN] === "1") return;
+    const secret = randomBytes(32).toString("hex");
+    process.env.TWIN_AUTH_SECRET = secret;
+    console.log(
+      `[twin-${twin}] TWIN_AUTH_SECRET not set — generated ${secret} for this loopback boot (not persisted; set TWIN_AUTH_SECRET to choose one, or ${DEV_SECRETS_OPT_IN}=1 for the public dev secret)`
+    );
+    return;
+  }
 
   const dataDir = process.env.POME_TWIN_DATA_DIR || join(".pome-data", twin);
   const secretPath = join(dataDir, "secret");

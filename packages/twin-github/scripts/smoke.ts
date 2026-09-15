@@ -1,10 +1,14 @@
+import { randomBytes } from "node:crypto";
 import { serve } from "@hono/node-server";
 import { sign } from "hono/jwt";
 import { createGitHubCloneApp } from "../src/twin.js";
 
 const port = 43333;
 const sid = "smoke-session";
-const secret = process.env.TWIN_AUTH_SECRET ?? "dev-only-insecure-secret";
+// The twin verifies against process.env.TWIN_AUTH_SECRET and fails closed
+// without one (F-1801), so pin a secret here before minting the token: the
+// token below and the server are then on the same key.
+const secret = (process.env.TWIN_AUTH_SECRET ??= randomBytes(32).toString("hex"));
 const token = await sign(
   { sid, team_id: "tm_smoke", exp: Math.floor(Date.now() / 1000) + 3600 },
   secret

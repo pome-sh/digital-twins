@@ -66,8 +66,9 @@ The twin must refuse to start if it cannot read or generate the required secret.
 The process must return a nonzero exit code.
 The error must name `TWIN_AUTH_SECRET`.
 
-Loopback hosts keep the development fallback when `NODE_ENV` is not `production`.
-A production process on a loopback host must supply `TWIN_AUTH_SECRET`.
+On a loopback host with no `TWIN_AUTH_SECRET`, generate a 32-byte hexadecimal secret for the process and print it one time. Do not persist it.
+Serve the public development secret only when `POME_ALLOW_DEV_SECRETS=1` is set.
+`NODE_ENV` plays no part in secret handling.
 
 ### Runtime Dependencies
 
@@ -109,13 +110,15 @@ A plain Node.js start must load compiled JavaScript.
 | `LINEAR_TWIN_NO_SEED=1` | Do not apply a Linear seed at boot | Apply the seed |
 | `POME_SEED_JSON` | Apply the supplied seed at boot | Apply the default seed |
 | `POME_RECORDER_EVENTS_PATH` | Write recorder events as NDJSON to this file | Store recorder events in memory |
-| `TWIN_AUTH_SECRET` | HS256 secret for session JWTs and provider-shaped tokens. A supplied value always wins. | Development fallback on loopback unless `NODE_ENV=production`. Generated and persisted on non-loopback hosts. |
+| `TWIN_AUTH_SECRET` | HS256 secret for session JWTs and provider-shaped tokens. A supplied value always wins. | Generated per process on loopback hosts, printed once, not persisted. Generated and persisted on non-loopback hosts. |
+| `POME_ALLOW_DEV_SECRETS=1` | Serve the public development secret when `TWIN_AUTH_SECRET` is unset. For harnesses only. | Not set: generate a secret, or refuse the request |
 | `POME_TWIN_DATA_DIR` | Directory for the persisted boot secret at `<dir>/secret` | `.pome-data/<twin>` relative to the working directory |
 | `TWIN_ADMIN_TOKEN` | Use `X-Admin-Token` authentication for `/admin/*`. Compare the value with a timing-safe operation. | Check the loopback socket only |
+| `TWIN_ADMIN_ALLOW_NO_PEER=1` | Admit `/admin/*` requests that carry no transport peer address (in-process callers). For harnesses only. | Not set: reject them |
 | `POME_RUN_ID` | Run ID on recorder events | `"spawn"` |
 | `POME_TWIN_VERSION` / `POME_TWIN_GIT_SHA` / `POME_TWIN_BUILD_TIME` | Values in the `/healthz` `runtime` object | `0.1.0` / `dev` / `dev` |
 | `SLACK_DETERMINISTIC_TS` | Use deterministic Slack message timestamps | Not set |
-| `NODE_ENV=production` | Require strict secret handling. Reject unknown peer addresses at the admin gate. | Not set |
+| `NODE_ENV=production` | Print a boot warning when `TWIN_ADMIN_TOKEN` is unset. Secret handling and the admin gate do not read it. | Not set |
 
 A provider-specific no-seed variable takes precedence over `POME_SEED_JSON` and skips all boot seeding.
 
@@ -145,7 +148,7 @@ The admin gate has two modes:
 - Return status `403` when this header is missing or incorrect.
 - Otherwise, allow requests only when the socket peer is loopback.
 - Do not trust proxy headers or client headers for the peer check.
-- With `NODE_ENV=production`, reject an unknown peer address.
+- Reject a request that carries no peer address (an in-process caller, or a bridge that reports none) unless `TWIN_ADMIN_ALLOW_NO_PEER=1` is set. `NODE_ENV` plays no part.
 
 The implementation is in `packages/sdk/src/admin-gate.ts`.
 

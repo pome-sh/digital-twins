@@ -1,5 +1,18 @@
 # @pome-sh/sandbox-domains
 
+## Unreleased (minor)
+
+**A twin booted with no `TWIN_AUTH_SECRET` now fails closed instead of
+verifying tokens against the public `dev-only-insecure-secret`** (F-1801).
+`resolveAuthSecret()` throws at the first bearer check unless the env is set or
+`POME_ALLOW_DEV_SECRETS=1` is — the same opt-in pome-cloud's `loadTwinSecret()`
+requires. A served twin bound to loopback mints a per-process secret and prints
+it once; `NODE_ENV` no longer plays a part. `/admin/reset` and `/admin/seed`
+refuse a request that carries no transport peer unless
+`TWIN_ADMIN_ALLOW_NO_PEER=1` is set (F-1804); an in-process harness that drives
+the app with `app.request()` must set it, a deployment should set
+`TWIN_ADMIN_TOKEN` instead.
+
 ## 0.3.1 — 2026-08-30
 
 The bundled `@pome-sh/sdk` exposes `./package.json` in its `exports`, so the CLI can resolve each inlined twin's version for the `pome checks <twin>` header (F-1791). No exported names, types or shapes change.
