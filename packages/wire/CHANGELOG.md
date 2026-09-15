@@ -4,6 +4,14 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
+## 0.4.2 — 2026-09-15
+
+Version-only release: publish-relevant paths changed and no `## Unreleased`
+entry was supplied, so this heading is the whole record. `@pome-sh/wire`'s bytes
+moved under `packages/wire/`.
+
+- 0cc9708 Simplify user-facing documentation (#537)
+
 ## 0.4.1 — 2026-09-01
 
 Doc-only: source comments and the README no longer reference the removed

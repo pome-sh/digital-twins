@@ -15,7 +15,7 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
-## Unreleased (patch)
+## 0.43.1 — 2026-09-15
 
 **`pome twin start` writes `.pome/twin-status.json` owner-only** (F-1800). The
 file carries the twin's bearer JWT and was written 0644; it is now 0600 in a

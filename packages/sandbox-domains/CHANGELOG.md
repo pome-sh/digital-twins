@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (minor)
+## 0.4.0 — 2026-09-15
 
 **A twin booted with no `TWIN_AUTH_SECRET` now fails closed instead of
 verifying tokens against the public `dev-only-insecure-secret`** (F-1801).

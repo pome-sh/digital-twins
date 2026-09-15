@@ -1,5 +1,13 @@
 # @pome-sh/checks
 
+## 0.4.2 — 2026-09-15
+
+Version-only release: publish-relevant paths changed and no `## Unreleased`
+entry was supplied, so this heading is the whole record. `@pome-sh/checks`'s bytes
+moved under `packages/checks/`.
+
+- 0cc9708 Simplify user-facing documentation (#537)
+
 ## 0.4.1 — 2026-09-01
 
 Doc-only: a build-config comment no longer references the removed
