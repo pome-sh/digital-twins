@@ -17,8 +17,8 @@
 
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { chmod, mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { serve } from "@hono/node-server";
 import { sign } from "hono/jwt";
 import {
@@ -39,6 +39,34 @@ import { bootTwin } from "./twinHarness.js";
 
 /** The fixed session id a standalone twin serves under (`/s/standalone`). */
 const STANDALONE_SID = "standalone";
+
+/** Where `pome twin start` records the running twin, relative to the cwd. */
+export const STANDALONE_STATUS_PATH = ".pome/twin-status.json";
+
+export type StandaloneStatus = {
+  name: TwinName;
+  url: string;
+  rest_url: string;
+  mcp_url: string;
+  auth_token: string;
+};
+
+/**
+ * `.pome/twin-status.json` carries the bearer JWT for every `/s/standalone/*`
+ * endpoint, so it is written the way the CLI writes every other secret
+ * (`writeCredentialsFile`, `writeSecretsFile`): owner-only directory and
+ * file (F-1800). The `chmod` is not redundant — `mode` on `writeFile` applies
+ * only when the file is created, and a status file left by an older CLI is
+ * 0644 until something chmods it.
+ */
+export async function writeStandaloneStatusFile(
+  status: StandaloneStatus,
+  path: string = STANDALONE_STATUS_PATH,
+): Promise<void> {
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  await writeFile(path, JSON.stringify(status, null, 2), { mode: 0o600 });
+  await chmod(path, 0o600);
+}
 
 export type StandaloneAuthSecret = {
   secret: string;
@@ -258,15 +286,13 @@ export async function runTwinStartCommand(
         resolve();
       });
     });
-    await mkdir(".pome", { recursive: true });
-    await writeFile(
-      ".pome/twin-status.json",
-      JSON.stringify(
-        { name, url: restUrl, rest_url: restUrl, mcp_url: mcpUrl, auth_token: token },
-        null,
-        2,
-      ),
-    );
+    await writeStandaloneStatusFile({
+      name,
+      url: restUrl,
+      rest_url: restUrl,
+      mcp_url: mcpUrl,
+      auth_token: token,
+    });
   } catch (err) {
     // Boot fails loudly or not at all: without this, the rejection leaves a
     // bound listener keeping the process alive behind the error message.

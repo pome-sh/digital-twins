@@ -5,30 +5,46 @@ import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resolveAuthSecret } from "../src/auth.js";
+import { DEV_ONLY_INSECURE_SECRET, resolveAuthSecret } from "../src/auth.js";
 import { TwinBootError, ensureTwinAuthSecret } from "../src/server.js";
 
 describe("resolveAuthSecret", () => {
   const prevNodeEnv = process.env.NODE_ENV;
   const prevSecret = process.env.TWIN_AUTH_SECRET;
+  const prevOptIn = process.env.POME_ALLOW_DEV_SECRETS;
 
   afterEach(() => {
     if (prevNodeEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = prevNodeEnv;
     if (prevSecret === undefined) delete process.env.TWIN_AUTH_SECRET;
     else process.env.TWIN_AUTH_SECRET = prevSecret;
+    if (prevOptIn === undefined) delete process.env.POME_ALLOW_DEV_SECRETS;
+    else process.env.POME_ALLOW_DEV_SECRETS = prevOptIn;
   });
 
-  it("throws when NODE_ENV=production and secret missing", () => {
+  it("throws when the secret is missing, whatever NODE_ENV says (F-1801)", () => {
     delete process.env.TWIN_AUTH_SECRET;
-    process.env.NODE_ENV = "production";
-    expect(() => resolveAuthSecret()).toThrow(/TWIN_AUTH_SECRET required/);
+    delete process.env.POME_ALLOW_DEV_SECRETS;
+    for (const nodeEnv of [undefined, "production", "staging", "test"]) {
+      if (nodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = nodeEnv;
+      expect(() => resolveAuthSecret()).toThrow(/TWIN_AUTH_SECRET is not set/);
+    }
   });
 
-  it("returns dev fallback when secret missing outside production", () => {
+  it("serves the public dev secret only under the exact POME_ALLOW_DEV_SECRETS=1 opt-in", () => {
     delete process.env.TWIN_AUTH_SECRET;
     delete process.env.NODE_ENV;
-    expect(resolveAuthSecret()).toBe("dev-only-insecure-secret");
+    process.env.POME_ALLOW_DEV_SECRETS = "1";
+    expect(resolveAuthSecret()).toBe(DEV_ONLY_INSECURE_SECRET);
+    process.env.POME_ALLOW_DEV_SECRETS = "true";
+    expect(() => resolveAuthSecret()).toThrow(/TWIN_AUTH_SECRET is not set/);
+  });
+
+  it("an env-injected secret wins over the opt-in", () => {
+    process.env.TWIN_AUTH_SECRET = "cloud-injected-per-tenant-secret-123456";
+    process.env.POME_ALLOW_DEV_SECRETS = "1";
+    expect(resolveAuthSecret()).toBe("cloud-injected-per-tenant-secret-123456");
   });
 });
 
@@ -76,10 +92,24 @@ describe("ensureTwinAuthSecret", () => {
     expect(fileExists()).toBe(false);
   });
 
-  it("loopback binds keep the dev-fallback path: no generation", () => {
+  it("loopback bind with no env: a per-process secret, printed once, never persisted (F-1801)", () => {
+    delete process.env.POME_ALLOW_DEV_SECRETS;
     ensureTwinAuthSecret("github", "127.0.0.1");
-    expect(process.env.TWIN_AUTH_SECRET).toBeUndefined();
+    const secret = process.env.TWIN_AUTH_SECRET ?? "";
+    expect(secret).toMatch(HEX_64);
     expect(fileExists()).toBe(false);
+    expect(logged()).toContain(secret);
+  });
+
+  it("loopback bind under POME_ALLOW_DEV_SECRETS=1: nothing generated, the engine serves the dev secret", () => {
+    process.env.POME_ALLOW_DEV_SECRETS = "1";
+    try {
+      ensureTwinAuthSecret("github", "127.0.0.1");
+      expect(process.env.TWIN_AUTH_SECRET).toBeUndefined();
+      expect(fileExists()).toBe(false);
+    } finally {
+      delete process.env.POME_ALLOW_DEV_SECRETS;
+    }
   });
 
   it("non-loopback bind with no env: generates 32-byte hex, persists, sets env, prints once", () => {
