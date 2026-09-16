@@ -14,12 +14,6 @@
 // packages/twin-github/src/mcp.ts — single POST per request, `application/json`
 // response, `tools/list` → { tools }, `tools/call` → { content:[{text}], isError }).
 //
-// Trace signals (best-effort, NOT analyzed in v1): when POME_ADAPTER_SIGNALS_PATH
-// is set, the loop appends ToolUseEvent / ToolResultEvent rows whose on-disk
-// shape matches the M0 event schema in @pome-sh/wire, so traces stay comparable
-// across scaffolds and v2's explanation layer inherits them.
-import { appendFileSync } from "node:fs";
-import { randomUUID } from "node:crypto";
 import {
   generateText,
   stepCountIs,
@@ -159,127 +153,6 @@ export function createHttpMcpClient(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// Best-effort trace signals (M0 event rows for POME_ADAPTER_SIGNALS_PATH).
-// ---------------------------------------------------------------------------
-
-// Hand-built JSON-line rows matching the M0 event shapes in @pome-sh/wire (no
-// @pome-sh/wire runtime dep). The CLI runner merges this file into the canonical
-// events.jsonl after the subprocess exits.
-function emitToolUse(
-  signalsPath: string | null,
-  row: { tool_use_id: string; tool_name: string; input: unknown },
-): void {
-  if (!signalsPath) return;
-  try {
-    appendFileSync(
-      signalsPath,
-      JSON.stringify({
-        ts: new Date().toISOString(),
-        event_id: randomUUID(),
-        parent_event_id: null,
-        kind: "ToolUseEvent",
-        tool_use_id: row.tool_use_id,
-        tool_name: row.tool_name,
-        input: row.input,
-      }) + "\n",
-    );
-  } catch {
-    // best-effort: never let trace I/O fail the agent.
-  }
-}
-
-function emitToolResult(
-  signalsPath: string | null,
-  row: { tool_use_id: string; output: unknown; is_error: boolean },
-): void {
-  if (!signalsPath) return;
-  try {
-    appendFileSync(
-      signalsPath,
-      JSON.stringify({
-        ts: new Date().toISOString(),
-        event_id: randomUUID(),
-        parent_event_id: null,
-        kind: "ToolResultEvent",
-        tool_use_id: row.tool_use_id,
-        output: row.output,
-        is_error: row.is_error,
-      }) + "\n",
-    );
-  } catch {
-    // best-effort.
-  }
-}
-
-// Append ONE authoritative LlmCallEvent per generateText step (one model
-// round-trip). The capture-server proxy can't read token/cost from the
-// encrypted CONNECT tunnel; the scaffold holds the AI SDK response and is the
-// only source that knows usage. The matrix runs mcp-loop cells with capture
-// OFF (see cli/src/matrix/index.ts), so these rows are the SOLE LlmCallEvent
-// rows and runResourceMetrics sums them without double-counting proxy latency.
-//
-// On-disk shape matches llmCallEventSchema (src/types/shared.ts): host/port/
-// bytes_in/bytes_out are non-null (the scaffold never sees the HTTP/byte layer,
-// so bytes are honestly 0 and host is synthetic); url/method/status are null;
-// model/prompt_tokens/completion_tokens/cost_usd carry real values.
-function emitLlmCall(
-  signalsPath: string | null,
-  row: {
-    host: string;
-    latency_ms: number;
-    model: string;
-    prompt_tokens: number | null;
-    completion_tokens: number | null;
-    cost_usd: number | null;
-  },
-): void {
-  if (!signalsPath) return;
-  try {
-    appendFileSync(
-      signalsPath,
-      JSON.stringify({
-        ts: new Date().toISOString(),
-        event_id: randomUUID(),
-        parent_event_id: null,
-        kind: "LlmCallEvent",
-        host: row.host,
-        port: 443,
-        latency_ms: row.latency_ms,
-        bytes_in: 0,
-        bytes_out: 0,
-        url: null,
-        method: null,
-        status: null,
-        model: row.model,
-        prompt_tokens: row.prompt_tokens,
-        completion_tokens: row.completion_tokens,
-        cost_usd: row.cost_usd,
-      }) + "\n",
-    );
-  } catch {
-    // best-effort: never let trace I/O fail the agent.
-  }
-}
-
-// Read the Vercel AI Gateway's per-call cost from a step's providerMetadata.
-// ProviderMetadata = Record<string, Record<string, JSONValue>>; the gateway
-// surfaces cost under providerMetadata.gateway.cost. Defensive: returns the
-// number only when finite, else null (provider/route dependent — may be absent).
-function readGatewayCost(pm: unknown): number | null {
-  if (!pm || typeof pm !== "object") return null;
-  const gateway = (pm as Record<string, unknown>).gateway;
-  if (!gateway || typeof gateway !== "object") return null;
-  const cost = (gateway as Record<string, unknown>).cost;
-  return typeof cost === "number" && Number.isFinite(cost) ? cost : null;
-}
-
-// Coerce a possibly-undefined SDK token count to a schema-valid non-negative
-// integer, or null when absent/non-finite.
-function coerceTokenCount(n: unknown): number | null {
-  return typeof n === "number" && Number.isFinite(n) ? Math.max(0, Math.round(n)) : null;
-}
-
-// ---------------------------------------------------------------------------
 // The loop.
 // ---------------------------------------------------------------------------
 
@@ -294,19 +167,6 @@ export type RunLoopOptions = {
   task: string;
   system?: string;
   maxTurns?: number;
-  // Where to append best-effort ToolUse/ToolResult/LlmCall signals (or null to
-  // skip).
-  signalsPath?: string | null;
-  // The verbatim POME_MATRIX_MODEL slug (e.g. "anthropic/claude-opus-4.5") used
-  // as LlmCallEvent.model — distinct from the resolved `model: LanguageModel`,
-  // which has no portable public model-id accessor. This is the human-readable
-  // label and the exact key the matrix's Tier-2 pricing table looks up.
-  // Defaults to "unknown" when omitted (hand-run callers without a slug).
-  modelId?: string;
-  // Synthetic host for the emitted LlmCallEvent (the scaffold never sees the
-  // HTTP layer). The caller derives it from provider + gateway; defaults to
-  // "ai-gateway".
-  host?: string;
 };
 
 export type RunLoopResult = {
@@ -317,11 +177,10 @@ export type RunLoopResult = {
 };
 
 // Build the AI SDK tool set from the twin's MCP tools. Each tool's `execute`
-// dispatches back through the MCP client and emits best-effort trace signals.
+// dispatches back through the MCP client.
 function buildToolSet(
   tools: McpToolDef[],
   mcp: McpClient,
-  signalsPath: string | null,
   onToolCall: () => void,
 ): Record<string, ReturnType<typeof dynamicTool>> {
   const set: Record<string, ReturnType<typeof dynamicTool>> = {};
@@ -331,18 +190,7 @@ function buildToolSet(
       inputSchema: jsonSchema(t.inputSchema as never),
       execute: async (input: unknown) => {
         onToolCall();
-        const toolUseId = randomUUID();
-        emitToolUse(signalsPath, {
-          tool_use_id: toolUseId,
-          tool_name: t.name,
-          input,
-        });
         const result = await mcp.callTool(t.name, input);
-        emitToolResult(signalsPath, {
-          tool_use_id: toolUseId,
-          output: result.text,
-          is_error: result.isError,
-        });
         // Hand the raw tool text back to the model; the AI SDK serializes it.
         return result.text;
       },
@@ -355,20 +203,15 @@ function buildToolSet(
 // unit-testable with a mocked model and a fake MCP client (no network, no key).
 export async function runMcpLoop(options: RunLoopOptions): Promise<RunLoopResult> {
   const maxTurns = options.maxTurns ?? DEFAULT_MAX_TURNS;
-  const signalsPath = options.signalsPath ?? null;
 
   const mcpTools = await options.mcp.listTools();
   let toolCallCount = 0;
-  const toolSet = buildToolSet(mcpTools, options.mcp, signalsPath, () => {
+  const toolSet = buildToolSet(mcpTools, options.mcp, () => {
     toolCallCount += 1;
   });
 
   const messages: ModelMessage[] = [{ role: "user", content: options.task }];
 
-  const modelId = options.modelId ?? "unknown";
-  const host = options.host ?? "ai-gateway";
-
-  const t0 = Date.now();
   const result = await generateText({
     model: options.model,
     system: options.system,
@@ -377,24 +220,6 @@ export async function runMcpLoop(options: RunLoopOptions): Promise<RunLoopResult
     // Keep stepping while the model emits tool calls, up to the turn budget.
     stopWhen: stepCountIs(maxTurns),
   });
-  const elapsed = Date.now() - t0;
-
-  // Emit one authoritative LlmCallEvent per step (each step = one model call).
-  // The generateText wall-clock is split evenly across steps so the summed
-  // latency_ms over rows equals the real wall-clock (the SDK exposes no
-  // per-step timing). Tokens/cost are exact per step.
-  const stepCount = result.steps.length;
-  const perStepLatency = Math.max(0, Math.round(elapsed / Math.max(1, stepCount)));
-  for (const step of result.steps) {
-    emitLlmCall(signalsPath, {
-      host,
-      latency_ms: perStepLatency,
-      model: modelId,
-      prompt_tokens: coerceTokenCount(step.usage?.inputTokens),
-      completion_tokens: coerceTokenCount(step.usage?.outputTokens),
-      cost_usd: readGatewayCost(step.providerMetadata),
-    });
-  }
 
   return {
     text: result.text,
@@ -416,7 +241,6 @@ export type LoopEnvContract = {
   authToken?: string;
   model: string;
   promptPath?: string;
-  signalsPath: string | null;
 };
 
 // Discover the twin MCP URL from POME_<TWIN>_MCP_URL. The runner currently sets
@@ -458,13 +282,11 @@ export function resolveLoopEnv(
     throw new Error("mcp-loop: POME_MATRIX_MODEL is required (set by the matrix)");
   }
 
-  const signalsRaw = env.POME_ADAPTER_SIGNALS_PATH;
   return {
     task,
     mcpUrl,
     authToken: env.POME_AUTH_TOKEN?.trim() || undefined,
     model,
     promptPath: env.POME_MATRIX_PROMPT_PATH?.trim() || undefined,
-    signalsPath: signalsRaw && signalsRaw.length > 0 ? signalsRaw : null,
   };
 }

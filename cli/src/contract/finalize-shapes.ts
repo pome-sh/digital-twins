@@ -11,7 +11,7 @@ import { criterionDefSchema, perTwinStateKeysSchema } from "./rest.js";
 
 // POST /v1/sessions/:id/finalize — ADR-013 managed-judge REQUEST. This is the
 // LIVE scoring wire: the CLI (cli/src/hosted/client.ts `finalize`) uploads trace
-// / state / signals blobs via the presigned upload-url routes, then POSTs the
+// / state blobs via the presigned upload-url routes, then POSTs the
 // criterion *definitions* plus the storage KEYS here; the cloud runs the managed
 // judge and returns `finalizeInitialResponseSchema`. (The sibling
 // `submitResultRequestSchema` in rest.ts is the DEPRECATED BYOK shim that scores
@@ -40,6 +40,9 @@ export const finalizeRequestSchema = z.object({
   trace_storage_key: z.string().optional(),
   state_initial_storage_key: z.string().optional(),
   state_final_storage_key: z.string().optional(),
+  // Compatibility-only: older CLI releases supplied this optional key. The
+  // current CLI no longer produces adapter signals, but the public request
+  // schema must continue to parse persisted/replayed finalize requests.
   signals_storage_key: z.string().optional(),
   // Multi-twin (M3): additive per-twin state storage keys, keyed by twin id.
   // Absent on single-twin sessions, which use the flat state_*_storage_key fields

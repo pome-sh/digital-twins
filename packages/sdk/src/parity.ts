@@ -16,6 +16,7 @@
 // unsupported envelope; an optional `live` hook lets a twin compare
 // read-only shapes against the real upstream (e.g. `gh api`).
 
+import { randomBytes } from "node:crypto";
 import { sign } from "hono/jwt";
 import {
   compareToolNames,
@@ -93,7 +94,7 @@ export interface RunParityOptions {
   restProbes?: ParityRestProbe[];
   /** Session id; default "fidelity-parity". */
   sid?: string;
-  /** JWT secret; default env TWIN_AUTH_SECRET or the engine dev secret. */
+  /** JWT secret; default env TWIN_AUTH_SECRET, else a per-process random secret pinned into the env. */
   secret?: string;
   /** Extra JWT claims (login, team_id, account_id, ...). */
   claims?: Record<string, unknown>;
@@ -119,7 +120,14 @@ function bodyKeys(body: unknown): string[] {
 
 export async function runFidelityParity(options: RunParityOptions): Promise<ParityResult> {
   const sid = options.sid ?? "fidelity-parity";
-  const secret = options.secret ?? process.env.TWIN_AUTH_SECRET ?? "dev-only-insecure-secret";
+  // The token minted here is verified by `options.app` through
+  // `resolveAuthSecret()`, which reads the env per request, so pinning the
+  // secret into the env is what keeps the two sides on one key. No public
+  // fallback any more (F-1801): an unset env gets a per-process random one.
+  const secret =
+    options.secret ??
+    process.env.TWIN_AUTH_SECRET ??
+    (process.env.TWIN_AUTH_SECRET = randomBytes(32).toString("hex"));
   const token = await sign(
     { sid, exp: Math.floor(Date.now() / 1000) + 3600, ...options.claims },
     secret

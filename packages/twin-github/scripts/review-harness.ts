@@ -141,7 +141,19 @@ let ownedServer: { close: () => void } | undefined;
 
 if (target === "local") {
   const sid = process.env.REVIEW_SID ?? `harness_${runId}`;
-  const secret = process.env.TWIN_AUTH_SECRET ?? "dev-only-insecure-secret";
+  // The harness mints its own bearer, so it has to hold the secret the twin
+  // verifies with. A self-booted twin takes whatever this process pins into
+  // the env; a twin someone else started (explicit GITHUB_MCP_URL) must be
+  // given the same TWIN_AUTH_SECRET, because the public dev fallback is gone
+  // (F-1801) and a guessed secret would just be a 401.
+  const secret =
+    process.env.TWIN_AUTH_SECRET ??
+    (explicitUrl ? undefined : (await import("node:crypto")).randomBytes(32).toString("hex"));
+  if (!secret) {
+    throw new Error(
+      "TWIN_AUTH_SECRET must be set when GITHUB_MCP_URL points at a running twin: the harness mints a bearer against it."
+    );
+  }
   if (!explicitUrl) {
     const { serve } = await import("@hono/node-server");
     const { createGitHubCloneApp } = await import("../src/twin.js");

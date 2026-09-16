@@ -2,17 +2,32 @@
 // Shared admin-endpoint gate. First-party twins import
 // this through `@pome-sh/sdk/server`; do not copy this file into a twin package.
 //
-// Tiered policy (semantics unchanged from the per-twin copies it replaces):
+// Tiered policy:
 //   1. TWIN_ADMIN_TOKEN set → require X-Admin-Token to match (timing-safe).
 //   2. TWIN_ADMIN_TOKEN unset + client IP known → allow only loopback.
-//   3. TWIN_ADMIN_TOKEN unset + client IP unknown → deny in production,
-//      allow otherwise (accepted fail-open for in-process test harnesses).
+//   3. TWIN_ADMIN_TOKEN unset + client IP unknown → deny, unless the process
+//      opted in with TWIN_ADMIN_ALLOW_NO_PEER=1. The opt-in exists for
+//      in-process test harnesses, which drive the app with app.request() and
+//      have no socket to read a peer from. Tier 3 used to read NODE_ENV
+//      instead and allow everything outside "production" (F-1804): a twin
+//      behind a serving bridge that reports no peer then granted
+//      /admin/reset and /admin/seed to anyone who could reach it, and NODE_ENV
+//      unset, "staging", "preview" and "test" all fell open. NODE_ENV is not
+//      a security boundary, so the gate no longer reads it.
 
 import type { Context, MiddlewareHandler } from "hono";
 import { timingSafeEqual } from "node:crypto";
 
 /** Context variable consulted first by getClientIp(). */
 export const CLIENT_IP_VAR = "pomeClientIp";
+
+/**
+ * Opt-in that admits `/admin/*` requests carrying no transport peer address.
+ * Set it (to exactly "1") in a test harness that calls the app in-process;
+ * never in a deployment — a deployment that cannot see its peer should use
+ * TWIN_ADMIN_TOKEN.
+ */
+export const ADMIN_NO_PEER_OPT_IN = "TWIN_ADMIN_ALLOW_NO_PEER";
 
 type ClientIpEnv = { Variables: { pomeClientIp?: string } };
 
@@ -121,9 +136,11 @@ export function createAdminGate(options: AdminGateOptions = {}): MiddlewareHandl
     }
     const remote = await getClientIp(c);
     if (!remote) {
-      if (process.env.NODE_ENV === "production") return forbidden();
-      await next();
-      return;
+      if (process.env[ADMIN_NO_PEER_OPT_IN] === "1") {
+        await next();
+        return;
+      }
+      return forbidden();
     }
     if (!isLoopbackAddress(remote)) return forbidden();
     await next();

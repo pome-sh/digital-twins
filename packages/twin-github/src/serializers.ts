@@ -660,12 +660,6 @@ export function checkRunJson(run: CheckRunRow, repo: RepoRow) {
     html_url: `https://github.com/${repo.full_name}/runs/${run.id}`,
     details_url: run.details_url,
     status: run.status,
-    // The twin's `conclusion` column carries the full GitHub check-run
-    // conclusion vocabulary including `"stale"`, but the pinned
-    // @octokit/openapi-types version's `check-run.conclusion` enum predates
-    // `"stale"`. The twin faithfully emits a real upstream value; narrow it to
-    // the schema's declared union for the type anchor only (twin
-    // tracks live GitHub, not a lagging spec snapshot), runtime value unchanged.
     conclusion: run.conclusion as CheckRun["conclusion"],
     started_at: run.started_at,
     completed_at: run.completed_at,

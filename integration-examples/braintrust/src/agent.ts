@@ -14,6 +14,7 @@
 
 import type { Tracer } from "@opentelemetry/api";
 import { anthropic } from "@ai-sdk/anthropic";
+import { OpenTelemetry } from "@ai-sdk/otel";
 import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 
@@ -141,7 +142,7 @@ export async function runAgent(input: {
       ? {
           experimental_telemetry: {
             isEnabled: true,
-            tracer: input.tracer,
+            integrations: [new OpenTelemetry({ tracer: input.tracer })],
             ...(input.traceName ? { functionId: input.traceName } : {}),
           },
         }

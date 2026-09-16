@@ -26,12 +26,47 @@ export interface SessionClaims {
 /** Minimum session value; twins extend it via hooks (login, account_id, …). */
 export type SessionValue = { sid: string } & Record<string, unknown>;
 
+/** The public development secret. Served only under the opt-in below. */
+export const DEV_ONLY_INSECURE_SECRET = "dev-only-insecure-secret";
+
+/** Same name and value pome-cloud's `loadTwinSecret()` already honours. */
+export const DEV_SECRETS_OPT_IN = "POME_ALLOW_DEV_SECRETS";
+
+/**
+ * The HS256 secret every session JWT and provider-shaped token is signed and
+ * verified with. Read per request, so a boot path that sets
+ * `process.env.TWIN_AUTH_SECRET` before the first request (the CLI's
+ * `twin start` and `run --local`, `ensureTwinAuthSecret` for a served twin)
+ * is what makes the minted token and the verifying twin agree.
+ *
+ * Fails closed. Until F-1801 a missing secret outside `NODE_ENV=production`
+ * fell back to the public string above, so a twin started without the env
+ * verified bearer tokens against a secret anyone can read on GitHub, and
+ * anyone who could reach it forged a session JWT for any sid. `NODE_ENV` is
+ * not a security boundary — unset, "staging", "preview" and "test" all took
+ * the fallback — so the decision no longer reads it: set the secret, or say
+ * `POME_ALLOW_DEV_SECRETS=1` out loud.
+ */
 export function resolveAuthSecret(): string {
   const secret = process.env.TWIN_AUTH_SECRET;
-  if (!secret && process.env.NODE_ENV === "production") {
-    throw new Error("TWIN_AUTH_SECRET required in production");
+  if (secret) return secret;
+  if (process.env[DEV_SECRETS_OPT_IN] === "1") return DEV_ONLY_INSECURE_SECRET;
+  throw new MissingAuthSecretError();
+}
+
+/**
+ * Thrown by `resolveAuthSecret()` when the process has no secret to sign or
+ * verify with. `bearerAuth` answers it with a 401 rather than letting it
+ * surface as a 500: with no secret, no token can be valid, and the client's
+ * token being unverifiable is the client's 401, not the process's stack trace.
+ */
+export class MissingAuthSecretError extends Error {
+  constructor() {
+    super(
+      `TWIN_AUTH_SECRET is not set. Set it, or set ${DEV_SECRETS_OPT_IN}=1 to serve the public dev secret on a twin nothing but this machine can reach.`
+    );
+    this.name = "MissingAuthSecretError";
   }
-  return secret ?? "dev-only-insecure-secret";
 }
 
 // ─── Provider-shaped tokens ─────────────────────────────
@@ -357,7 +392,16 @@ export function bearerAuth(options: BearerAuthOptions = {}): MiddlewareHandler {
 
     // Row 1: provider-shaped tokens.
     if (options.providerToken) {
-      const providerSid = verifyProviderToken(options.providerToken, token);
+      let providerSid: string | undefined;
+      try {
+        providerSid = verifyProviderToken(options.providerToken, token);
+      } catch (err) {
+        // No secret means no provider-shaped token can verify. The JWT path
+        // below reaches the same answer through classifyJwtError; this one is
+        // outside that try, so it is spelled out.
+        if (err instanceof MissingAuthSecretError) return respond(unauthorized("invalid", { token }));
+        throw err;
+      }
       if (providerSid) {
         const mismatch = checkSid(providerSid);
         if (mismatch) return mismatch;

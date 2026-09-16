@@ -28,7 +28,8 @@ import {
 
 type Workspace_Allow =
   | "avatar_base_url" | "discoverable" | "enterprise_domain" | "enterprise_name"
-  | "is_verified" | "lob_sales_home_enabled";
+  | "is_verified" | "lob_sales_home_enabled"
+  | "is_sfdc_auto_slack" | "locale" | "pay_prod_cur" | "sso_provider";
 const _cov_serializeWorkspace: AssertNoUncovered<SlackWorkspace, ReturnType<typeof serializeWorkspace>, Workspace_Allow> = true;
 
 type UserProfile_Allow =
@@ -40,7 +41,8 @@ const _cov_serializeUserProfile: AssertNoUncovered<SlackUserProfile, ReturnType<
 
 type User_Allow =
   | "enterprise_user" | "has_2fa" | "is_connector_bot" | "is_invited_user"
-  | "is_stranger" | "is_workflow_bot";
+  | "is_stranger" | "is_workflow_bot"
+  | "enterprise_id" | "enterprise_name" | "teams";
 const _cov_serializeUser: AssertNoUncovered<SlackUser, ReturnType<typeof serializeUser>, User_Allow> = true;
 
 type Channel_Allow =
@@ -89,7 +91,10 @@ type File_Allow =
   | "thumb_960" | "thumb_960_gif" | "thumb_960_h" | "thumb_960_w" | "thumb_gif"
   | "thumb_pdf" | "thumb_pdf_h" | "thumb_pdf_w" | "thumb_tiny" | "thumb_video"
   | "thumb_video_h" | "thumb_video_w" | "title_blocks" | "to" | "transcription"
-  | "update_notification" | "updated" | "url_static_preview" | "vtt";
+  | "update_notification" | "updated" | "url_static_preview" | "vtt"
+  | "app_provides_file_work_objects" | "canvas_creator_id" | "canvas_readtime"
+  | "inline_attachment_count" | "is_ai_suggested" | "is_modified_by_ai"
+  | "skipped_shares";
 const _cov_serializeFile: AssertNoUncovered<SlackFileInfo, ReturnType<typeof serializeFile>, File_Allow> = true;
 
 type Bookmark_Allow = never;

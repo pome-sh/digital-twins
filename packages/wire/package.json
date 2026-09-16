@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/wire",
-  "version": "0.4.1",
-  "description": "Pome's wire format — Zod schemas for recorder events, the OpenTelemetry extension surface, secret redaction, and framework-agnostic trace correlation. Shared by every twin, the sdk, the adapter and the CLI.",
+  "version": "0.4.2",
+  "description": "Pome's wire format \u2014 Zod schemas for recorder events, the OpenTelemetry extension surface, secret redaction, and framework-agnostic trace correlation. Shared by every twin, the sdk, the adapter and the CLI.",
   "private": false,
   "type": "module",
   "main": "./dist/index.js",
@@ -65,13 +65,13 @@
     "check:trace-contract": "node scripts/emit-trace-contract.mjs --check"
   },
   "peerDependencies": {
-    "zod": "^4.1.13"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@types/node": "^26.1.0",
+    "@types/node": "^26.6.1",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10",
-    "zod": "^4.1.13"
+    "vitest": "^5.0.1",
+    "zod": "^4.6.5"
   },
   "engines": {
     "node": ">=24"

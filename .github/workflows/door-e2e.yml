@@ -1,0 +1,141 @@
+name: door e2e
+
+# The README's first command, walked by a machine on a clean box (F-1829):
+# install @pome-sh/cli cold, `pome twin start github`, and connect EXACTLY the
+# way Claude Code and Codex connect — from the `claude mcp add … --header` line
+# the banner printed — with initialize → tools/list → tools/call over
+# streamable HTTP, then read the call back through `pome twin tape`.
+#
+# Two sources. A pull request packs THIS checkout's CLI and installs the
+# tarball, so the door is proven before it ships. The daily run and a manual
+# dispatch install `@pome-sh/cli@latest` from the registry, so what a stranger
+# gets today is proven too. Both on Linux and macOS, because "cold start on a
+# clean machine reaches healthy in ≤ 30 s" is a claim about both.
+#
+# Not a required check: macOS runners queue, and the required `typecheck-test`
+# already covers the CLI's own suite. Red here is a door problem to fix the
+# same day, not a merge blocker.
+
+on:
+  pull_request:
+    paths:
+      - "cli/**"
+      - "packages/sdk/**"
+      - "packages/twin-github/**"
+      - "packages/wire/**"
+      - "scripts/ci/door-e2e.mjs"
+      - ".github/workflows/door-e2e.yml"
+  push:
+    branches: [main]
+    paths:
+      - "cli/**"
+      - "packages/sdk/**"
+      - "packages/twin-github/**"
+      - "packages/wire/**"
+      - "scripts/ci/door-e2e.mjs"
+      - ".github/workflows/door-e2e.yml"
+  schedule:
+    # Daily, off the top of the hour (same reasoning as release-alarm.yml),
+    # against the published package: the registry is what strangers install.
+    - cron: "52 7 * * *"
+  workflow_dispatch:
+    inputs:
+      spec:
+        description: "@pome-sh/cli version to install from npm (default: latest)"
+        default: "latest"
+        required: false
+
+concurrency:
+  group: door-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  door:
+    name: door (${{ matrix.os }}, ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'npm' || 'tarball' }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # The dispatch input reaches the shell through the environment, never
+      # through ${{ }} inside the script: interpolated there it would be parsed
+      # as shell, and a dispatcher could run commands with it.
+      - name: Decide the source
+        id: source
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SPEC_INPUT: ${{ github.event.inputs.spec }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "schedule" ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "source=npm" >> "$GITHUB_OUTPUT"
+            echo "spec=${SPEC_INPUT:-latest}" >> "$GITHUB_OUTPUT"
+          else
+            echo "source=tarball" >> "$GITHUB_OUTPUT"
+            echo "spec=" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The tarball source needs this checkout built: the CLI inlines every
+      # @pome-sh package (tsup noExternal), so `npm pack -w @pome-sh/cli` ships
+      # whatever dist/ holds.
+      - name: Install dependencies
+        if: steps.source.outputs.source == 'tarball'
+        run: npm ci
+      - name: Build workspaces
+        if: steps.source.outputs.source == 'tarball'
+        run: npm run build
+
+      - name: Walk the door
+        shell: bash
+        env:
+          SOURCE: ${{ steps.source.outputs.source }}
+          SPEC: ${{ steps.source.outputs.spec }}
+        run: |
+          set -euo pipefail
+          if [ "$SOURCE" = "npm" ]; then
+            node scripts/ci/door-e2e.mjs --source npm --spec "$SPEC" --port 3391
+          else
+            node scripts/ci/door-e2e.mjs --source tarball --port 3391
+          fi
+
+  # A cron that fires, fails and tells nobody is the failure these two jobs
+  # close (scripts/ci/assert-schedule-alarm-coverage.mjs insists on them): the
+  # daily run against the registry files one long-lived issue when the door
+  # breaks for strangers, and closes it when a later run walks through again.
+  # Pull requests and pushes are seen by their authors and stay out of it.
+  schedule-alarm:
+    needs: door
+    if: failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/schedule-alarm.yml
+    with:
+      title: "the door e2e against npm is failing"
+      label: "schedule-alarm:door-e2e"
+      outcome: failure
+      detail: "door-e2e.yml's run against @pome-sh/cli@latest failed on at least one of ubuntu/macOS: a stranger's `npx @pome-sh/cli twin start github` plus the printed `claude mcp add` line no longer reaches initialize → tools/list → tools/call, or `pome twin tape` no longer shows the call. See the run log for the step that broke."
+
+  schedule-alarm-recovery:
+    needs: door
+    if: success() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/schedule-alarm.yml
+    with:
+      title: "the door e2e against npm is failing"
+      label: "schedule-alarm:door-e2e"
+      outcome: success

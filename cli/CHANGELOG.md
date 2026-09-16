@@ -15,6 +15,54 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
+## Unreleased (patch)
+
+**The GitHub twin types against `@octokit/openapi-types` v29.** Stacked pull
+requests and the `stale` check-run conclusion come from the official schema.
+The HTTP tape is unchanged.
+
+## 0.44.0 — 2026-09-16
+
+**Adapter signals are no longer captured or uploaded** (F-1822). `pome run` no
+longer sets `POME_ADAPTER_SIGNALS_PATH`, writes `signals.jsonl`, or sends
+`signals_storage_key` on finalize. The twin HTTP tape is the capture path.
+
+**`pome twin start` prints paste-ready connect snippets** (F-1827). Under the
+banner, after the `POME_*` lines: the `claude mcp add --transport http … --header`
+one-liner, the `[mcp_servers.pome-<twin>]` table for `~/.codex/config.toml`, a
+`.mcp.json` stanza (with `${POME_AUTH_TOKEN}`, so nothing secret lands in the
+repo), and the line that points the vendor SDK at the twin. Nothing already
+printed moves or changes.
+
+**`pome twin start` boots several twins at once** (F-1836). `pome twin start
+github slack linear` starts all three in one process, each on its own port
+(its default, else the next free one; with `--port` the first twin takes that
+port and the rest count up from it), prints one status block per twin and one
+shared connect block, and stops all of them on Ctrl-C. `.pome/twin-status.json`
+now holds one entry per twin under `twins`, so a second `twin start` in the same
+folder adds to it instead of replacing it; the top-level fields still mirror the
+twin just started, so `jq -r .rest_url` keeps working. `pome twin status`
+reports each entry. One twin behaves exactly as before.
+
+**`pome twin tape` shows what the agent did on a local twin** (F-1837). One
+line per request — time, tool or method + path, status, fidelity, whether
+state changed — with calls the twin does not model (`501 unsupported`) and
+writes that landed nothing marked, so "the agent said it did X" and "X
+happened" cannot be confused. `--diff` adds the state diff since boot per
+collection (added, changed, removed), against a snapshot `twin start` now
+writes to `.pome/twin-state/<twin>.initial.json`; `--json` prints one envelope.
+Reads `.pome/twin-status.json`; no account, no hosted call.
+
+## 0.43.1 — 2026-09-15
+
+**`pome twin start` writes `.pome/twin-status.json` owner-only** (F-1800). The
+file carries the twin's bearer JWT and was written 0644; it is now 0600 in a
+0700 directory, and an older 0644 file is chmod'ed on the next start. The
+bundled twin runtime also stops serving the public dev secret and stops
+admitting peerless admin calls without an explicit opt-in (F-1801, F-1804);
+`twin start` and `run --local` set their own secret, so nothing changes for a
+CLI user — see `@pome-sh/sandbox-domains` for what a library consumer must do.
+
 ## 0.43.0 — 2026-09-01
 
 **`pome demo` and the hidden `pome demo-agent` are removed** (F-1718). Both

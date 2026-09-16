@@ -174,8 +174,7 @@ export interface SubmitResultInput {
   // "custom". Omit / null when the user has not declared it — control-plane
   // accepts both shapes.
   agentSdk?: string | null;
-  // Correlator output. Empty arrays when no adapter signals were
-  // captured AND the heuristic correlator is unavailable.
+  // Correlator output. Empty arrays when the cloud correlator produced none.
   lanes: Lane[];
   steps: Step[];
   // Wire field for a CLI-supplied fix prompt. The OSS CLI
@@ -213,11 +212,6 @@ export interface StateUploadUrlResponse {
    *  id. Absent on single-twin sessions and on an older cloud, where the
    *  top-level pair (= primary twin) is authoritative. */
   per_twin?: Record<string, StateUploadUrlPair>;
-}
-
-export interface SignalsUploadUrlResponse {
-  url: string;
-  key: string;
 }
 
 // D18.1 — mint a signed PUT for meta.json (spec_version + twin package
@@ -258,13 +252,6 @@ export interface FinalizeInput {
   traceStorageKey?: string;
   stateInitialStorageKey?: string;
   stateFinalStorageKey?: string;
-  // F0-4 / L7 — when set, cloud's finalize-run switches the correlator to
-  // `correlateTraceJsonlWithSignals` so adapter-emitted HookEvent /
-  // ToolUseEvent / ToolResultEvent / SubagentSpawnEvent / LlmTurnEvent rows
-  // correlate into lanes/steps alongside the twin-HTTP timeline. The CLI
-  // uploads signals.jsonl via `requestSignalsUploadUrl` first; the returned
-  // storage key flows here.
-  signalsStorageKey?: string;
   // Multi-twin (M3): per-twin state storage keys, keyed by twin id. Sent only
   // for multi-twin sessions; each entry carries at least one of
   // state_initial_key / state_final_key. Omitted on single-twin runs, which
@@ -324,11 +311,6 @@ export interface HostedClient {
     sessionId: string,
     twins?: string[],
   ): Promise<StateUploadUrlResponse>;
-  /** F0-4 / L7 — mint a signed PUT for `signals.jsonl` (adapter-emitted
-   *  HookEvent / ToolUseEvent / ToolResultEvent / SubagentSpawnEvent /
-   *  LlmTurnEvent rows). The returned `key` flows into
-   *  `FinalizeInput.signalsStorageKey`. */
-  requestSignalsUploadUrl(sessionId: string): Promise<SignalsUploadUrlResponse>;
   /** D18.1 — mint a signed PUT for meta.json. See `MetaUploadUrlResponse`
    *  for the feature-detection contract (a 404 here means an older control
    *  plane; callers must tolerate it silently). */
@@ -1008,26 +990,6 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       );
     },
 
-    async requestSignalsUploadUrl(sessionId) {
-      return postJson(
-        `/v1/sessions/${encodeURIComponent(sessionId)}/signals-upload-url`,
-        {},
-        (raw) => {
-          if (
-            typeof raw === "object" &&
-            raw !== null &&
-            typeof (raw as { url?: unknown }).url === "string" &&
-            typeof (raw as { key?: unknown }).key === "string"
-          ) {
-            return raw as SignalsUploadUrlResponse;
-          }
-          throw new HostedOrchError(
-            "POST /v1/sessions/:id/signals-upload-url returned unexpected shape",
-          );
-        },
-      );
-    },
-
     async requestMetaUploadUrl(sessionId) {
       return postJson(
         `/v1/sessions/${encodeURIComponent(sessionId)}/meta-upload-url`,
@@ -1113,9 +1075,6 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       }
       if (input.stateFinalStorageKey !== undefined) {
         body.state_final_storage_key = input.stateFinalStorageKey;
-      }
-      if (input.signalsStorageKey !== undefined) {
-        body.signals_storage_key = input.signalsStorageKey;
       }
       if (
         input.perTwinStateKeys !== undefined &&

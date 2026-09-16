@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/twin-gmail",
   "version": "0.4.0",
-  "description": "Deterministic Gmail-shaped twin for agent testing — SQLite-backed domain core.",
+  "description": "Deterministic Gmail-shaped twin for agent testing \u2014 SQLite-backed domain core.",
   "private": true,
   "type": "module",
   "main": "./dist/src/index.js",
@@ -47,17 +47,17 @@
     "preview:drift": "tsx scripts/preview-drift.ts"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.0",
+    "@hono/node-server": "^2.1.1",
     "@pome-sh/sdk": "*",
-    "hono": "^4.13.0",
-    "zod": "^4.4.3"
+    "hono": "^4.13.8",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@googleapis/gmail": "18.0.0",
-    "@types/node": "^26.1.2",
-    "tsx": "^4.23.5",
+    "@googleapis/gmail": "22.0.0",
+    "@types/node": "^26.6.1",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.1"
   },
   "keywords": [
     "gmail",

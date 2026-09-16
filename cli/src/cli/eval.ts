@@ -118,8 +118,6 @@ export interface RunDirArtifacts {
   eventsJsonl: string;
   stateInitialJson: string;
   stateFinalJson: string;
-  /** Present only when the optional signals.jsonl exists. */
-  signalsJsonl: string | null;
   /** D18.1 — raw meta.json text (the same bytes `meta` was parsed from),
    *  re-redacted and uploaded via `requestMetaUploadUrl`. */
   metaJson: string;
@@ -206,26 +204,12 @@ export async function readRunDirArtifacts(
   const stateFinalJson = await readRequiredFile(runDir, "state_final.json");
   parseJsonFile("state_final.json", stateFinalJson);
 
-  // signals.jsonl is optional (adapter-emitted); when present it must parse.
-  let signalsJsonl: string | null = null;
-  try {
-    signalsJsonl = await readFile(join(runDir, "signals.jsonl"), "utf8");
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new HostedUsageError(
-        `pome eval: signals.jsonl could not be read: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  }
-  if (signalsJsonl !== null) validateJsonl("signals.jsonl", signalsJsonl);
-
   return {
     runDir,
     meta,
     eventsJsonl,
     stateInitialJson,
     stateFinalJson,
-    signalsJsonl,
     metaJson: metaRaw,
   };
 }
@@ -440,7 +424,6 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
     stateFinalJson: JSON.stringify(
       redactSecrets(JSON.parse(artifacts.stateFinalJson)),
     ),
-    signalsJsonl: redactJsonl(artifacts.signalsJsonl ?? ""),
     // D18.1 — already validated as parseable JSON in readRunDirArtifacts.
     // Re-serialize with the SAME formatting writeRunArtifactsCore's writeJson
     // uses (2-space indent + trailing newline) so the bytes `pome eval`
@@ -487,7 +470,6 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
       traceStorageKey: keys.eventsKey ?? undefined,
       stateInitialStorageKey: keys.stateInitialKey ?? undefined,
       stateFinalStorageKey: keys.stateFinalKey ?? undefined,
-      signalsStorageKey: keys.signalsKey ?? undefined,
     });
   }
 

@@ -50,17 +50,33 @@ const SLACK = {
 
 const EXTRA: Record<string, Record<string, unknown>> = { "twin-slack": SLACK };
 
+// The admin gate refuses a request that carries no transport peer (F-1804).
+// Every packages/* suite drives its twin in-process with app.request(), which
+// has no socket, so the suites opt in here — one place, before any module
+// loads. The tests that cover the gate itself delete the variable first.
+const IN_PROCESS_ADMIN = { TWIN_ADMIN_ALLOW_NO_PEER: "1" };
+
+/** A project entry's own `env`, merged over the in-process admin opt-in. */
+function packageEnv(extra: Record<string, unknown>): Record<string, string> {
+  const own = (extra.env ?? {}) as Record<string, string>;
+  return { ...IN_PROCESS_ADMIN, ...own };
+}
+
 export default defineConfig({
   test: {
     projects: [
-      ...PACKAGES.map((name) => ({
-        test: {
-          name,
-          root: `./packages/${name}`,
-          include: ["test/**/*.test.ts"],
-          ...(EXTRA[name] ?? (name.startsWith("twin-") ? TWIN : {})),
-        },
-      })),
+      ...PACKAGES.map((name) => {
+        const extra = EXTRA[name] ?? (name.startsWith("twin-") ? TWIN : {});
+        return {
+          test: {
+            name,
+            root: `./packages/${name}`,
+            include: ["test/**/*.test.ts"],
+            ...extra,
+            env: packageEnv(extra),
+          },
+        };
+      }),
       {
         test: {
           name: "cli",

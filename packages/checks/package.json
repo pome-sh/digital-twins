@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/checks",
-  "version": "0.4.1",
-  "description": "Pome's grading vocabulary — the check declarations, seed schemas and default seeds of all five digital twins, plus the check DSL they are written in. Declarations only: no twin server, no database, no routes, no tools.",
+  "version": "0.4.2",
+  "description": "Pome's grading vocabulary \u2014 the check declarations, seed schemas and default seeds of all five digital twins, plus the check DSL they are written in. Declarations only: no twin server, no database, no routes, no tools.",
   "private": false,
   "type": "module",
   "main": "./dist/index.js",
@@ -71,7 +71,7 @@
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@pome-sh/sdk": "*",
@@ -80,11 +80,11 @@
     "@pome-sh/twin-linear": "*",
     "@pome-sh/twin-slack": "*",
     "@pome-sh/twin-stripe": "*",
-    "@types/node": "^26.1.2",
-    "tsup": "^8.5.0",
+    "@types/node": "^26.6.1",
+    "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10",
-    "zod": "^4.4.3"
+    "vitest": "^5.0.1",
+    "zod": "^4.6.5"
   },
   "engines": {
     "node": ">=24"

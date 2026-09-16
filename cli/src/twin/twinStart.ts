@@ -17,17 +17,10 @@
 
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { serve } from "@hono/node-server";
+import { serve, type ServerType } from "@hono/node-server";
 import { sign } from "hono/jwt";
-import {
-  defaultPortFor,
-  isTwinName,
-  TWIN_NAMES,
-  TWIN_REGISTRY,
-  type TwinName,
-} from "./registry.js";
+import { isTwinName, TWIN_NAMES, TWIN_REGISTRY, type TwinName } from "./registry.js";
 import {
   parseSeedFileText,
   readSeedFileText,
@@ -35,7 +28,28 @@ import {
   soleTwinOf,
   twinsNamedBy,
 } from "./seedFile.js";
-import { bootTwin } from "./twinHarness.js";
+import { bootTwin, type TwinHarness } from "./twinHarness.js";
+import { renderConnectSnippets, type ConnectSnippetInput } from "./connectSnippets.js";
+import { chooseStandalonePorts } from "./twinPorts.js";
+import {
+  snapshotStandaloneInitialState,
+  updateStandaloneStatusFile,
+  type StandaloneStatus,
+} from "./twinStatusFile.js";
+
+// The status file and the port choice have their own modules; re-exported so
+// `pome twin status` and the tests keep one import path for the command.
+export {
+  STANDALONE_STATUS_PATH,
+  mergeStandaloneStatus,
+  readStandaloneStatusFile,
+  standaloneStatusEntries,
+  updateStandaloneStatusFile,
+  writeStandaloneStatusFile,
+  type StandaloneStatus,
+  type StandaloneStatusFile,
+} from "./twinStatusFile.js";
+export { chooseStandalonePorts, isLoopbackPortFree } from "./twinPorts.js";
 
 /** The fixed session id a standalone twin serves under (`/s/standalone`). */
 const STANDALONE_SID = "standalone";
@@ -178,137 +192,296 @@ export function resolveStandaloneTwin(
   );
 }
 
+/**
+ * Which twins `pome twin start` is starting, from its `[names...]` argument.
+ *
+ * One name is the everyday case and keeps `resolveStandaloneTwin`'s rules;
+ * several names boot several twins in one process (F-1836). No name at all
+ * still means "the one twin the `--seed` envelope names". A name repeated or
+ * unknown is refused here, before any seed is parsed or any port bound.
+ */
+export function resolveStandaloneTwins(
+  names: readonly string[],
+  seedPath: string | undefined,
+  seedText: string | undefined,
+): TwinName[] {
+  if (names.length === 0) return [resolveStandaloneTwin(undefined, seedPath, seedText)];
+  const twins: TwinName[] = [];
+  for (const name of names) {
+    if (!isTwinName(name)) {
+      throw new Error(`Unknown twin '${name}'. Supported: ${TWIN_NAMES.join(", ")}.`);
+    }
+    if (twins.includes(name)) {
+      throw new Error(
+        `pome twin start: '${name}' is named twice. Each twin boots once per command; name it once.`,
+      );
+    }
+    twins.push(name);
+  }
+  return twins;
+}
+
+
+/**
+ * The seed each twin boots, keyed by twin. One twin is `resolveStandaloneSeed`
+ * unchanged. Several twins read the same authored source once (`--seed`, else
+ * `POME_SEED_JSON`, else every twin's default) and apply the single-twin rules
+ * per twin: a flat file cannot say which of several twins it is for, so it is
+ * refused naming the mismatch, and an envelope must carry every named twin —
+ * the same loud refusal one twin gets when the envelope has no entry for it.
+ * Extra twins the envelope names are tolerated, as they are for one twin.
+ */
+export async function resolveStandaloneSeeds(
+  twins: readonly TwinName[],
+  seedPath: string | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+  seedText?: string,
+): Promise<Map<TwinName, StandaloneSeed>> {
+  const out = new Map<TwinName, StandaloneSeed>();
+  if (twins.length === 1) {
+    const only = twins[0]!;
+    out.set(only, await resolveStandaloneSeed(only, seedPath, env, seedText));
+    return out;
+  }
+
+  let authored: { raw: string; origin: string; source: "file" | "env"; path?: string } | undefined;
+  if (seedPath !== undefined) {
+    authored = {
+      raw: seedText ?? readSeedFileText(seedPath, "pome twin start --seed"),
+      origin: `--seed ${seedPath}`,
+      source: "file",
+      path: seedPath,
+    };
+  } else if (env.POME_SEED_JSON !== undefined && env.POME_SEED_JSON !== "") {
+    authored = { raw: env.POME_SEED_JSON, origin: "POME_SEED_JSON", source: "env" };
+  }
+
+  if (authored === undefined) {
+    for (const twin of twins) {
+      out.set(twin, { seedState: await TWIN_REGISTRY[twin].defaultSeed(), source: "default" });
+    }
+    return out;
+  }
+
+  const file = parseSeedFileText(authored.raw, authored.origin);
+  if (file.shape === "flat") {
+    throw new Error(
+      `${authored.origin} is a flat seed for one twin, and pome twin start was given ${twins.length} names ` +
+        `(${twins.join(", ")}), so nothing says which one it is for. Name one twin, or wrap it in a ` +
+        `per-twin envelope: { "${twins[0]}": { … } }.`,
+    );
+  }
+  for (const twin of twins) {
+    out.set(twin, {
+      seedState: await seedForTwin(file, twin, authored.origin),
+      source: authored.source,
+      ...(authored.path !== undefined ? { path: authored.path } : {}),
+    });
+  }
+  return out;
+}
+
+/**
+ * One process serves one `TWIN_AUTH_SECRET` (the twins' auth middleware reads
+ * the env per request), so several twins share one secret. Env still wins.
+ * Otherwise the persisted files are consulted: one distinct persisted secret
+ * is used for all, two different ones are a refusal naming both files rather
+ * than a silent pick, and none at all means a fresh per-boot secret. One
+ * twin is `resolveStandaloneAuthSecret` unchanged.
+ */
+export function resolveStandaloneAuthSecretFor(
+  twins: readonly TwinName[],
+  env: NodeJS.ProcessEnv = process.env,
+  resolveOne: (twin: string, env: NodeJS.ProcessEnv) => StandaloneAuthSecret = resolveStandaloneAuthSecret,
+): StandaloneAuthSecret {
+  if (twins.length === 1) return resolveOne(twins[0]!, env);
+  if (env.TWIN_AUTH_SECRET) return { secret: env.TWIN_AUTH_SECRET, source: "env" };
+  const persisted = twins
+    .map((twin) => resolveOne(twin, env))
+    .filter((resolved) => resolved.source === "persisted");
+  const distinct = new Set(persisted.map((resolved) => resolved.secret));
+  if (distinct.size > 1) {
+    throw new Error(
+      `pome twin start: ${persisted.map((resolved) => resolved.path).join(" and ")} hold different secrets, ` +
+        `and one process serves one secret. Inject TWIN_AUTH_SECRET, or make the files agree.`,
+    );
+  }
+  const shared = persisted[0];
+  if (shared !== undefined) return { secret: shared.secret, source: "persisted", path: shared.path! };
+  return { secret: randomBytes(32).toString("hex"), source: "ephemeral" };
+}
+
+
 export async function runTwinStartCommand(
-  nameArg: string | undefined,
+  namesArg: readonly string[] | string | undefined,
   options: { port?: string; seed?: string },
 ): Promise<void> {
-  // Read the seed file BEFORE resolving the twin: with `<name>` omitted, the
-  // file is what names it. One read feeds both.
+  const names =
+    namesArg === undefined ? [] : typeof namesArg === "string" ? [namesArg] : [...namesArg];
+  // Read the seed file BEFORE resolving the twins: with no name given, the
+  // file is what names the twin. One read feeds both.
   const seedText =
     options.seed === undefined
       ? undefined
       : readSeedFileText(options.seed, "pome twin start --seed");
-  const name = resolveStandaloneTwin(nameArg, options.seed, seedText);
-  // `PORT` wins when set (contract suite / packaged entries); gmail and linear
-  // then honor their own override (`defaultPortFor`), other twins keep 3333.
-  const portRaw = options.port ?? defaultPortFor(name, process.env);
-  const port = Number(portRaw);
-  // Port 0 (ephemeral) is rejected: every printed URL and the status-file
-  // token would name a port nobody can discover from outside the process.
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error(`pome twin start: invalid --port "${portRaw}"`);
-  }
+  const twins = resolveStandaloneTwins(names, options.seed, seedText);
+  const ports = await chooseStandalonePorts(twins, options.port, process.env);
 
-  // Resolve the seed BEFORE the auth secret and the listener: a refused seed
+  // Resolve every seed BEFORE the auth secret and any listener: a refused seed
   // must not persist a secret file or leave a bound port behind.
-  const world = await resolveStandaloneSeed(name, options.seed, process.env, seedText);
+  const seeds = await resolveStandaloneSeeds(twins, options.seed, process.env, seedText);
 
-  const resolved = resolveStandaloneAuthSecret(name);
-  // The in-process twin's auth middleware (resolveAuthSecret) reads the env;
+  const resolved = resolveStandaloneAuthSecretFor(twins);
+  // The in-process twins' auth middleware (resolveAuthSecret) reads the env;
   // pinning the resolved secret here is what makes the minted JWT and the
-  // running twin agree.
+  // running twins agree.
   process.env.TWIN_AUTH_SECRET = resolved.secret;
 
-  const baseUrl = `http://127.0.0.1:${port}`;
-  const harness = await bootTwin({
-    twin: name,
-    seedState: world.seedState,
-    runId: STANDALONE_SID,
-    twinBaseUrl: baseUrl,
-  });
+  type Booted = { twin: TwinName; port: number; baseUrl: string; harness: TwinHarness };
+  const booted: Booted[] = [];
+  try {
+    for (const [index, twin] of twins.entries()) {
+      const port = ports[index]!;
+      const baseUrl = `http://127.0.0.1:${port}`;
+      const harness = await bootTwin({
+        twin,
+        seedState: seeds.get(twin)!.seedState,
+        runId: STANDALONE_SID,
+        twinBaseUrl: baseUrl,
+      });
+      booted.push({ twin, port, baseUrl, harness });
+      // The boot snapshot `twin tape --diff` diffs against (F-1837); nothing listens yet.
+      await snapshotStandaloneInitialState(twin, () => harness.exportState());
+    }
+  } catch (err) {
+    for (const entry of booted) await entry.harness.close();
+    throw err;
+  }
+
+  // One token for every twin in this process, the way `pome run --local` mints
+  // it: `login` so the GitHub REST merge gate resolves the agent user, plus
+  // every twin's extra claims (stripe's `account_id`) so the token lands on
+  // each seeded account. With one twin the claims are exactly that twin's.
+  let extraClaims: Record<string, unknown> = {};
+  for (const entry of booted) extraClaims = { ...extraClaims, ...(entry.harness.extraClaims ?? {}) };
   const token = await sign(
     {
       sid: STANDALONE_SID,
       team_id: "tm_local",
-      // Same claims `pome run --local` mints: `login` so the GitHub REST
-      // merge gate resolves the agent user; twin-supplied extras (stripe's
-      // `account_id`) so the token lands on the seeded account.
       login: "pome-agent",
-      ...(harness.extraClaims ?? {}),
+      ...extraClaims,
       exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
     },
     resolved.secret,
   );
 
-  const restUrl = `${baseUrl}/s/${STANDALONE_SID}`;
-  const mcpUrl = `${restUrl}/mcp`;
-  const server = serve({ fetch: harness.app.fetch, port, hostname: "127.0.0.1" });
-
+  const servers: ServerType[] = [];
+  const closeAll = async () => {
+    for (const server of servers) {
+      (server as { closeAllConnections?: () => void }).closeAllConnections?.();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+    for (const entry of booted) await entry.harness.close();
+  };
   try {
-    // `serve()` calls listen() and attaches no `error` listener, and listen is
-    // async: without this await, an EADDRINUSE lands as an uncaught `error`
-    // event AFTER the status file and the whole banner have been written, so
-    // the reader gets a stack trace under a token that never worked.
-    await new Promise<void>((resolve, reject) => {
-      const onError = (err: NodeJS.ErrnoException) => {
-        reject(
-          err.code === "EADDRINUSE"
-            ? new Error(
-                `pome twin start: port ${port} is already in use — pass --port <port>, or stop the twin using it.`,
-              )
-            : err,
-        );
-      };
-      server.once("error", onError);
-      server.once("listening", () => {
-        server.off("error", onError);
-        // With no `error` listener at all, a post-bind server error is a fatal
-        // uncaught exception with a stack trace. Log it and keep serving.
-        server.on("error", (err) => console.error(`pome twin start: server error: ${err}`));
-        resolve();
+    for (const entry of booted) {
+      const server = serve({ fetch: entry.harness.app.fetch, port: entry.port, hostname: "127.0.0.1" });
+      servers.push(server);
+      // `serve()` calls listen() and attaches no `error` listener, and listen is
+      // async: without this await, an EADDRINUSE lands as an uncaught `error`
+      // event AFTER the status file and the whole banner have been written, so
+      // the reader gets a stack trace under a token that never worked.
+      await new Promise<void>((resolve, reject) => {
+        const onError = (err: NodeJS.ErrnoException) => {
+          reject(
+            err.code === "EADDRINUSE"
+              ? new Error(
+                  `pome twin start: port ${entry.port} is already in use — pass --port <port>, or stop the twin using it.`,
+                )
+              : err,
+          );
+        };
+        server.once("error", onError);
+        server.once("listening", () => {
+          server.off("error", onError);
+          // With no `error` listener at all, a post-bind server error is a fatal
+          // uncaught exception with a stack trace. Log it and keep serving.
+          server.on("error", (err) => console.error(`pome twin start: server error: ${err}`));
+          resolve();
+        });
       });
+    }
+    const entries: StandaloneStatus[] = booted.map((entry) => {
+      const restUrl = `${entry.baseUrl}/s/${STANDALONE_SID}`;
+      return { name: entry.twin, url: restUrl, rest_url: restUrl, mcp_url: `${restUrl}/mcp`, auth_token: token };
     });
-    await mkdir(".pome", { recursive: true });
-    await writeFile(
-      ".pome/twin-status.json",
-      JSON.stringify(
-        { name, url: restUrl, rest_url: restUrl, mcp_url: mcpUrl, auth_token: token },
-        null,
-        2,
-      ),
-    );
+    await updateStandaloneStatusFile(entries);
   } catch (err) {
     // Boot fails loudly or not at all: without this, the rejection leaves a
     // bound listener keeping the process alive behind the error message.
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-    await harness.close();
+    await closeAll();
     throw err;
   }
 
-  console.log(`Pome ${name} twin listening at ${restUrl}`);
-  // "Did my seed land?" is the question a user-authored seed creates, and the
-  // twin cannot answer it after the fact — every seeded twin looks seeded.
-  if (world.source === "file") {
-    console.log(`Seed: ${world.path} (replaces the ${name} twin's default).`);
-  } else if (world.source === "env") {
-    console.log(
-      `Seed: POME_SEED_JSON (replaces the ${name} twin's default; --seed <path> overrides it).`,
-    );
-  } else {
-    console.log(
-      `Seed: the ${name} twin's default (pass --seed <path>, or write one with \`pome twin new-seed ${name}\`).`,
-    );
+  const connect: ConnectSnippetInput[] = [];
+  for (const [index, entry] of booted.entries()) {
+    const { twin: name, port, baseUrl, harness } = entry;
+    const restUrl = `${baseUrl}/s/${STANDALONE_SID}`;
+    const mcpUrl = `${restUrl}/mcp`;
+    const world = seeds.get(name)!;
+    console.log(`Pome ${name} twin listening at ${restUrl}`);
+    // "Did my seed land?" is the question a user-authored seed creates, and the
+    // twin cannot answer it after the fact — every seeded twin looks seeded.
+    if (world.source === "file") {
+      console.log(`Seed: ${world.path} (replaces the ${name} twin's default).`);
+    } else if (world.source === "env") {
+      console.log(
+        `Seed: POME_SEED_JSON (replaces the ${name} twin's default; --seed <path> overrides it).`,
+      );
+    } else {
+      console.log(
+        `Seed: the ${name} twin's default (pass --seed <path>, or write one with \`pome twin new-seed ${name}\`).`,
+      );
+    }
+    // One secret per process, so the persisted-secret line is said once.
+    if (index === 0 && resolved.source === "persisted") {
+      console.log(
+        `Auth: using the persisted secret from ${resolved.path} (an env-injected TWIN_AUTH_SECRET overrides it).`,
+      );
+    }
+    console.log(`POME_${harness.envName}_REST_URL=${restUrl}`);
+    console.log(`POME_${harness.envName}_MCP_URL=${mcpUrl}`);
+    console.log(`POME_AUTH_TOKEN=${token}`);
+    if (harness.tokenEnvName) console.log(`${harness.tokenEnvName}=${token}`);
+    // F28 — every `/s/<sid>/*` endpoint requires a Bearer JWT, including
+    // /s/standalone/healthz. New users curling the printed `${restUrl}` get
+    // HTTP 401 and assume the twin is broken. The unauth liveness probe lives
+    // at the root `/healthz`. Print the curl command so copy-paste debugging
+    // works without a JWT.
+    console.log(`Health check (no auth): curl ${baseUrl}/healthz`);
+    connect.push({
+      name,
+      envName: harness.envName,
+      port,
+      restUrl,
+      mcpUrl,
+      token,
+      ...(harness.tokenEnvName ? { tokenEnvName: harness.tokenEnvName } : {}),
+    });
   }
-  if (resolved.source === "persisted") {
-    console.log(
-      `Auth: using the persisted secret from ${resolved.path} (an env-injected TWIN_AUTH_SECRET overrides it).`,
-    );
-  }
-  console.log(`POME_${harness.envName}_REST_URL=${restUrl}`);
-  console.log(`POME_${harness.envName}_MCP_URL=${mcpUrl}`);
-  console.log(`POME_AUTH_TOKEN=${token}`);
-  if (harness.tokenEnvName) console.log(`${harness.tokenEnvName}=${token}`);
-  // F28 — every `/s/<sid>/*` endpoint requires a Bearer JWT, including
-  // /s/standalone/healthz. New users curling the printed `${restUrl}` get
-  // HTTP 401 and assume the twin is broken. The unauth liveness probe lives
-  // at the root `/healthz`. Print the curl command so copy-paste debugging
-  // works without a JWT.
-  console.log(`Health check (no auth): curl ${baseUrl}/healthz`);
+  // F-1827 — the URL and token above used to be the whole answer, and the
+  // reader hand-wired them into their client. Print the exact text each
+  // client takes instead, after the env lines so `POME_AUTH_TOKEN=` is still
+  // the first token on the wire for anything that greps for it. Several twins
+  // share one block: one export line, one .mcp.json, one paste.
+  console.log("");
+  console.log(renderConnectSnippets(connect));
+  console.log("");
   console.log("Ctrl-C to stop.");
 
-  // Foreground server: the bound socket keeps the event loop alive until a
-  // signal lands. Graceful path closes the listener, then flushes the
-  // recorder and releases the SQLite handle via the harness.
+  // Foreground servers: the bound sockets keep the event loop alive until a
+  // signal lands. Graceful path closes every listener, then flushes each
+  // recorder and releases the SQLite handles via the harnesses.
   const shutdown = () => {
     void (async () => {
       // `close()` alone waits for in-flight keep-alive connections, so a
@@ -317,9 +490,7 @@ export async function runTwinStartCommand(
       // resolves anyway.
       const hardExit = setTimeout(() => process.exit(1), 10_000);
       hardExit.unref();
-      (server as { closeAllConnections?: () => void }).closeAllConnections?.();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-      await harness.close();
+      await closeAll();
       process.exit(0);
     })();
   };

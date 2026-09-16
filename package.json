@@ -40,13 +40,13 @@
     "npm": ">=11.5.1"
   },
   "devDependencies": {
-    "knip": "^6.31.0",
+    "knip": "^6.35.1",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.1"
   },
   "overrides": {
-    "hono": "^4.13.0",
-    "fast-uri": "^3.1.5",
-    "esbuild": "^0.28.1"
+    "hono": "^4.13.8",
+    "fast-uri": "^3.1.8",
+    "esbuild": "^0.28.2"
   }
 }

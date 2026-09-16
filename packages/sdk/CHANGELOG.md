@@ -4,6 +4,14 @@
 
 ## Unreleased (minor)
 
+`resolveAuthSecret()` fails closed: with `TWIN_AUTH_SECRET` unset it throws
+unless `POME_ALLOW_DEV_SECRETS=1`, and `NODE_ENV` no longer decides (F-1801).
+`ensureTwinAuthSecret()` mints a per-process secret for a loopback bind instead
+of leaving the engine on the public dev string. `createAdminGate()` refuses a
+request with no transport peer unless `TWIN_ADMIN_ALLOW_NO_PEER=1` (F-1804);
+`ADMIN_NO_PEER_OPT_IN`, `DEV_ONLY_INSECURE_SECRET` and `DEV_SECRETS_OPT_IN` are
+exported so a harness spells the opt-ins from one place.
+
 `POST /s/:sid/mcp/call` takes exactly one body shape, `{tool, arguments}`. The
 `legacyMcp` twin-definition hook is gone with the `{name}`/`{params}` alias keys
 and the per-twin missing-tool envelope it carried; a body naming no tool answers
