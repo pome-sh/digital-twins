@@ -105,7 +105,7 @@ async function startStubCloud(): Promise<StubCloud> {
       }
 
       const uploadMatch = url.match(
-        /^\/v1\/sessions\/([^/]+)\/(result-upload-url|state-upload-url|signals-upload-url)$/,
+        /^\/v1\/sessions\/([^/]+)\/(result-upload-url|state-upload-url)$/,
       );
       if (req.method === "POST" && uploadMatch) {
         const sid = uploadMatch[1]!;
@@ -113,8 +113,6 @@ async function startStubCloud(): Promise<StubCloud> {
         const base = `http://127.0.0.1:${port}`;
         if (route === "result-upload-url") {
           json(200, { url: `${base}/put/${sid}/events.jsonl`, key: `team-t/session-${sid}/events.jsonl` });
-        } else if (route === "signals-upload-url") {
-          json(200, { url: `${base}/put/${sid}/signals.jsonl`, key: `team-t/session-${sid}/signals.jsonl` });
         } else {
           json(200, {
             state_initial: {

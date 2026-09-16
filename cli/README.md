@@ -202,7 +202,6 @@ A run can also contain these files:
 
 | File | Condition |
 | --- | --- |
-| `signals.jsonl` | The runner creates this adapter-event sidecar. |
 | `egress.jsonl` | The capture proxy records refused connections here. |
 | `state_final.<twin>.json` | A multi-twin run records each additional final state. |
 | `verdict.json` | A hosted `pome run` caches the hosted verdict for `pome fix-prompt`. |

@@ -71,7 +71,6 @@ const FAKE_STATE = {
 function makeStubClient({
   requestEventsUploadUrlImpl,
   requestStateUploadUrlImpl,
-  requestSignalsUploadUrlImpl,
   requestMetaUploadUrlImpl,
   fetchStateImpl,
   finalizeScore = 100,
@@ -81,7 +80,6 @@ function makeStubClient({
     state_initial: { url: string; key: string };
     state_final: { url: string; key: string };
   }>;
-  requestSignalsUploadUrlImpl?: () => Promise<{ url: string; key: string }>;
   requestMetaUploadUrlImpl?: () => Promise<{ url: string; key: string }>;
   fetchStateImpl?: () => Promise<unknown>;
   finalizeScore?: number;
@@ -92,7 +90,6 @@ function makeStubClient({
     initial: string | undefined;
     final: string | undefined;
   };
-  getFinalizeSignalsStorageKey: () => string | undefined;
   getFinalizeInput: () => unknown;
   getCreateSessionInput: () => unknown;
   /** The FULL argument list of every deleteSession call, so the teardown's `{ discard:
@@ -157,14 +154,6 @@ function makeStubClient({
       (async () => {
         throw new HostedOrchError("no state-upload-url stubbed");
       }),
-    requestSignalsUploadUrl:
-      requestSignalsUploadUrlImpl ??
-      // F0-4 / L7 — signals upload is per-run optional. Tests that don't
-      // care about the signals path get an unreachable stub; the F0-4
-      // suite supplies a real mock.
-      (async () => {
-        throw new HostedOrchError("no signals-upload-url stubbed");
-      }),
     requestMetaUploadUrl:
       requestMetaUploadUrlImpl ??
       // D18.1 — best-effort like the other blobs; tests that don't care get
@@ -194,9 +183,6 @@ function makeStubClient({
         finalizeInput as { stateFinalStorageKey?: string } | undefined
       )?.stateFinalStorageKey,
     }),
-    getFinalizeSignalsStorageKey: () =>
-      (finalizeInput as { signalsStorageKey?: string } | undefined)
-        ?.signalsStorageKey,
     getFinalizeInput: () => finalizeInput,
     getCreateSessionInput: () => createSessionInput,
   };
@@ -215,72 +201,6 @@ describe("runTaskHosted events.jsonl upload orchestration", () => {
     await rm(tmp, { recursive: true, force: true });
   });
 
-  // F0-4 / L7 — when the agent emits adapter signals (HookEvent /
-  // ToolUseEvent / SubagentSpawnEvent rows), the runner uploads
-  // signals.jsonl to the cloud and threads `signalsStorageKey` onto the
-  // /finalize call so the server-side correlator switches to
-  // `correlateTraceJsonlWithSignals`. Empty signals files skip the upload
-  // entirely (covered by every other happy-path test in this suite).
-  it("F0-4: uploads signals.jsonl and forwards signalsStorageKey to finalize when agent emits signals", async () => {
-    const SIGNALS_URL = "https://signed.example/put-signals";
-    const SIGNALS_KEY = `team-tm_x/session-${FAKE_SESSION_ID}/signals.jsonl`;
-
-    let signalsPutBody: string | null = null;
-    let signalsPutCount = 0;
-    let eventsPutCount = 0;
-
-    const { client, getFinalizeSignalsStorageKey } = makeStubClient({
-      requestEventsUploadUrlImpl: async () => ({
-        url: FAKE_UPLOAD_URL,
-        key: FAKE_UPLOAD_KEY,
-      }),
-      requestSignalsUploadUrlImpl: async () => ({
-        url: SIGNALS_URL,
-        key: SIGNALS_KEY,
-      }),
-    });
-
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
-      const urlStr = String(url);
-      const method = (init as RequestInit | undefined)?.method;
-      if (urlStr === FAKE_UPLOAD_URL && method === "PUT") {
-        eventsPutCount += 1;
-        return new Response(null, { status: 200 });
-      }
-      if (urlStr === SIGNALS_URL && method === "PUT") {
-        signalsPutCount += 1;
-        signalsPutBody = await gunzipInitBody(init as RequestInit);
-        return new Response(null, { status: 200 });
-      }
-      throw new Error(`Unexpected fetch call to ${urlStr}`);
-    });
-
-    const taskPath = join(tmp, "scn.md");
-    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
-    // Stub agent writes a single fake HookEvent to the signals path the
-    // runner injected via POME_ADAPTER_SIGNALS_PATH. JSON-stringify so
-    // path escaping works on Windows too.
-    const stubSignal =
-      '{"kind":"HookEvent","event_id":"hk_1","ts":"2026-05-27T18:00:00.000Z","token":"redaction_fixture_secret_signal"}';
-    const agentScript = `require('fs').appendFileSync(process.env.POME_ADAPTER_SIGNALS_PATH, ${JSON.stringify(`${stubSignal}\n`)}); console.log('ok');`;
-    const stubAgent = `node -e ${JSON.stringify(agentScript)}`;
-
-    const result = await runTaskHosted({
-      taskPath,
-      agentCommand: stubAgent,
-      artifactsDir: join(tmp, "runs"),
-      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
-      client,
-    });
-
-    expect(result.cloudRunId).toBe(FAKE_RUN_ID);
-    expect(eventsPutCount).toBe(1);
-    expect(signalsPutCount).toBe(1);
-    expect(signalsPutBody).toContain('"kind":"HookEvent"');
-    expect(signalsPutBody).toContain("[REDACTED]");
-    expect(signalsPutBody).not.toContain("redaction_fixture_secret_signal");
-    expect(getFinalizeSignalsStorageKey()).toBe(SIGNALS_KEY);
-  });
 
   // D18.1 / D18.6 — when the control plane exposes the meta-upload-url route,
   // the runner reads the on-disk meta.json (written by writeRunArtifactsCore

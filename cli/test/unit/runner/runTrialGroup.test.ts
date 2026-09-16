@@ -124,9 +124,6 @@ function makeFakeClient(overrides: Partial<FakeCloud> = {}): FakeCloud {
     async requestStateUploadUrl() {
       throw new Error("not used");
     },
-    async requestSignalsUploadUrl() {
-      throw new Error("not used");
-    },
     async requestMetaUploadUrl() {
       throw new Error("not used");
     },
@@ -582,7 +579,6 @@ function makeQuotaCloud(input: {
     submitResult: unused,
     requestEventsUploadUrl: unused,
     requestStateUploadUrl: unused,
-    requestSignalsUploadUrl: unused,
     requestMetaUploadUrl: unused,
     abandonSession: async (sessionId) => ({
       session_id: sessionId,
