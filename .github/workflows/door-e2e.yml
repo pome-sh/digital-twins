@@ -54,7 +54,7 @@ permissions:
 
 jobs:
   door:
-    name: door (${{ matrix.os }}, ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && 'npm' || 'tarball' }})
+    name: door (${{ matrix.os }}, ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'npm' || 'tarball' }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     strategy:
@@ -62,20 +62,26 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
+      # The dispatch input reaches the shell through the environment, never
+      # through ${{ }} inside the script: interpolated there it would be parsed
+      # as shell, and a dispatcher could run commands with it.
       - name: Decide the source
         id: source
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SPEC_INPUT: ${{ github.event.inputs.spec }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "$EVENT_NAME" = "schedule" ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "source=npm" >> "$GITHUB_OUTPUT"
-            echo "spec=${{ github.event.inputs.spec || 'latest' }}" >> "$GITHUB_OUTPUT"
+            echo "spec=${SPEC_INPUT:-latest}" >> "$GITHUB_OUTPUT"
           else
             echo "source=tarball" >> "$GITHUB_OUTPUT"
             echo "spec=" >> "$GITHUB_OUTPUT"
@@ -103,3 +109,33 @@ jobs:
           else
             node scripts/ci/door-e2e.mjs --source tarball --port 3391
           fi
+
+  # A cron that fires, fails and tells nobody is the failure these two jobs
+  # close (scripts/ci/assert-schedule-alarm-coverage.mjs insists on them): the
+  # daily run against the registry files one long-lived issue when the door
+  # breaks for strangers, and closes it when a later run walks through again.
+  # Pull requests and pushes are seen by their authors and stay out of it.
+  schedule-alarm:
+    needs: door
+    if: failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/schedule-alarm.yml
+    with:
+      title: "the door e2e against npm is failing"
+      label: "schedule-alarm:door-e2e"
+      outcome: failure
+      detail: "door-e2e.yml's run against @pome-sh/cli@latest failed on at least one of ubuntu/macOS: a stranger's `npx @pome-sh/cli twin start github` plus the printed `claude mcp add` line no longer reaches initialize → tools/list → tools/call, or `pome twin tape` no longer shows the call. See the run log for the step that broke."
+
+  schedule-alarm-recovery:
+    needs: door
+    if: success() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/schedule-alarm.yml
+    with:
+      title: "the door e2e against npm is failing"
+      label: "schedule-alarm:door-e2e"
+      outcome: success

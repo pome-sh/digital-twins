@@ -72,187 +72,198 @@ function since(start) {
   return Math.round(performance.now() - start);
 }
 
-// ── 1. A clean room with a cold npm cache ──────────────────────────────────
-const install = room("install");
-const cache = room("npm-cache");
-const env = { ...process.env, npm_config_cache: cache, npm_config_update_notifier: "false", npm_config_fund: "false" };
+// Every step below runs inside main() so that an error thrown anywhere — a
+// banner that does not parse, a refused request, a failing `twin tape` — still
+// kills the twin and removes the rooms. `fail()` is the only exit for a red.
+async function main() {
+  // ── 1. A clean room with a cold npm cache ──────────────────────────────────
+  const install = room("install");
+  const cache = room("npm-cache");
+  const env = { ...process.env, npm_config_cache: cache, npm_config_update_notifier: "false", npm_config_fund: "false" };
 
-let spec = `@pome-sh/cli@${SPEC}`;
-if (SOURCE === "tarball") {
-  const dest = room("pack");
-  sh("npm", ["pack", "-w", "@pome-sh/cli", "--ignore-scripts", "--pack-destination", dest], { cwd: ROOT, env });
-  const files = readdirSync(dest).filter((f) => f.endsWith(".tgz"));
-  if (files.length !== 1) fail(`npm pack produced ${files.length} tarballs in ${dest}`);
-  spec = join(dest, files[0]);
-} else if (SOURCE !== "npm") {
-  fail(`--source must be tarball or npm, got ${SOURCE}`);
-}
+  let spec = `@pome-sh/cli@${SPEC}`;
+  if (SOURCE === "tarball") {
+    const dest = room("pack");
+    sh("npm", ["pack", "-w", "@pome-sh/cli", "--ignore-scripts", "--pack-destination", dest], { cwd: ROOT, env });
+    const files = readdirSync(dest).filter((f) => f.endsWith(".tgz"));
+    if (files.length !== 1) fail(`npm pack produced ${files.length} tarballs in ${dest}`);
+    spec = join(dest, files[0]);
+  } else if (SOURCE !== "npm") {
+    fail(`--source must be tarball or npm, got ${SOURCE}`);
+  }
 
-console.log(`door e2e: installing ${spec} into ${install} (cache ${cache})`);
-const installStart = performance.now();
-try {
-  sh("npm", ["install", "--prefix", install, "--no-audit", "--no-fund", "--loglevel=error", spec], { env, cwd: install });
-} catch (err) {
-  fail(`npm install failed:\n${err.stderr ?? err.message}`);
-}
-timings.install_ms = since(installStart);
-const pomeBin = join(install, "node_modules", ".bin", "pome");
-const version = sh(pomeBin, ["--version"], { env }).trim();
-console.log(`door e2e: installed pome ${version} in ${timings.install_ms} ms`);
-
-// ── 2. `pome twin start github`, as the README's first command ─────────────
-const cwd = room("project");
-const bootStart = performance.now();
-twin = spawn(pomeBin, ["twin", "start", TWIN, "--port", String(PORT)], {
-  cwd,
-  env,
-  stdio: ["ignore", "pipe", "pipe"],
-});
-let banner = "";
-twin.stdout.on("data", (chunk) => { banner += chunk; });
-twin.stderr.on("data", (chunk) => { banner += chunk; });
-const exited = new Promise((resolveExit) => twin.once("exit", (code) => resolveExit(code)));
-
-const base = `http://127.0.0.1:${PORT}`;
-const deadline = Date.now() + 60_000;
-for (;;) {
+  console.log(`door e2e: installing ${spec} into ${install} (cache ${cache})`);
+  const installStart = performance.now();
   try {
-    const res = await fetch(`${base}/healthz`);
-    if (res.ok && (await res.json()).twin === TWIN) break;
+    sh("npm", ["install", "--prefix", install, "--no-audit", "--no-fund", "--loglevel=error", spec], { env, cwd: install });
+  } catch (err) {
+    fail(`npm install failed:\n${err.stderr ?? err.message}`);
+  }
+  timings.install_ms = since(installStart);
+  const pomeBin = join(install, "node_modules", ".bin", "pome");
+  const version = sh(pomeBin, ["--version"], { env }).trim();
+  console.log(`door e2e: installed pome ${version} in ${timings.install_ms} ms`);
+
+  // ── 2. `pome twin start github`, as the README's first command ─────────────
+  const cwd = room("project");
+  const bootStart = performance.now();
+  twin = spawn(pomeBin, ["twin", "start", TWIN, "--port", String(PORT)], {
+    cwd,
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let banner = "";
+  twin.stdout.on("data", (chunk) => { banner += chunk; });
+  twin.stderr.on("data", (chunk) => { banner += chunk; });
+  const exited = new Promise((resolveExit) => twin.once("exit", (code) => resolveExit(code)));
+
+  const base = `http://127.0.0.1:${PORT}`;
+  const deadline = Date.now() + 60_000;
+  for (;;) {
+    try {
+      const res = await fetch(`${base}/healthz`);
+      if (res.ok && (await res.json()).twin === TWIN) break;
+    } catch {
+      // not up yet
+    }
+    if (Date.now() > deadline) fail(`twin never answered /healthz on ${PORT}\n--- banner ---\n${banner}`);
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  timings.boot_to_healthy_ms = since(bootStart);
+  console.log(`door e2e: ${TWIN} twin healthy in ${timings.boot_to_healthy_ms} ms`);
+
+  // The banner arrives buffered; wait for the connect block to be complete.
+  const bannerDeadline = Date.now() + 10_000;
+  while (!banner.includes("Ctrl-C to stop.") && Date.now() < bannerDeadline) {
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  if (!banner.includes("Ctrl-C to stop.")) fail(`banner never finished\n--- banner ---\n${banner}`);
+
+  // ── 3. Take the printed snippets, exactly as printed ───────────────────────
+  const claudeLine = banner.match(/^\s*(claude mcp add --transport http (\S+) (\S+) --header "Authorization: Bearer (\S+)")\s*$/m);
+  if (!claudeLine) fail(`no claude mcp add line in the banner\n--- banner ---\n${banner}`);
+  const [, pasted, serverName, mcpUrl, token] = claudeLine;
+  if (serverName !== `pome-${TWIN}`) fail(`server name is ${serverName}, expected pome-${TWIN}`);
+  if (mcpUrl !== `${base}/s/standalone/mcp`) fail(`printed MCP URL is ${mcpUrl}`);
+  console.log(`door e2e: pasted line → ${pasted.replace(token, "<token>")}`);
+
+  const codexTable = banner.match(/^\s*\[mcp_servers\.(\S+)\]\s*\n\s*url = "([^"]+)"\s*\n\s*bearer_token_env_var = "POME_AUTH_TOKEN"\s*$/m);
+  if (!codexTable) fail(`no Codex table in the banner\n--- banner ---\n${banner}`);
+  if (codexTable[1] !== serverName || codexTable[2] !== mcpUrl) fail("Codex table disagrees with the claude line");
+
+  const exportLine = banner.match(/^\s*export .*\bPOME_AUTH_TOKEN=(\S+)/m);
+  if (!exportLine || exportLine[1] !== token) fail("export line missing, or carries a different token");
+
+  const stanzaStart = banner.indexOf('"mcpServers"');
+  if (stanzaStart < 0) fail("no .mcp.json stanza in the banner");
+  const braceStart = banner.lastIndexOf("{", stanzaStart);
+  let depth = 0;
+  let braceEnd = -1;
+  for (let i = braceStart; i < banner.length; i += 1) {
+    if (banner[i] === "{") depth += 1;
+    if (banner[i] === "}") depth -= 1;
+    if (depth === 0) {
+      braceEnd = i;
+      break;
+    }
+  }
+  const stanza = JSON.parse(banner.slice(braceStart, braceEnd + 1));
+  const server = stanza.mcpServers?.[serverName];
+  if (!server || server.url !== mcpUrl || server.headers?.Authorization !== "Bearer ${POME_AUTH_TOKEN}") {
+    fail(`.mcp.json stanza is not the one expected: ${JSON.stringify(stanza)}`);
+  }
+
+  // ── 4. The handshake, the way Claude Code and Codex do it ──────────────────
+  // Streamable HTTP: JSON-RPC over POST, `Accept` for both JSON and SSE, the
+  // bearer from the pasted line, and the session id echoed back when the server
+  // hands one out.
+  let sessionId;
+  async function rpc(body, { expectResult = true } = {}) {
+    const headers = {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      authorization: `Bearer ${token}`,
+      "mcp-protocol-version": "2025-06-18",
+    };
+    if (sessionId) headers["mcp-session-id"] = sessionId;
+    const res = await fetch(mcpUrl, { method: "POST", headers, body: JSON.stringify(body) });
+    const sid = res.headers.get("mcp-session-id");
+    if (sid) sessionId = sid;
+    if (!expectResult) {
+      if (res.status >= 300) fail(`${body.method} answered ${res.status}`);
+      return undefined;
+    }
+    if (!res.ok) fail(`${body.method} answered ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    const text = await res.text();
+    const contentType = res.headers.get("content-type") ?? "";
+    let message;
+    if (contentType.includes("text/event-stream")) {
+      const data = text.split("\n").filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim());
+      message = JSON.parse(data.at(-1) ?? "null");
+    } else {
+      message = JSON.parse(text);
+    }
+    if (!message || message.error) fail(`${body.method} returned an error: ${JSON.stringify(message?.error ?? message)}`);
+    return message.result;
+  }
+
+  const init = await rpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "pome-door-e2e", version: "1.0.0" },
+    },
+  });
+  if (!init?.serverInfo?.name) fail(`initialize returned no serverInfo: ${JSON.stringify(init)}`);
+  await rpc({ jsonrpc: "2.0", method: "notifications/initialized" }, { expectResult: false });
+
+  const tools = await rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" });
+  const names = (tools?.tools ?? []).map((t) => t.name);
+  if (!names.includes("create_issue")) fail(`tools/list has no create_issue (got ${names.length} tools)`);
+
+  const call = await rpc({
+    jsonrpc: "2.0",
+    id: 3,
+    method: "tools/call",
+    params: {
+      name: "create_issue",
+      arguments: { owner: "acme", repo: "api", title: "Login page returns 500 after the deploy" },
+    },
+  });
+  const text = call?.content?.find((c) => c.type === "text")?.text;
+  let issue;
+  try {
+    issue = JSON.parse(text);
   } catch {
-    // not up yet
+    fail(`tools/call create_issue returned no JSON issue: ${JSON.stringify(call).slice(0, 300)}`);
   }
-  if (Date.now() > deadline) fail(`twin never answered /healthz on ${PORT}\n--- banner ---\n${banner}`);
-  await new Promise((r) => setTimeout(r, 100));
-}
-timings.boot_to_healthy_ms = since(bootStart);
-console.log(`door e2e: ${TWIN} twin healthy in ${timings.boot_to_healthy_ms} ms`);
+  if (typeof issue?.number !== "number") fail(`create_issue returned no number: ${text?.slice(0, 200)}`);
+  console.log(`door e2e: initialize → ${init.serverInfo.name}; tools/list → ${names.length} tools; create_issue → #${issue.number}`);
 
-// The banner arrives buffered; wait for the connect block to be complete.
-const bannerDeadline = Date.now() + 10_000;
-while (!banner.includes("Ctrl-C to stop.") && Date.now() < bannerDeadline) {
-  await new Promise((r) => setTimeout(r, 25));
-}
-if (!banner.includes("Ctrl-C to stop.")) fail(`banner never finished\n--- banner ---\n${banner}`);
+  // ── 5. The same install's `pome twin tape` sees the call as a state change ──
+  const tapeJson = sh(pomeBin, ["twin", "tape", "--json", "--diff"], { cwd, env });
+  const tape = JSON.parse(tapeJson);
+  const row = tape.requests?.find((r) => r.tool === "create_issue");
+  if (!row || row.state_mutation !== true) fail(`twin tape does not show create_issue as a state change: ${tapeJson.slice(0, 400)}`);
+  const added = tape.diff?.find((d) => d.path === "repositories[acme/api].issues");
+  if (!added || added.added.length !== 1) fail(`twin tape --diff does not show the new issue: ${JSON.stringify(tape.diff)}`);
+  console.log(`door e2e: pome twin tape → ${tape.summary.requests} request(s), ${tape.summary.changed_state} changed state; diff ${added.path} +${added.added.length}`);
 
-// ── 3. Take the printed snippets, exactly as printed ───────────────────────
-const claudeLine = banner.match(/^\s*(claude mcp add --transport http (\S+) (\S+) --header "Authorization: Bearer (\S+)")\s*$/m);
-if (!claudeLine) fail(`no claude mcp add line in the banner\n--- banner ---\n${banner}`);
-const [, pasted, serverName, mcpUrl, token] = claudeLine;
-if (serverName !== `pome-${TWIN}`) fail(`server name is ${serverName}, expected pome-${TWIN}`);
-if (mcpUrl !== `${base}/s/standalone/mcp`) fail(`printed MCP URL is ${mcpUrl}`);
-console.log(`door e2e: pasted line → ${pasted.replace(token, "<token>")}`);
+  // ── 6. Ctrl-C stops it ─────────────────────────────────────────────────────
+  twin.kill("SIGINT");
+  const code = await Promise.race([exited, new Promise((r) => setTimeout(() => r("timeout"), 15_000))]);
+  if (code !== 0) fail(`twin start exited ${code} on SIGINT`);
 
-const codexTable = banner.match(/^\s*\[mcp_servers\.(\S+)\]\s*\n\s*url = "([^"]+)"\s*\n\s*bearer_token_env_var = "POME_AUTH_TOKEN"\s*$/m);
-if (!codexTable) fail(`no Codex table in the banner\n--- banner ---\n${banner}`);
-if (codexTable[1] !== serverName || codexTable[2] !== mcpUrl) fail("Codex table disagrees with the claude line");
-
-const exportLine = banner.match(/^\s*export .*\bPOME_AUTH_TOKEN=(\S+)/m);
-if (!exportLine || exportLine[1] !== token) fail("export line missing, or carries a different token");
-
-const stanzaStart = banner.indexOf('"mcpServers"');
-if (stanzaStart < 0) fail("no .mcp.json stanza in the banner");
-const braceStart = banner.lastIndexOf("{", stanzaStart);
-let depth = 0;
-let braceEnd = -1;
-for (let i = braceStart; i < banner.length; i += 1) {
-  if (banner[i] === "{") depth += 1;
-  if (banner[i] === "}") depth -= 1;
-  if (depth === 0) {
-    braceEnd = i;
-    break;
-  }
-}
-const stanza = JSON.parse(banner.slice(braceStart, braceEnd + 1));
-const server = stanza.mcpServers?.[serverName];
-if (!server || server.url !== mcpUrl || server.headers?.Authorization !== "Bearer ${POME_AUTH_TOKEN}") {
-  fail(`.mcp.json stanza is not the one expected: ${JSON.stringify(stanza)}`);
+  console.log(`door e2e: OK — pome ${version} from ${SOURCE}; install ${timings.install_ms} ms, boot→healthy ${timings.boot_to_healthy_ms} ms, node ${process.version}, ${process.platform}`);
+  console.log(`::notice::door e2e OK — pome ${version} (${SOURCE}); install ${timings.install_ms} ms; boot→healthy ${timings.boot_to_healthy_ms} ms; ${process.platform}`);
+  cleanup();
 }
 
-// ── 4. The handshake, the way Claude Code and Codex do it ──────────────────
-// Streamable HTTP: JSON-RPC over POST, `Accept` for both JSON and SSE, the
-// bearer from the pasted line, and the session id echoed back when the server
-// hands one out.
-let sessionId;
-async function rpc(body, { expectResult = true } = {}) {
-  const headers = {
-    "content-type": "application/json",
-    accept: "application/json, text/event-stream",
-    authorization: `Bearer ${token}`,
-    "mcp-protocol-version": "2025-06-18",
-  };
-  if (sessionId) headers["mcp-session-id"] = sessionId;
-  const res = await fetch(mcpUrl, { method: "POST", headers, body: JSON.stringify(body) });
-  const sid = res.headers.get("mcp-session-id");
-  if (sid) sessionId = sid;
-  if (!expectResult) {
-    if (res.status >= 300) fail(`${body.method} answered ${res.status}`);
-    return undefined;
-  }
-  if (!res.ok) fail(`${body.method} answered ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  const text = await res.text();
-  const contentType = res.headers.get("content-type") ?? "";
-  let message;
-  if (contentType.includes("text/event-stream")) {
-    const data = text.split("\n").filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim());
-    message = JSON.parse(data.at(-1) ?? "null");
-  } else {
-    message = JSON.parse(text);
-  }
-  if (!message || message.error) fail(`${body.method} returned an error: ${JSON.stringify(message?.error ?? message)}`);
-  return message.result;
-}
-
-const init = await rpc({
-  jsonrpc: "2.0",
-  id: 1,
-  method: "initialize",
-  params: {
-    protocolVersion: "2025-06-18",
-    capabilities: {},
-    clientInfo: { name: "pome-door-e2e", version: "1.0.0" },
-  },
-});
-if (!init?.serverInfo?.name) fail(`initialize returned no serverInfo: ${JSON.stringify(init)}`);
-await rpc({ jsonrpc: "2.0", method: "notifications/initialized" }, { expectResult: false });
-
-const tools = await rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" });
-const names = (tools?.tools ?? []).map((t) => t.name);
-if (!names.includes("create_issue")) fail(`tools/list has no create_issue (got ${names.length} tools)`);
-
-const call = await rpc({
-  jsonrpc: "2.0",
-  id: 3,
-  method: "tools/call",
-  params: {
-    name: "create_issue",
-    arguments: { owner: "acme", repo: "api", title: "Login page returns 500 after the deploy" },
-  },
-});
-const text = call?.content?.find((c) => c.type === "text")?.text;
-let issue;
 try {
-  issue = JSON.parse(text);
-} catch {
-  fail(`tools/call create_issue returned no JSON issue: ${JSON.stringify(call).slice(0, 300)}`);
+  await main();
+} catch (err) {
+  fail(err instanceof Error ? (err.stack ?? err.message) : String(err));
 }
-if (typeof issue?.number !== "number") fail(`create_issue returned no number: ${text?.slice(0, 200)}`);
-console.log(`door e2e: initialize → ${init.serverInfo.name}; tools/list → ${names.length} tools; create_issue → #${issue.number}`);
-
-// ── 5. The same install's `pome twin tape` sees the call as a state change ──
-const tapeJson = sh(pomeBin, ["twin", "tape", "--json", "--diff"], { cwd, env });
-const tape = JSON.parse(tapeJson);
-const row = tape.requests?.find((r) => r.tool === "create_issue");
-if (!row || row.state_mutation !== true) fail(`twin tape does not show create_issue as a state change: ${tapeJson.slice(0, 400)}`);
-const added = tape.diff?.find((d) => d.path === "repositories[acme/api].issues");
-if (!added || added.added.length !== 1) fail(`twin tape --diff does not show the new issue: ${JSON.stringify(tape.diff)}`);
-console.log(`door e2e: pome twin tape → ${tape.summary.requests} request(s), ${tape.summary.changed_state} changed state; diff ${added.path} +${added.added.length}`);
-
-// ── 6. Ctrl-C stops it ─────────────────────────────────────────────────────
-twin.kill("SIGINT");
-const code = await Promise.race([exited, new Promise((r) => setTimeout(() => r("timeout"), 15_000))]);
-if (code !== 0) fail(`twin start exited ${code} on SIGINT`);
-
-console.log(`door e2e: OK — pome ${version} from ${SOURCE}; install ${timings.install_ms} ms, boot→healthy ${timings.boot_to_healthy_ms} ms, node ${process.version}, ${process.platform}`);
-console.log(`::notice::door e2e OK — pome ${version} (${SOURCE}); install ${timings.install_ms} ms; boot→healthy ${timings.boot_to_healthy_ms} ms; ${process.platform}`);
-cleanup();
