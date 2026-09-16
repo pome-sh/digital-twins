@@ -80,7 +80,7 @@ type Repo_Allow =
   | "squash_merge_commit_message" | "merge_commit_title" | "merge_commit_message"
   | "allow_merge_commit" | "allow_forking" | "web_commit_signoff_required"
   | "open_issues" | "watchers" | "master_branch" | "anonymous_access_enabled"
-  | "code_search_index_status";
+  | "code_search_index_status" | "has_pull_requests" | "pull_request_creation_policy";
 const _cov_repoJson: AssertNoUncovered<Repository, ReturnType<typeof repoJson>, Repo_Allow> = true;
 
 type Branch_Allow = "protection" | "protection_url";
@@ -103,12 +103,14 @@ type Issue_Allow =
   | "state_reason" | "active_lock_reason" | "pull_request" | "draft"
   | "closed_by" | "body_html" | "body_text" | "timeline_url"
   | "performed_via_github_app" | "author_association" | "sub_issues_summary"
-  | "parent_issue_url" | "issue_dependencies_summary" | "issue_field_values";
+  | "parent_issue_url" | "issue_dependencies_summary" | "issue_field_values"
+  | "pinned_comment";
 const _cov_issueJson: AssertNoUncovered<Issue, ReturnType<typeof issueJson>, Issue_Allow> = true;
 
 type IssueComment_Allow =
   | "url" | "reactions" | "body_html" | "body_text"
-  | "performed_via_github_app" | "author_association";
+  | "performed_via_github_app" | "author_association"
+  | "pin" | "minimized";
 const _cov_issueCommentJson: AssertNoUncovered<IssueComment, ReturnType<typeof issueCommentJson>, IssueComment_Allow> = true;
 
 type PullRequest_Allow =

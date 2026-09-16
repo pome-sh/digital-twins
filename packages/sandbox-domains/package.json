@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/sandbox-domains",
   "version": "0.4.0",
-  "description": "Pome's twin domain layer — the in-process runtime a bound check reads: each digital twin's domain object, its SQLite opener, its seed parser and its declared check vocabulary. Runtime, not server: no Hono app, no routes, no MCP tool table.",
+  "description": "Pome's twin domain layer \u2014 the in-process runtime a bound check reads: each digital twin's domain object, its SQLite opener, its seed parser and its declared check vocabulary. Runtime, not server: no Hono app, no routes, no MCP tool table.",
   "private": false,
   "type": "module",
   "main": "./dist/index.js",
@@ -71,7 +71,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@octokit/openapi-types": "^28.0.0",
+    "@octokit/openapi-types": "^29.0.1",
     "hono": "^4.13.0",
     "stripe": "22.3.2"
   },
@@ -88,7 +88,7 @@
     "@types/node": "^26.1.2",
     "tsup": "^8.5.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10",
+    "vitest": "^5.0.1",
     "zod": "^4.4.3"
   },
   "engines": {

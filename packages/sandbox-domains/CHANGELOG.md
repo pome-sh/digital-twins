@@ -1,5 +1,11 @@
 # @pome-sh/sandbox-domains
 
+## Unreleased (patch)
+
+**`@octokit/openapi-types` is v29.** Shipped GitHub schema types pick up
+stacked pull requests and the `stale` check-run conclusion. No runtime API
+change.
+
 ## 0.4.0 — 2026-09-15
 
 **A twin booted with no `TWIN_AUTH_SECRET` now fails closed instead of

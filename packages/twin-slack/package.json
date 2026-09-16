@@ -58,10 +58,10 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@slack/web-api": "^8.0.0",
     "@types/node": "^26.1.2",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "^5.0.1",
     "tsx": "^4.23.5",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.1"
   },
   "keywords": [
     "slack",

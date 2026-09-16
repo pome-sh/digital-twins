@@ -42,7 +42,7 @@
   "devDependencies": {
     "knip": "^6.31.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.1"
   },
   "overrides": {
     "hono": "^4.13.0",
