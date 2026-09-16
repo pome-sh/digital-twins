@@ -8,7 +8,7 @@
 // because it carries the bearer JWT (F-1800).
 
 import { chmod, mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type { TwinName } from "./registry.js";
 
 /** Where `pome twin start` records the running twin, relative to the cwd. */
@@ -45,6 +45,26 @@ export async function writeStandaloneStatusFile(
   await writeFile(tmp, JSON.stringify(status, null, 2), { mode: 0o600 });
   await rename(tmp, path);
   await chmod(path, 0o600);
+}
+
+/**
+ * `.pome/` git-ignores itself. The status file carries a bearer, and the one
+ * time it was committed (F-1806) it was because nothing stopped `git add .`
+ * in a fresh checkout. A `.gitignore` inside the directory with `*` is the
+ * convention `.vercel/` and `.terraform/` use: no edit to the user's own
+ * `.gitignore`, and it travels with the directory. Written once; a user who
+ * deletes it has decided.
+ */
+export async function ensureSelfIgnoring(dir: string): Promise<void> {
+  // Only the CLI's own directory. A caller that keeps the status file
+  // somewhere else (the tests do) must not find its parent hidden from git.
+  if (basename(dir) !== ".pome") return;
+  const path = join(dir, ".gitignore");
+  try {
+    await writeFile(path, "*\n", { flag: "wx", mode: 0o600 });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+  }
 }
 
 /** A lock that a crashed writer left behind is broken after this long. */
@@ -101,6 +121,7 @@ export async function updateStandaloneStatusFile(
   path: string = STANDALONE_STATUS_PATH,
 ): Promise<StandaloneStatusFile> {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  await ensureSelfIgnoring(dirname(path));
   return await withStatusLock(path, async () => {
     const merged = mergeStandaloneStatus(await readStandaloneStatusFile(path), entries);
     await writeStandaloneStatusFile(merged, path);
