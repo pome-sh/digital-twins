@@ -28,6 +28,7 @@ import { realpathSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { OpenTelemetry } from "@ai-sdk/otel";
 import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 
@@ -207,7 +208,7 @@ async function main() {
       tools,
       stopWhen: stepCountIs(maxSteps),
       experimental_telemetry: telemetry.tracer
-        ? { isEnabled: true, tracer: telemetry.tracer }
+        ? { isEnabled: true, integrations: [new OpenTelemetry({ tracer: telemetry.tracer })] }
         : undefined,
     });
     console.log(

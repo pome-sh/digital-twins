@@ -2,6 +2,10 @@
 
 ## Unreleased (minor)
 
+**GitHub schema types track `@octokit/openapi-types` v29.** Stacked
+pull requests (`pull-request-stack`) and the `stale` check-run conclusion
+come from the official schema instead of a local transcription.
+
 **A seed key no field matches is refused, naming the key** (F-1689). `seedSchema`
 is `z.strictObject` at every level, so a misspelled field is an error rather than
 an absence. Before this,

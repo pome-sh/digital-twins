@@ -3,6 +3,9 @@
 
 ## Unreleased (patch)
 
+**Official-client smoke uses `@googleapis/gmail` v22.** Same Gmail v1
+surface; the pin tracks the current generated client.
+
 `parseSeed` drops a top-level `_meta` before validating (F-1689). This schema was
 already `.strict()` at every level, which is what made it refuse the provenance
 block `pome compile-seeds` stamps on every `<task>.seed.json` — so pointing

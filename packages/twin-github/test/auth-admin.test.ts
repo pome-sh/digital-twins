@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Admin-gate coverage for twin-github: the gate MECHANISM (token mode, loopback socket
 // check, fail-closed on a missing peer) is the engine's and is covered there.
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
 
 describe("admin gate — token mode renders the github envelope", () => {
@@ -43,48 +43,29 @@ describe("admin gate — token mode renders the github envelope", () => {
 
 describe("admin gate — fallback (no TWIN_ADMIN_TOKEN)", () => {
   // The vitest config opts every in-process suite into the gate; this block
-  // covers the gate itself, so it takes the opt-in away first.
-  const prevOptIn = process.env.TWIN_ADMIN_ALLOW_NO_PEER;
+  // covers the gate itself, so it takes the opt-in away first. vitest 5's
+  // `test.env` is a getter — `delete process.env.X` does not stick, so stubEnv
+  // is the override that wins.
   beforeEach(() => {
-    delete process.env.TWIN_ADMIN_TOKEN;
-    delete process.env.TWIN_ADMIN_ALLOW_NO_PEER;
+    vi.stubEnv("TWIN_ADMIN_TOKEN", "");
+    vi.stubEnv("TWIN_ADMIN_ALLOW_NO_PEER", "");
   });
   afterEach(() => {
-    if (prevOptIn === undefined) delete process.env.TWIN_ADMIN_ALLOW_NO_PEER;
-    else process.env.TWIN_ADMIN_ALLOW_NO_PEER = prevOptIn;
-  });
-
-  it("rejects in-process requests (no client ip) outside production — NODE_ENV is not a boundary (F-1804)", async () => {
-    const prev = process.env.NODE_ENV;
-    delete process.env.NODE_ENV;
-    try {
-      const app = createGitHubCloneApp();
-      const res = await app.request("/admin/reset", { method: "POST" });
-      expect(res.status).toBe(403);
-      expect(((await res.json()) as { message: string }).message).toBe("Forbidden");
-    } finally {
-      if (prev !== undefined) process.env.NODE_ENV = prev;
-    }
+    vi.unstubAllEnvs();
   });
 
   it("admits in-process requests only under TWIN_ADMIN_ALLOW_NO_PEER=1", async () => {
-    process.env.TWIN_ADMIN_ALLOW_NO_PEER = "1";
+    vi.stubEnv("TWIN_ADMIN_ALLOW_NO_PEER", "1");
     const app = createGitHubCloneApp();
     const res = await app.request("/admin/reset", { method: "POST" });
     expect(res.status).toBe(200);
   });
 
   it("rejects in-process requests with unknown client ip in production", async () => {
-    const prev = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
-    try {
-      const app = createGitHubCloneApp();
-      const res = await app.request("/admin/reset", { method: "POST" });
-      expect(res.status).toBe(403);
-      expect(((await res.json()) as { message: string }).message).toBe("Forbidden");
-    } finally {
-      if (prev === undefined) delete process.env.NODE_ENV;
-      else process.env.NODE_ENV = prev;
-    }
+    vi.stubEnv("NODE_ENV", "production");
+    const app = createGitHubCloneApp();
+    const res = await app.request("/admin/reset", { method: "POST" });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message: string }).message).toBe("Forbidden");
   });
 });
