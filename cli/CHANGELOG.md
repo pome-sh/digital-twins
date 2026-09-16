@@ -15,6 +15,12 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
+## Unreleased (patch)
+
+**The GitHub twin types against `@octokit/openapi-types` v29.** Stacked pull
+requests and the `stale` check-run conclusion come from the official schema.
+The HTTP tape is unchanged.
+
 ## 0.44.0 — 2026-09-16
 
 **Adapter signals are no longer captured or uploaded** (F-1822). `pome run` no
