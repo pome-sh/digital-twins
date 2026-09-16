@@ -163,6 +163,17 @@ jobs:
           scripts/ci/decide-publish.sh "@pome-sh/wire" "packages/wire/package.json" "wire" "https://npm.pkg.github.com"
 
   publish:
+    # Build-time inputs live on the job, not on the Build step: the CLI's
+    # `prepublishOnly` runs `npm run build` again inside `npm publish`, and
+    # 0.45.0 shipped with an empty telemetry key because that rebuild did not
+    # see a step-level env. The daily usage tick (F-1832) needs a PostHog
+    # project key and host. Repository VARIABLES, not secrets: a project key
+    # is write-only by design and ships in the public binary anyway. Unset →
+    # the published CLI sends nothing.
+    env:
+      POME_GIT_SHA: ${{ github.sha }}
+      POME_TELEMETRY_KEY: ${{ vars.POME_TELEMETRY_KEY }}
+      POME_TELEMETRY_HOST: ${{ vars.POME_TELEMETRY_HOST }}
     name: publish ${{ matrix.package }}
     needs: plan
     if: needs.plan.outputs.cli == 'true' || needs.plan.outputs.checks == 'true' || needs.plan.outputs.sandboxDomains == 'true' || needs.plan.outputs.wireNpm == 'true'
@@ -244,14 +255,6 @@ jobs:
         run: npm ci
       - name: Build
         if: matrix.enabled == 'true'
-        env:
-          POME_GIT_SHA: ${{ github.sha }}
-          # The CLI's daily usage tick (F-1832) needs a PostHog project key and
-          # host baked in at build time. Repository VARIABLES, not secrets: a
-          # project key is write-only by design and ships in the public binary
-          # anyway. Unset → the published CLI sends nothing.
-          POME_TELEMETRY_KEY: ${{ vars.POME_TELEMETRY_KEY }}
-          POME_TELEMETRY_HOST: ${{ vars.POME_TELEMETRY_HOST }}
         run: npm run build
       # Every internal @pome-sh/* package is bundled into the two published
       # tarballs, so a third-party dep of an inlined package that is not
