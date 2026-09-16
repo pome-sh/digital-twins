@@ -21,8 +21,6 @@ one it corrects.
 requests and the `stale` check-run conclusion come from the official schema.
 The HTTP tape is unchanged.
 
-## Unreleased (patch)
-
 **`pome --help` opens with the twin door** (F-1838). The first line now says
 what a twin is and names `pome twin start <twin>` as the way in; `twin` is the
 first command listed, and `init`, `run`, `eval`, `inspect`, `fix-prompt`, the
