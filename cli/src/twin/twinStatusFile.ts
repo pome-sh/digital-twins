@@ -8,7 +8,7 @@
 // because it carries the bearer JWT (F-1800).
 
 import { chmod, mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type { TwinName } from "./registry.js";
 
 /** Where `pome twin start` records the running twin, relative to the cwd. */
@@ -56,6 +56,9 @@ export async function writeStandaloneStatusFile(
  * deletes it has decided.
  */
 export async function ensureSelfIgnoring(dir: string): Promise<void> {
+  // Only the CLI's own directory. A caller that keeps the status file
+  // somewhere else (the tests do) must not find its parent hidden from git.
+  if (basename(dir) !== ".pome") return;
   const path = join(dir, ".gitignore");
   try {
     await writeFile(path, "*\n", { flag: "wx", mode: 0o600 });

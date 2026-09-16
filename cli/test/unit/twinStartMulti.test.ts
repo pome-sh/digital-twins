@@ -305,6 +305,10 @@ describe("updateStandaloneStatusFile", () => {
     await writeFile(join(dir, ".pome", ".gitignore"), "twin-status.json\n");
     await updateStandaloneStatusFile([entry("slack", 3334)], path);
     expect(await readFile(join(dir, ".pome", ".gitignore"), "utf8")).toBe("twin-status.json\n");
+    // A status file kept outside `.pome/` never hides its parent from git.
+    const elsewhere = join(dir, "twin-status.json");
+    await updateStandaloneStatusFile([entry("github", 3333)], elsewhere);
+    expect(existsSync(join(dir, ".gitignore"))).toBe(false);
   });
 
   it("breaks a stale lock a crashed writer left behind", async () => {
