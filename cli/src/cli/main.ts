@@ -92,6 +92,7 @@ import { loadTrialEvents } from "../hosted/trialEvents.js";
 import type { Task } from "../task/taskSchema.js";
 import { parseTaskFile } from "../task/parseTask.js";
 import type { RecorderEvent } from "../types/shared.js";
+import { commandName, maybeSendUsageTick } from "./usageTick.js";
 
 const PACKAGE_VERSION = readPackageVersion();
 const DEFAULT_AGENT_FILE = "examples/agents/scripted-triage-agent.ts";
@@ -162,10 +163,151 @@ export function createProgram() {
   program
     .name("pome")
     .description(
-      "Test AI agents against digital twins of real SaaS APIs. Runs are recorded to app.pome.sh. Start with `pome init`.",
+      "Stateful local twins of GitHub, Slack, Stripe, Gmail and Linear that your agent calls as if they were the real API. Start with `pome twin start <twin>`.",
     )
     .version(PACKAGE_VERSION)
-    .showHelpAfterError("(add --help for usage)");
+    .showHelpAfterError("(add --help for usage)")
+    // The daily usage tick (F-1832): fires before any command's action — so
+    // never for `--help` or `--version` — with the command's name and nothing
+    // from its arguments, at most once a day, and never in CI or when
+    // POME_TELEMETRY=0 / DO_NOT_TRACK is set. Not awaited: it can neither fail
+    // nor delay the command beyond its own short timeout.
+    .hook("preAction", (_root, actionCommand) => {
+      void maybeSendUsageTick({ command: commandName(actionCommand), version: PACKAGE_VERSION });
+    });
+
+  // The door comes first, in the default "Commands:" group, so `pome --help`
+  // reads top-down the way the README does: start a twin, connect an agent,
+  // read the tape. Everything registered after `commandsGroup` below sits
+  // under "Going further:" — graded tasks, hosted runs, the project scaffold.
+  const twin = program
+    .command("twin")
+    .summary("Run a twin on this machine")
+    .description(
+      "Start a twin on this machine, print its status, show its tape, or write a starter seed file",
+    );
+  twin
+    .command("start")
+    .argument(
+      "[names...]",
+      `Twin names (${TWIN_NAME_LIST.join(" | ")}). One, or several to boot together (each on its own port). Optional when --seed names exactly one twin.`,
+    )
+    .option(
+      "--port <port>",
+      // Built from the registry rather than restated: the per-twin overrides
+      // are the registry's to add, and this text went stale when linear's did.
+      `Port to bind (default: $PORT, else ${TWIN_NAME_LIST.filter(
+        (twin) => TWIN_REGISTRY[twin].portEnvName,
+      )
+        .map((twin) => `${TWIN_REGISTRY[twin].portEnvName}/${TWIN_REGISTRY[twin].defaultPort} for ${twin}`)
+        .join(", ")}, otherwise 3333). With several twins: the first twin's port; the rest take the next free ports above it. Without it, each twin takes its default port, else the next free one.`,
+    )
+    .option(
+      "--seed <path>",
+      "Boot from a JSON or YAML seed file instead of the default. A seed REPLACES the default; it does not merge. Takes the per-twin envelope { <twin>: { … } } or one twin's flat seed (several twins need the envelope, one entry per named twin). Overrides POME_SEED_JSON.",
+    )
+    .description(
+      "Start one or more standalone twins as a long-lived foreground server (Ctrl-C to stop)",
+    )
+    .action(async (names: string[], options: { port?: string; seed?: string }) => {
+      const { runTwinStartCommand } = await import("../twin/twinStart.js");
+      await runTwinStartCommand(names, options);
+    });
+
+  twin
+    .command("new-seed")
+    .argument("<name...>", `Twin name (${TWIN_NAME_LIST.join(" | ")}). Repeat for one file covering several.`)
+    .option("--out <path>", "Write to this file instead of stdout. Refuses to overwrite.")
+    // Summary as well as description, like `twin status`: the round trip below is
+    // four extra lines in `pome twin --help`'s command list without one.
+    .summary("Print a new starter seed file for a twin")
+    .description(
+      "Print a new starter seed file for a twin, generated from the twin's own starting state. One twin is flat, several are the per-twin envelope. Boot it with `twin start <twin> --seed`, seed a sandbox with `sandbox create --twin <twin> --seed`, or drop it beside a task as <task>.seed.json",
+    )
+    .action(async (names: string[], options: { out?: string }) => {
+      const { runTwinSeedCommand } = await import("../twin/twinSeed.js");
+      await runTwinSeedCommand(names, options);
+    });
+
+  twin
+    .command("status")
+    .summary("Say whether the local twins are running")
+    .description(
+      "Say whether each twin `pome twin start` booted here is still running, and print its paste-able env lines",
+    )
+    .action(async () => {
+      const statusPath = ".pome/twin-status.json";
+      if (!existsSync(statusPath)) {
+        console.log("No standalone twin status found.");
+        return;
+      }
+      // `twin start` writes this file non-atomically, so a Ctrl-C or a full disk
+      // mid-write leaves it truncated. Validate every field this command prints
+      // BEFORE printing any of it — one named message, not `Invalid URL` or an
+      // `undefined twin —` line above a TypeError. The file holds one entry per
+      // twin under `twins` (F-1836); an older single-twin file is one entry.
+      const { standaloneStatusEntries } = await import("../twin/twinStart.js");
+      let entries: { name: string; rest_url: string; mcp_url: string; auth_token: string; origin: string }[];
+      try {
+        entries = standaloneStatusEntries(JSON.parse(await readFile(statusPath, "utf8"))).map(
+          (status) => ({ ...status, origin: new URL(status.rest_url).origin }),
+        );
+        if (entries.length === 0 || entries.some((status) => status.name === "")) {
+          throw new Error("no twins");
+        }
+      } catch {
+        throw new Error(
+          `pome twin status: ${statusPath} is unreadable — start a twin with \`pome twin start <${TWIN_NAME_LIST.join("|")}>\`.`,
+        );
+      }
+      for (const [index, status] of entries.entries()) {
+        // Nothing deletes the status file, so it outlives Ctrl-C, a SIGKILL and a
+        // failed bind. A 200 alone does not mean the twin is back: 3333/3336/3337
+        // are ordinary dev-server ports, and any other server on one would pass.
+        // `/healthz` names the twin serving it, so that is the discriminator.
+        const running = await fetch(`${status.origin}/healthz`, {
+          signal: AbortSignal.timeout(1000),
+        }).then(
+          async (res) =>
+            res.ok &&
+            ((await res.json().catch(() => ({}))) as { twin?: string }).twin === status.name,
+          () => false,
+        );
+        if (index > 0) console.log("");
+        console.log(
+          running
+            ? `${status.name} twin — running`
+            : `${status.name} twin — not running (stale ${statusPath})`,
+        );
+        const envName = TWIN_REGISTRY[status.name as TwinName]?.envName ?? status.name.toUpperCase();
+        console.log(`POME_${envName}_REST_URL=${status.rest_url}`);
+        console.log(`POME_${envName}_MCP_URL=${status.mcp_url}`);
+        console.log(`POME_AUTH_TOKEN=${status.auth_token}`);
+      }
+    });
+
+  twin
+    .command("tape")
+    .argument(
+      "[name]",
+      `Twin name (${TWIN_NAME_LIST.join(" | ")}). Optional when one twin is recorded in .pome/twin-status.json.`,
+    )
+    .option(
+      "--diff",
+      "Also print the state diff since the twin booted — its seed, default or --seed — per collection: added, changed, removed.",
+      false,
+    )
+    .option("--json", "Print the tape (and the diff, with --diff) as one JSON envelope.", false)
+    .summary("Show what the agent did on a local twin")
+    .description(
+      "Print the running twin's tape: one line per request with status, fidelity and whether state changed, so a call that claimed success but landed nothing stands out. Reads the twin's address and token from .pome/twin-status.json; no account, no hosted call.",
+    )
+    .action(async (name: string | undefined, options: { diff?: boolean; json?: boolean }) => {
+      const { runTwinTapeCommand } = await import("../twin/twinTape.js");
+      await runTwinTapeCommand(name, options);
+    });
+
+  program.commandsGroup("Going further:");
 
   program
     .command("init")
@@ -1212,133 +1354,6 @@ export function createProgram() {
           trials,
         }),
       );
-    });
-
-  const twin = program
-    .command("twin")
-    .summary("Run a twin on this machine")
-    .description(
-      "Start a twin on this machine, print its status, show its tape, or write a starter seed file",
-    );
-  twin
-    .command("start")
-    .argument(
-      "[names...]",
-      `Twin names (${TWIN_NAME_LIST.join(" | ")}). One, or several to boot together (each on its own port). Optional when --seed names exactly one twin.`,
-    )
-    .option(
-      "--port <port>",
-      // Built from the registry rather than restated: the per-twin overrides
-      // are the registry's to add, and this text went stale when linear's did.
-      `Port to bind (default: $PORT, else ${TWIN_NAME_LIST.filter(
-        (twin) => TWIN_REGISTRY[twin].portEnvName,
-      )
-        .map((twin) => `${TWIN_REGISTRY[twin].portEnvName}/${TWIN_REGISTRY[twin].defaultPort} for ${twin}`)
-        .join(", ")}, otherwise 3333). With several twins: the first twin's port; the rest take the next free ports above it. Without it, each twin takes its default port, else the next free one.`,
-    )
-    .option(
-      "--seed <path>",
-      "Boot from a JSON or YAML seed file instead of the default. A seed REPLACES the default; it does not merge. Takes the per-twin envelope { <twin>: { … } } or one twin's flat seed (several twins need the envelope, one entry per named twin). Overrides POME_SEED_JSON.",
-    )
-    .description(
-      "Start one or more standalone twins as a long-lived foreground server (Ctrl-C to stop)",
-    )
-    .action(async (names: string[], options: { port?: string; seed?: string }) => {
-      const { runTwinStartCommand } = await import("../twin/twinStart.js");
-      await runTwinStartCommand(names, options);
-    });
-
-  twin
-    .command("new-seed")
-    .argument("<name...>", `Twin name (${TWIN_NAME_LIST.join(" | ")}). Repeat for one file covering several.`)
-    .option("--out <path>", "Write to this file instead of stdout. Refuses to overwrite.")
-    // Summary as well as description, like `twin status`: the round trip below is
-    // four extra lines in `pome twin --help`'s command list without one.
-    .summary("Print a new starter seed file for a twin")
-    .description(
-      "Print a new starter seed file for a twin, generated from the twin's own starting state. One twin is flat, several are the per-twin envelope. Boot it with `twin start <twin> --seed`, seed a sandbox with `sandbox create --twin <twin> --seed`, or drop it beside a task as <task>.seed.json",
-    )
-    .action(async (names: string[], options: { out?: string }) => {
-      const { runTwinSeedCommand } = await import("../twin/twinSeed.js");
-      await runTwinSeedCommand(names, options);
-    });
-
-  twin
-    .command("status")
-    .summary("Say whether the local twins are running")
-    .description(
-      "Say whether each twin `pome twin start` booted here is still running, and print its paste-able env lines",
-    )
-    .action(async () => {
-      const statusPath = ".pome/twin-status.json";
-      if (!existsSync(statusPath)) {
-        console.log("No standalone twin status found.");
-        return;
-      }
-      // `twin start` writes this file non-atomically, so a Ctrl-C or a full disk
-      // mid-write leaves it truncated. Validate every field this command prints
-      // BEFORE printing any of it — one named message, not `Invalid URL` or an
-      // `undefined twin —` line above a TypeError. The file holds one entry per
-      // twin under `twins` (F-1836); an older single-twin file is one entry.
-      const { standaloneStatusEntries } = await import("../twin/twinStart.js");
-      let entries: { name: string; rest_url: string; mcp_url: string; auth_token: string; origin: string }[];
-      try {
-        entries = standaloneStatusEntries(JSON.parse(await readFile(statusPath, "utf8"))).map(
-          (status) => ({ ...status, origin: new URL(status.rest_url).origin }),
-        );
-        if (entries.length === 0 || entries.some((status) => status.name === "")) {
-          throw new Error("no twins");
-        }
-      } catch {
-        throw new Error(
-          `pome twin status: ${statusPath} is unreadable — start a twin with \`pome twin start <${TWIN_NAME_LIST.join("|")}>\`.`,
-        );
-      }
-      for (const [index, status] of entries.entries()) {
-        // Nothing deletes the status file, so it outlives Ctrl-C, a SIGKILL and a
-        // failed bind. A 200 alone does not mean the twin is back: 3333/3336/3337
-        // are ordinary dev-server ports, and any other server on one would pass.
-        // `/healthz` names the twin serving it, so that is the discriminator.
-        const running = await fetch(`${status.origin}/healthz`, {
-          signal: AbortSignal.timeout(1000),
-        }).then(
-          async (res) =>
-            res.ok &&
-            ((await res.json().catch(() => ({}))) as { twin?: string }).twin === status.name,
-          () => false,
-        );
-        if (index > 0) console.log("");
-        console.log(
-          running
-            ? `${status.name} twin — running`
-            : `${status.name} twin — not running (stale ${statusPath})`,
-        );
-        const envName = TWIN_REGISTRY[status.name as TwinName]?.envName ?? status.name.toUpperCase();
-        console.log(`POME_${envName}_REST_URL=${status.rest_url}`);
-        console.log(`POME_${envName}_MCP_URL=${status.mcp_url}`);
-        console.log(`POME_AUTH_TOKEN=${status.auth_token}`);
-      }
-    });
-
-  twin
-    .command("tape")
-    .argument(
-      "[name]",
-      `Twin name (${TWIN_NAME_LIST.join(" | ")}). Optional when one twin is recorded in .pome/twin-status.json.`,
-    )
-    .option(
-      "--diff",
-      "Also print the state diff since the twin booted — its seed, default or --seed — per collection: added, changed, removed.",
-      false,
-    )
-    .option("--json", "Print the tape (and the diff, with --diff) as one JSON envelope.", false)
-    .summary("Show what the agent did on a local twin")
-    .description(
-      "Print the running twin's tape: one line per request with status, fidelity and whether state changed, so a call that claimed success but landed nothing stands out. Reads the twin's address and token from .pome/twin-status.json; no account, no hosted call.",
-    )
-    .action(async (name: string | undefined, options: { diff?: boolean; json?: boolean }) => {
-      const { runTwinTapeCommand } = await import("../twin/twinTape.js");
-      await runTwinTapeCommand(name, options);
     });
 
   program

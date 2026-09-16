@@ -6,7 +6,7 @@ labels: bug
 ---
 
 <!--
-Security issues: do NOT file here. Email founders@pome.sh.
+Security issues: do NOT file here. See SECURITY.md (private report on GitHub, or founders@pome.sh).
 -->
 
 ## What happened
@@ -32,6 +32,15 @@ Minimal steps. Code snippets, commands, or a link to a small repo are best.
 - Version or image digest: <!-- `pome --version`, image sha256, or commit SHA -->
 - OS / arch: <!-- e.g. macOS 14 arm64, Ubuntu 22.04 x86_64 -->
 - Node.js / npm version (if relevant):
+
+## Tape
+
+<!--
+With the twin still running, in the folder you started it from:
+  pome twin tape --json > tape.json
+Attach tape.json. It carries request paths, status codes and fidelity marks;
+the bearer is redacted by the recorder.
+-->
 
 ## Logs
 

@@ -142,6 +142,7 @@ Global hosted configuration:
 | `POME_API_KEY` | Authenticate hosted commands. This value takes precedence over stored credentials. |
 | `POME_API_URL` | Set the control-plane URL. `--api-url` takes precedence. |
 | `POME_DASHBOARD_URL` | Set the dashboard URL for login and result links. |
+| `POME_TELEMETRY=0` | Turn off the anonymous daily usage event (one per day at most: CLI version, OS, Node major, command name; never arguments, paths or repo names). `DO_NOT_TRACK=1` is honoured too, and nothing is sent when `CI` is set. |
 
 Agent process configuration:
 

@@ -30,7 +30,11 @@ function indexBlock(program: Command): { entries: string[]; named: string[]; nam
   const lines = program.helpInformation().split("\n");
   const start = lines.indexOf("Commands:");
   expect(start, "root --help no longer prints a Commands: block").toBeGreaterThan(-1);
-  const entries = lines.slice(start + 1).filter((line) => line.trim().length > 0);
+  // A further group heading ("Going further:", F-1838) is a section title at
+  // column 0, not an entry; every entry sits in the command column.
+  const entries = lines
+    .slice(start + 1)
+    .filter((line) => line.trim().length > 0 && !/^\S.*:$/.test(line));
   const named = entries.filter((line) => names.some((name) => line.trimStart().startsWith(name)));
   return { entries, named, names };
 }
