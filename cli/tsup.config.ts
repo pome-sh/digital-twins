@@ -137,6 +137,12 @@ export default defineConfig({
     // Read by src/cli/checks.ts. Double-stringified: define injects raw
     // source text, and the runtime wants a string literal holding JSON.
     POME_INLINED_PKG_VERSIONS: JSON.stringify(JSON.stringify(inlinedPackageVersions())),
+    // Read by src/cli/usageTick.ts (F-1832). A PostHog project key is
+    // write-only by design, so it is safe in a public binary; a build made
+    // without these set sends nothing at all. The release workflow supplies
+    // them from repository variables.
+    POME_TELEMETRY_KEY: JSON.stringify(process.env.POME_TELEMETRY_KEY ?? ""),
+    POME_TELEMETRY_HOST: JSON.stringify(process.env.POME_TELEMETRY_HOST ?? ""),
   },
   async onSuccess() {
     ensureExecutableBin();

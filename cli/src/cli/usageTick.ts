@@ -45,9 +45,14 @@ export type UsageState = {
 
 export type UsageDestination = { key: string; host: string };
 
+// `typeof` on an undeclared identifier is safe; reading it is not. Under
+// vitest (no tsup `define`) the identifiers do not exist at all.
 function bakedIn(name: "key" | "host"): string | undefined {
-  const value = name === "key" ? POME_TELEMETRY_KEY : POME_TELEMETRY_HOST;
-  return typeof value === "string" && value.length > 0 ? value : undefined;
+  const value =
+    name === "key"
+      ? typeof POME_TELEMETRY_KEY === "string" ? POME_TELEMETRY_KEY : undefined
+      : typeof POME_TELEMETRY_HOST === "string" ? POME_TELEMETRY_HOST : undefined;
+  return value !== undefined && value.length > 0 ? value : undefined;
 }
 
 /** Where the event goes, or `undefined` when this build carries no key. */

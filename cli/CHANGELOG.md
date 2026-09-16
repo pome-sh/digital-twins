@@ -15,11 +15,19 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
-## Unreleased (patch)
+## Unreleased (minor)
 
 **The GitHub twin types against `@octokit/openapi-types` v29.** Stacked pull
 requests and the `stale` check-run conclusion come from the official schema.
 The HTTP tape is unchanged.
+
+**The CLI sends one anonymous usage event per day** (F-1832), minor because a
+user who does not want it must act. What leaves the machine: a random id kept
+in `~/.pome/telemetry.json`, the CLI version, the OS, the Node major and the
+command's name (`twin start`, `init`); never an argument, a path, a repo name
+or anything from a tape. The first send prints a one-line notice on stderr.
+`POME_TELEMETRY=0` (or `DO_NOT_TRACK=1`) turns it off; nothing is sent when
+`CI` is set, and nothing is sent from a build made without an ingest key.
 
 ## 0.44.0 — 2026-09-16
 

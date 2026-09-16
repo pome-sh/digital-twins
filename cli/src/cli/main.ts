@@ -92,6 +92,7 @@ import { loadTrialEvents } from "../hosted/trialEvents.js";
 import type { Task } from "../task/taskSchema.js";
 import { parseTaskFile } from "../task/parseTask.js";
 import type { RecorderEvent } from "../types/shared.js";
+import { commandName, maybeSendUsageTick } from "./usageTick.js";
 
 const PACKAGE_VERSION = readPackageVersion();
 const DEFAULT_AGENT_FILE = "examples/agents/scripted-triage-agent.ts";
@@ -165,7 +166,15 @@ export function createProgram() {
       "Test AI agents against digital twins of real SaaS APIs. Runs are recorded to app.pome.sh. Start with `pome init`.",
     )
     .version(PACKAGE_VERSION)
-    .showHelpAfterError("(add --help for usage)");
+    .showHelpAfterError("(add --help for usage)")
+    // The daily usage tick (F-1832): fires before any command's action — so
+    // never for `--help` or `--version` — with the command's name and nothing
+    // from its arguments, at most once a day, and never in CI or when
+    // POME_TELEMETRY=0 / DO_NOT_TRACK is set. Not awaited: it can neither fail
+    // nor delay the command beyond its own short timeout.
+    .hook("preAction", (_root, actionCommand) => {
+      void maybeSendUsageTick({ command: commandName(actionCommand), version: PACKAGE_VERSION });
+    });
 
   program
     .command("init")
