@@ -2,7 +2,7 @@
 import { serve } from "@hono/node-server";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
-import { join, resolve as resolvePath, sep as pathSep } from "node:path";
+import { join, resolve as resolvePath } from "node:path";
 import { sign } from "hono/jwt";
 import { parseTaskFile, seedStateForTwin } from "../task/parseTask.js";
 import { bootTwin, type TwinHarness } from "../twin/twinHarness.js";
@@ -12,7 +12,6 @@ import { getAvailablePort } from "./ports.js";
 import { runAgentCommand } from "./agentRunner.js";
 import { egressArgs, spawnCaptureServerChild } from "./captureServerChild.js";
 import { buildEgressAllowlist, readBlockedEgress, type BlockedEgress } from "../capture-server/egress.js";
-import { mergeAdapterSignalsIntoEvents } from "./mergeAdapterSignals.js";
 import { writeRunNoScore } from "./runTaskCore.js";
 
 // Promisify a Hono/node server `close()` so teardown can await in-flight
@@ -67,17 +66,8 @@ export async function runTask(options: RunTaskOptions) {
   // score/judge/correlate locally. A verdict comes only from the cloud.
   const writeRun = writeRunNoScore;
 
-  // Per-run signals file. Lives as a sibling of events.jsonl in the
-  // run's artifact directory so an agent that writes M0 HookEvent / ToolUseEvent
-  // rows to `POME_ADAPTER_SIGNALS_PATH` has a target. The runner merges these
-  // into events.jsonl post-run via `mergeAdapterSignalsIntoEvents`.
-  // Forward-slash path is passed to the subprocess so cross-platform shell
-  // quoting stays sane.
   const runDir = join(artifactsDir, scenario.slug, runId);
   await mkdir(runDir, { recursive: true });
-  const signalsPath = join(runDir, "signals.jsonl");
-  await writeFile(signalsPath, "");
-  const signalsPathForEnv = pathSep === "\\" ? signalsPath.replace(/\\/g, "/") : signalsPath;
   const eventsJsonlPath = join(runDir, "events.jsonl");
   // Touch events.jsonl so the capture-server child has a target file to
   // append to (it would create it anyway, but this also ensures `pome
@@ -216,7 +206,6 @@ export async function runTask(options: RunTaskOptions) {
     POME_AUTH_TOKEN: token,
     POME_RUN_ID: runId,
     POME_ARTIFACTS_DIR: runDir,
-    POME_ADAPTER_SIGNALS_PATH: signalsPathForEnv,
     ...(options.extraAgentEnv ?? {}),
     ...proxyEnv,
   };
@@ -273,7 +262,6 @@ export async function runTask(options: RunTaskOptions) {
         stateInitial,
         stateFinal
       });
-      await mergeAdapterSignalsIntoEvents(signalsPath, eventsJsonlPath);
       // Preflight failure always exits 3 (matches prior behavior).
       void exitCode;
       const blockedEgress = await collectBlockedEgress();
@@ -301,7 +289,6 @@ export async function runTask(options: RunTaskOptions) {
       stateInitial,
       stateFinal
     });
-    await mergeAdapterSignalsIntoEvents(signalsPath, eventsJsonlPath);
     const blockedEgress = await collectBlockedEgress();
     return { scenario, runId, artifacts, agent, exitCode, blockedEgress };
   } finally {

@@ -3,9 +3,8 @@
 // depend on nearly every step above them, and the long comments arguing those decisions
 // are worth more beside the code than in a module that has to re-derive the context.
 // SPDX-License-Identifier: Apache-2.0
-import { createHash, randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { runAgentCommand } from "./agentRunner.js";
 import { toTwinHttpEvent, writeRunArtifactsCore } from "../recorder/artifacts.js";
@@ -22,7 +21,6 @@ import {
 } from "../hosted/client.js";
 import { ensureMcpSuffix } from "../cli/session.js";
 import {
-  redactJsonl,
   scoreFromFinalizeResponse,
   uploadRunBlobs,
 } from "../hosted/uploadAndFinalize.js";
@@ -131,7 +129,6 @@ export function buildAgentEnv(params: {
   runId: string;
   artifactsDir: string;
   slug: string;
-  signalsPath: string;
 }): Record<string, string> {
   const {
     session,
@@ -144,7 +141,6 @@ export function buildAgentEnv(params: {
     runId,
     artifactsDir,
     slug,
-    signalsPath,
   } = params;
 
   const env: Record<string, string> = {
@@ -182,7 +178,6 @@ export function buildAgentEnv(params: {
     POME_AUTH_TOKEN: session.agent_token,
     POME_RUN_ID: runId,
     POME_ARTIFACTS_DIR: join(artifactsDir, slug, runId),
-    POME_ADAPTER_SIGNALS_PATH: signalsPath,
   };
 
   for (const twin of twins) {
@@ -244,15 +239,6 @@ export async function runTaskHosted(
   const agentId = identity.agentId;
   const agentVersion = identity.agentVersion;
   const agentSdk = identity.framework ?? null;
-
-  // Per-run signals file. POME_ADAPTER_SIGNALS_PATH is injected into the agent
-  // env so adapter-rich correlator gets step/tool_call signals when the agent
-  // emits them; otherwise the heuristic correlator path runs over events alone.
-  const signalsDir = await mkdtemp(join(tmpdir(), "pome-signals-"));
-  const signalsPath = join(signalsDir, `${randomUUID()}.jsonl`);
-  // Touch the file so an agent that `appendFileSync`s to it on first signal
-  // doesn't race the read in the empty case.
-  await writeFile(signalsPath, "");
 
   // 1. Spawn cloud session — fails fast on auth/quota/orch. Trial
   // groups mint all k sessions upfront (one shared group_id) and pass each
@@ -340,7 +326,6 @@ export async function runTaskHosted(
       runId,
       artifactsDir,
       slug: scenario.slug,
-      signalsPath,
     });
 
     const preflightTimeoutSeconds = Math.min(10, scenario.config.timeout);
@@ -353,14 +338,6 @@ export async function runTaskHosted(
 
     let agentResult = preflight;
     if (preflight.exitCode === 0) {
-      // The preflight probe appended its own signals (turns/steps/
-      // tool_calls) to the shared POME_ADAPTER_SIGNALS_PATH file. Those must
-      // NOT reach the uploaded signals.jsonl / usage ledger. Truncate before
-      // the real run so the blob counts real-run telemetry only. runAgentCommand
-      // awaits child exit, so the preflight's writes are already flushed here.
-      // Gated on preflight success: the preflight-failed → single-run path keeps
-      // its current behavior (it uploads the preflight's signals).
-      await writeFile(signalsPath, "");
       agentResult = await runAgentCommand({
         command: options.agentCommand,
         env,
@@ -510,19 +487,17 @@ export async function runTaskHosted(
 
     // 6. NO local correlation. Correlation (like scoring/judging)
     //    is a cloud responsibility; the OSS CLI only captures the raw trace.
-    //    Cloud correlates the uploaded events/signals server-side. The events
+    //    Cloud correlates the uploaded events server-side. The events
     //    are uploaded exactly as captured (no local step_id back-fill).
 
-    // 7. Upload events.jsonl + state blobs + adapter signals.jsonl to cloud
-    //    storage in parallel. /finalize defaults the trace storage key to
-    //    the conventional `team-<>/session-<>/events.jsonl` path, so cloud's
-    //    judge finds the trace without an explicit override. State blobs
-    //    and signals have no conventional fallback today — without an
-    //    explicit override the judge sees "{}" for state files
-    //    and skips the adapter-rich correlator (F0-4 / L7). All four
-    //    uploads are best-effort: any failure leaves the corresponding
-    //    blob missing, the judge still runs against whatever it does have,
-    //    and the dashboard handles nulls gracefully.
+    // 7. Upload events.jsonl + state blobs to cloud storage in parallel.
+    //    /finalize defaults the trace storage key to the conventional
+    //    `team-<>/session-<>/events.jsonl` path, so cloud's judge finds the
+    //    trace without an explicit override. State blobs have no conventional
+    //    fallback today — without an explicit override the judge sees "{}".
+    //    Uploads are best-effort: any failure leaves the corresponding blob
+    //    missing, the judge still runs against whatever it does have, and
+    //    the dashboard handles nulls gracefully.
     // Wrap legacy RecorderEvents (no `kind` discriminator) into the unified
     // canonical shape before upload — cloud's schema gate rejects raw legacy
     // rows. Matches the wrap that `writeRunArtifactsCore` applies for the
@@ -534,23 +509,7 @@ export async function runTaskHosted(
     const stateFinalJson = JSON.stringify(redactSecrets(stateFinal));
 
     // Upload orchestration lives in ../hosted/uploadAndFinalize.ts
-    // so `pome eval` shares the exact best-effort semantics. Signals are
-    // read + redacted here (the tmp file is runner-owned); empty payloads
-    // skip the upload inside uploadRunBlobs. Read + redaction stay inside a
-    // guard so a redaction failure degrades to "signals skipped" — the
-    // pre-extraction contract — instead of aborting the whole hosted run.
-    let signalsJsonl = "";
-    try {
-      signalsJsonl = redactJsonl(
-        await readFile(signalsPath, "utf8").catch(() => ""),
-      );
-    } catch (err) {
-      console.warn(
-        `[pome] signals.jsonl upload skipped (${
-          err instanceof Error ? err.message : String(err)
-        }); continuing with signals_storage_key=null`,
-      );
-    }
+    // so `pome eval` shares the exact best-effort semantics.
     // D18.1 — meta.json is already redacted on disk (writeRunArtifactsCore's
     // writeJson applies redactSecrets); read it back rather than re-deriving
     // it so what's uploaded is byte-identical to the local artifact. A read
@@ -578,7 +537,6 @@ export async function runTaskHosted(
       eventsJsonl,
       stateInitialJson,
       stateFinalJson,
-      signalsJsonl,
       metaJson,
       twins: isMultiTwin ? twins : undefined,
       perTwinState,
@@ -588,7 +546,6 @@ export async function runTaskHosted(
       initialKey: uploaded.stateInitialKey,
       finalKey: uploaded.stateFinalKey,
     };
-    const signalsKey = uploaded.signalsKey;
 
     // 8. Finalize the run on cloud (ADR-013). Cloud loads the trace from
     //    storage, calls the managed judge via AI Gateway, persists the run
@@ -637,7 +594,6 @@ export async function runTaskHosted(
       traceStorageKey: eventsJsonlUrl ?? undefined,
       stateInitialStorageKey: stateKeys.initialKey ?? undefined,
       stateFinalStorageKey: stateKeys.finalKey ?? undefined,
-      signalsStorageKey: signalsKey ?? undefined,
       // Multi-twin (M3): per-twin state storage keys (>=1 key per entry).
       // Undefined for single-twin / an older cloud that returned no per_twin
       // upload block — the cloud then scores the primary twin from the flat keys.
@@ -756,7 +712,6 @@ export async function runTaskHosted(
     await client
       .deleteSession(session.session_id, true, { discard: true })
       .catch(() => undefined);
-    await rm(signalsDir, { recursive: true, force: true }).catch(() => undefined);
   }
 }
 

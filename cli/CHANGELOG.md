@@ -15,7 +15,11 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
-## Unreleased (patch)
+## Unreleased (minor)
+
+**Adapter signals are no longer captured or uploaded** (F-1822). `pome run` no
+longer sets `POME_ADAPTER_SIGNALS_PATH`, writes `signals.jsonl`, or sends
+`signals_storage_key` on finalize. The twin HTTP tape is the capture path.
 
 **`pome twin start` prints paste-ready connect snippets** (F-1827). Under the
 banner, after the `POME_*` lines: the `claude mcp add --transport http … --header`
