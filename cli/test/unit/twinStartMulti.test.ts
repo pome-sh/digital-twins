@@ -5,9 +5,10 @@
 // and what the status file looks like once a second command joins the first.
 // The single-twin path must come out of every helper unchanged.
 
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, readFile, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { TWIN_REGISTRY } from "../../src/twin/registry.js";
 import {
@@ -17,6 +18,7 @@ import {
   resolveStandaloneSeeds,
   resolveStandaloneTwins,
   standaloneStatusEntries,
+  updateStandaloneStatusFile,
   type StandaloneAuthSecret,
   type StandaloneStatus,
 } from "../../src/twin/twinStart.js";
@@ -273,4 +275,46 @@ describe("mergeStandaloneStatus", () => {
     expect(standaloneStatusEntries(undefined)).toEqual([]);
     expect(standaloneStatusEntries({ hello: "world" })).toEqual([]);
   });
+});
+
+describe("updateStandaloneStatusFile", () => {
+  const entry = (name: StandaloneStatus["name"], port: number): StandaloneStatus => ({
+    name,
+    url: `http://127.0.0.1:${port}/s/standalone`,
+    rest_url: `http://127.0.0.1:${port}/s/standalone`,
+    mcp_url: `http://127.0.0.1:${port}/s/standalone/mcp`,
+    auth_token: `token-${name}`,
+  });
+
+  it("concurrent starts in one folder all land in the file (read-merge-write is locked)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pome-twin-status-lock-"));
+    const path = join(dir, ".pome", "twin-status.json");
+    const names: StandaloneStatus["name"][] = ["github", "slack", "stripe", "gmail", "linear"];
+    await Promise.all(names.map((name, i) => updateStandaloneStatusFile([entry(name, 3400 + i)], path)));
+    const file = JSON.parse(await readFile(path, "utf8")) as { twins: Record<string, unknown> };
+    expect(Object.keys(file.twins).sort()).toEqual([...names].sort());
+    expect(existsSync(`${path}.lock`)).toBe(false);
+  });
+
+  it("breaks a stale lock a crashed writer left behind", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pome-twin-status-stale-"));
+    const path = join(dir, ".pome", "twin-status.json");
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(`${path}.lock`, "12345");
+    const old = new Date(Date.now() - 60_000);
+    await utimes(`${path}.lock`, old, old);
+    const merged = await updateStandaloneStatusFile([entry("github", 3333)], path);
+    expect(Object.keys(merged.twins)).toEqual(["github"]);
+    expect(existsSync(`${path}.lock`)).toBe(false);
+  });
+
+  it("refuses, naming the lock, when another process holds it", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pome-twin-status-held-"));
+    const path = join(dir, ".pome", "twin-status.json");
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(`${path}.lock`, "12345"); // fresh: mtime is now
+    await expect(updateStandaloneStatusFile([entry("github", 3333)], path)).rejects.toThrow(
+      "is held by another pome process",
+    );
+  }, 15_000);
 });

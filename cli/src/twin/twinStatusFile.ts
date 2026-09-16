@@ -7,7 +7,7 @@
 // the older single-twin shape keeps seeing what it saw. Written owner-only,
 // because it carries the bearer JWT (F-1800).
 
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { TwinName } from "./registry.js";
 
@@ -35,8 +35,77 @@ export async function writeStandaloneStatusFile(
   path: string = STANDALONE_STATUS_PATH,
 ): Promise<void> {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-  await writeFile(path, JSON.stringify(status, null, 2), { mode: 0o600 });
+  // Written beside and renamed over: a reader never sees a half-written file,
+  // and two writers cannot interleave bytes (the lock in
+  // `updateStandaloneStatusFile` is what keeps them from losing each other's
+  // entries). The rename keeps the temp file's 0600; the chmod after it is for
+  // the one case rename cannot cover, a pre-existing 0644 file on a filesystem
+  // that refuses the rename.
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(tmp, JSON.stringify(status, null, 2), { mode: 0o600 });
+  await rename(tmp, path);
   await chmod(path, 0o600);
+}
+
+/** A lock that a crashed writer left behind is broken after this long. */
+const STALE_LOCK_MS = 10_000;
+
+/**
+ * Exclusive lock around the status file, held for one read-merge-write.
+ * `open(…, "wx")` is atomic on every filesystem the CLI runs on, so two
+ * `pome twin start` processes launched together in one folder serialise
+ * here instead of each reading the old file and the last one erasing the
+ * other's entry. The lock carries the holder's pid, and one older than
+ * `STALE_LOCK_MS` is treated as a crash and taken over.
+ */
+async function withStatusLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
+  const lockPath = `${path}.lock`;
+  const deadline = Date.now() + 5_000;
+  for (;;) {
+    try {
+      const handle = await open(lockPath, "wx", 0o600);
+      try {
+        await handle.writeFile(String(process.pid));
+      } finally {
+        await handle.close();
+      }
+      break;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+      const age = await stat(lockPath).then((s) => Date.now() - s.mtimeMs, () => 0);
+      if (age > STALE_LOCK_MS) {
+        await unlink(lockPath).catch(() => undefined);
+        continue;
+      }
+      if (Date.now() > deadline) {
+        throw new Error(
+          `pome twin start: ${lockPath} is held by another pome process — if none is running, delete it.`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    await unlink(lockPath).catch(() => undefined);
+  }
+}
+
+/**
+ * Read, merge this command's twins in, write — under the lock, so concurrent
+ * starts in one folder all land in the file.
+ */
+export async function updateStandaloneStatusFile(
+  entries: readonly StandaloneStatus[],
+  path: string = STANDALONE_STATUS_PATH,
+): Promise<StandaloneStatusFile> {
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  return await withStatusLock(path, async () => {
+    const merged = mergeStandaloneStatus(await readStandaloneStatusFile(path), entries);
+    await writeStandaloneStatusFile(merged, path);
+    return merged;
+  });
 }
 
 /**

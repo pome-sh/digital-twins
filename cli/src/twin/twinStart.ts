@@ -31,12 +31,7 @@ import {
 import { bootTwin, type TwinHarness } from "./twinHarness.js";
 import { renderConnectSnippets, type ConnectSnippetInput } from "./connectSnippets.js";
 import { chooseStandalonePorts } from "./twinPorts.js";
-import {
-  mergeStandaloneStatus,
-  readStandaloneStatusFile,
-  writeStandaloneStatusFile,
-  type StandaloneStatus,
-} from "./twinStatusFile.js";
+import { updateStandaloneStatusFile, type StandaloneStatus } from "./twinStatusFile.js";
 
 // The status file and the port choice have their own modules; re-exported so
 // `pome twin status` and the tests keep one import path for the command.
@@ -45,6 +40,7 @@ export {
   mergeStandaloneStatus,
   readStandaloneStatusFile,
   standaloneStatusEntries,
+  updateStandaloneStatusFile,
   writeStandaloneStatusFile,
   type StandaloneStatus,
   type StandaloneStatusFile,
@@ -413,7 +409,7 @@ export async function runTwinStartCommand(
       const restUrl = `${entry.baseUrl}/s/${STANDALONE_SID}`;
       return { name: entry.twin, url: restUrl, rest_url: restUrl, mcp_url: `${restUrl}/mcp`, auth_token: token };
     });
-    await writeStandaloneStatusFile(mergeStandaloneStatus(await readStandaloneStatusFile(), entries));
+    await updateStandaloneStatusFile(entries);
   } catch (err) {
     // Boot fails loudly or not at all: without this, the rejection leaves a
     // bound listener keeping the process alive behind the error message.
