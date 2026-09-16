@@ -10,7 +10,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -294,4 +294,130 @@ describe("pome twin start — unknown-twin error (e2e)", () => {
       expect(output).toContain(name);
     }
   });
+});
+
+// F-1836 — several twins from one command, and two commands sharing a folder.
+describe("pome twin start — several twins (e2e)", () => {
+  type Spawned = { child: ChildProcess; output: () => string; exited: Promise<number | null> };
+  function start(cwd: string, args: string[]): Spawned {
+    const proc = spawn(TSX_BIN, [MAIN_TS, "twin", "start", ...args], {
+      cwd,
+      env: { ...process.env },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let output = "";
+    proc.stdout?.on("data", (chunk) => { output += chunk; });
+    proc.stderr?.on("data", (chunk) => { output += chunk; });
+    const exited = new Promise<number | null>((resolve) => proc.once("exit", (code) => resolve(code)));
+    return { child: proc, output: () => output, exited };
+  }
+  async function healthy(port: number, twin: string, output: () => string): Promise<void> {
+    const deadline = Date.now() + 60_000;
+    for (;;) {
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/healthz`);
+        if (res.status === 200 && ((await res.json()) as { twin?: string }).twin === twin) return;
+      } catch {
+        // not listening yet
+      }
+      if (Date.now() > deadline) {
+        throw new Error(`${twin} never answered /healthz on ${port}\n--- output ---\n${output()}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+  async function printed(output: () => string, pattern: RegExp): Promise<string> {
+    const deadline = Date.now() + 10_000;
+    while (!pattern.test(output()) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    const match = output().match(pattern)?.[1];
+    if (!match) throw new Error(`never printed ${pattern}\n--- output ---\n${output()}`);
+    return match;
+  }
+
+  it(
+    "boots github and slack together on distinct ports, records both, and stops both on SIGINT",
+    async () => {
+      const cwd = await mkdtemp(join(tmpdir(), "pome-twin-start-multi-e2e-"));
+      const port = await freePort();
+      const run = start(cwd, ["github", "slack", "--port", String(port)]);
+      child = run.child;
+
+      await healthy(port, "github", run.output);
+      const slackRest = await printed(run.output, /POME_SLACK_REST_URL=(\S+)/);
+      const slackPort = Number(new URL(slackRest).port);
+      expect(slackPort).toBeGreaterThan(port);
+      await healthy(slackPort, "slack", run.output);
+
+      // One token for the process, valid on both twins.
+      const token = await printed(run.output, /POME_AUTH_TOKEN=(\S+)/);
+      for (const p of [port, slackPort]) {
+        const res = await fetch(`http://127.0.0.1:${p}/s/standalone/_pome/health`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        expect(res.status).toBe(200);
+      }
+
+      // One status block per twin, one shared connect block.
+      await printed(run.output, /(Ctrl-C to stop\.)/);
+      const output = run.output();
+      expect(output.match(/twin listening at/g)?.length).toBe(2);
+      expect(output).toContain(`claude mcp add --transport http pome-github http://127.0.0.1:${port}/s/standalone/mcp`);
+      expect(output).toContain(`claude mcp add --transport http pome-slack ${slackRest}/mcp`);
+      expect(output.match(/^  export POME_/gm)?.length).toBe(1);
+
+      // The status file holds both, keyed by name; the top-level mirrors the first.
+      const status = JSON.parse(await readFile(join(cwd, ".pome", "twin-status.json"), "utf8")) as {
+        name: string;
+        twins: Record<string, { rest_url: string; auth_token: string }>;
+      };
+      expect(Object.keys(status.twins)).toEqual(["github", "slack"]);
+      expect(status.name).toBe("github");
+      expect(status.twins.slack?.rest_url).toBe(slackRest);
+      expect(status.twins.github?.auth_token).toBe(token);
+
+      run.child.kill("SIGINT");
+      await expect(run.exited).resolves.toBe(0);
+      for (const p of [port, slackPort]) {
+        await expect(fetch(`http://127.0.0.1:${p}/healthz`)).rejects.toThrow();
+      }
+    },
+    120_000,
+  );
+
+  it(
+    "a second twin start in the same folder keeps the first's status entry",
+    async () => {
+      const cwd = await mkdtemp(join(tmpdir(), "pome-twin-start-join-e2e-"));
+      const first = start(cwd, ["github", "--port", String(await freePort())]);
+      child = first.child;
+      const githubRest = await printed(first.output, /POME_GITHUB_REST_URL=(\S+)/);
+      await healthy(Number(new URL(githubRest).port), "github", first.output);
+
+      const second = start(cwd, ["slack", "--port", String(await freePort())]);
+      try {
+        const slackRest = await printed(second.output, /POME_SLACK_REST_URL=(\S+)/);
+        await healthy(Number(new URL(slackRest).port), "slack", second.output);
+
+        const status = JSON.parse(await readFile(join(cwd, ".pome", "twin-status.json"), "utf8")) as {
+          name: string;
+          rest_url: string;
+          twins: Record<string, { rest_url: string }>;
+        };
+        expect(Object.keys(status.twins).sort()).toEqual(["github", "slack"]);
+        expect(status.twins.github?.rest_url).toBe(githubRest);
+        expect(status.twins.slack?.rest_url).toBe(slackRest);
+        // The older single-twin readers see the twin that was just started.
+        expect(status.name).toBe("slack");
+        expect(status.rest_url).toBe(slackRest);
+      } finally {
+        second.child.kill("SIGINT");
+        await second.exited;
+      }
+      first.child.kill("SIGINT");
+      await expect(first.exited).resolves.toBe(0);
+    },
+    120_000,
+  );
 });

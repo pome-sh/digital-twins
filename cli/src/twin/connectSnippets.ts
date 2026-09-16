@@ -22,6 +22,10 @@
 //   - the SDK line how the vendor's own client library is pointed at the twin,
 //                  taken from each twin's README or official-client test.
 //
+// Several twins started by one command (F-1836) share one block: one line per
+// twin where a client takes one server per line, and one merged stanza where
+// it takes a file — so the paste count does not grow with the twin count.
+//
 // Pure — no I/O — so the unit test asserts the text and `twinStart` only prints
 // it.
 
@@ -56,17 +60,21 @@ export function codexConfigBlock(input: ConnectSnippetInput): string {
   ].join("\n");
 }
 
+/** One `.mcp.json` carrying every twin, one server entry each. */
+export function mcpJsonStanzaFor(inputs: readonly ConnectSnippetInput[]): string {
+  const mcpServers: Record<string, { type: string; url: string; headers: Record<string, string> }> = {};
+  for (const input of inputs) {
+    mcpServers[mcpServerName(input.name)] = {
+      type: "http",
+      url: input.mcpUrl,
+      headers: { Authorization: "Bearer ${POME_AUTH_TOKEN}" },
+    };
+  }
+  return JSON.stringify({ mcpServers }, null, 2);
+}
+
 export function mcpJsonStanza(input: ConnectSnippetInput): string {
-  const stanza = {
-    mcpServers: {
-      [mcpServerName(input.name)]: {
-        type: "http",
-        url: input.mcpUrl,
-        headers: { Authorization: "Bearer ${POME_AUTH_TOKEN}" },
-      },
-    },
-  };
-  return JSON.stringify(stanza, null, 2);
+  return mcpJsonStanzaFor([input]);
 }
 
 /**
@@ -118,20 +126,29 @@ export function sdkLines(input: ConnectSnippetInput): { label: string; lines: st
 }
 
 /**
- * One `export` line carrying every `POME_*` value the banner printed. The
- * banner's own `NAME=value` lines are kept as they are (things grep for them),
- * but pasted as-is they set shell variables that no child process — codex,
- * claude, your own script — can see. This line is the paste that makes the
- * Codex, `.mcp.json` and SDK snippets below actually find the token.
+ * One `export` line carrying every `POME_*` value the banner printed, for
+ * every twin. The banner's own `NAME=value` lines are kept as they are (things
+ * grep for them), but pasted as-is they set shell variables that no child
+ * process — codex, claude, your own script — can see. This line is the paste
+ * that makes the Codex, `.mcp.json` and SDK snippets below actually find the
+ * token. Twins started together share one token, so it appears once.
  */
-export function exportLine(input: ConnectSnippetInput): string {
-  const pairs = [
+export function exportLineFor(inputs: readonly ConnectSnippetInput[]): string {
+  const first = inputs[0];
+  if (first === undefined) throw new Error("exportLineFor: no twins");
+  const pairs = inputs.flatMap((input) => [
     `POME_${input.envName}_REST_URL=${input.restUrl}`,
     `POME_${input.envName}_MCP_URL=${input.mcpUrl}`,
-    `POME_AUTH_TOKEN=${input.token}`,
-    ...(input.tokenEnvName ? [`${input.tokenEnvName}=${input.token}`] : []),
-  ];
+  ]);
+  pairs.push(`POME_AUTH_TOKEN=${first.token}`);
+  for (const input of inputs) {
+    if (input.tokenEnvName) pairs.push(`${input.tokenEnvName}=${input.token}`);
+  }
   return `export ${pairs.join(" ")}`;
+}
+
+export function exportLine(input: ConnectSnippetInput): string {
+  return exportLineFor([input]);
 }
 
 function indent(text: string): string {
@@ -142,24 +159,31 @@ function indent(text: string): string {
 }
 
 /** The whole block, in the order a reader picks a client. */
-export function renderConnectSnippets(input: ConnectSnippetInput): string {
-  const sdk = sdkLines(input);
+export function renderConnectSnippets(
+  input: ConnectSnippetInput | readonly ConnectSnippetInput[],
+): string {
+  const inputs = Array.isArray(input)
+    ? (input as readonly ConnectSnippetInput[])
+    : [input as ConnectSnippetInput];
+  const sdkSections = inputs.map((twin) => {
+    const sdk = sdkLines(twin);
+    return [`Your own code, through ${sdk.label}:`, indent(sdk.lines.join("\n"))].join("\n");
+  });
   return [
     "Connect your agent (pick one):",
     "",
     "Claude Code:",
-    indent(claudeCodeCommand(input)),
+    indent(inputs.map(claudeCodeCommand).join("\n")),
     "",
     "Codex, .mcp.json and the SDK line below read the token from your shell. Export it once:",
-    indent(exportLine(input)),
+    indent(exportLineFor(inputs)),
     "",
     "Codex (append to ~/.codex/config.toml):",
-    indent(codexConfigBlock(input)),
+    indent(inputs.map(codexConfigBlock).join("\n\n")),
     "",
     ".mcp.json (Claude Code project scope, in the repo):",
-    indent(mcpJsonStanza(input)),
+    indent(mcpJsonStanzaFor(inputs)),
     "",
-    `Your own code, through ${sdk.label}:`,
-    indent(sdk.lines.join("\n")),
+    sdkSections.join("\n\n"),
   ].join("\n");
 }

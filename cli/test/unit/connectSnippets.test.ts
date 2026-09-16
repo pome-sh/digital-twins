@@ -97,6 +97,31 @@ describe("connect snippets", () => {
     expect(exportLine(inputFor("gmail"))).toContain(` POME_GMAIL_TOKEN=${TOKEN}`);
   });
 
+  it("several twins share one block: a line per twin where a client takes lines, one file where it takes a file", () => {
+    const github = inputFor("github", 3333);
+    const linear = inputFor("linear", 3337);
+    const block = renderConnectSnippets([github, linear]);
+    // Claude Code and Codex take one server per paste, so two of each.
+    expect(block).toContain(claudeCodeCommand(github));
+    expect(block).toContain(claudeCodeCommand(linear));
+    expect(block).toContain("[mcp_servers.pome-github]");
+    expect(block).toContain("[mcp_servers.pome-linear]");
+    // One export line carrying both twins' URLs, the shared token once, the alias once.
+    expect(block).toContain(
+      `export POME_GITHUB_REST_URL=${github.restUrl} POME_GITHUB_MCP_URL=${github.mcpUrl} POME_LINEAR_REST_URL=${linear.restUrl} POME_LINEAR_MCP_URL=${linear.mcpUrl} POME_AUTH_TOKEN=${TOKEN} POME_LINEAR_TOKEN=${TOKEN}`,
+    );
+    expect(block.split("POME_AUTH_TOKEN=").length - 1).toBe(1);
+    // One .mcp.json with both servers.
+    const stanza = block.slice(block.indexOf("  {"), block.indexOf("Your own code")).trim();
+    const parsed = JSON.parse(stanza.replace(/\n {2}/g, "\n")) as { mcpServers: Record<string, unknown> };
+    expect(Object.keys(parsed.mcpServers)).toEqual(["pome-github", "pome-linear"]);
+    // One SDK section per twin.
+    expect(block).toContain("Your own code, through GitHub's SDK (Octokit):");
+    expect(block).toContain("Your own code, through Linear's SDK:");
+    // A one-element array is the single-twin block, byte for byte.
+    expect(renderConnectSnippets([github])).toBe(renderConnectSnippets(github));
+  });
+
   it("renders the block in the order a reader picks a client; the token appears only where it is pasted into a shell", () => {
     const block = renderConnectSnippets(inputFor("github"));
     const at = (needle: string) => {

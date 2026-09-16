@@ -28,6 +28,16 @@ one-liner, the `[mcp_servers.pome-<twin>]` table for `~/.codex/config.toml`, a
 repo), and the line that points the vendor SDK at the twin. Nothing already
 printed moves or changes.
 
+**`pome twin start` boots several twins at once** (F-1836). `pome twin start
+github slack linear` starts all three in one process, each on its own port
+(its default, else the next free one; with `--port` the first twin takes that
+port and the rest count up from it), prints one status block per twin and one
+shared connect block, and stops all of them on Ctrl-C. `.pome/twin-status.json`
+now holds one entry per twin under `twins`, so a second `twin start` in the same
+folder adds to it instead of replacing it; the top-level fields still mirror the
+twin just started, so `jq -r .rest_url` keeps working. `pome twin status`
+reports each entry. One twin behaves exactly as before.
+
 ## 0.43.1 — 2026-09-15
 
 **`pome twin start` writes `.pome/twin-status.json` owner-only** (F-1800). The
