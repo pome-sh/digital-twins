@@ -21,6 +21,11 @@ one it corrects.
 requests and the `stale` check-run conclusion come from the official schema.
 The HTTP tape is unchanged.
 
+**The npm page says what the repo says** (F-1826). `@pome-sh/cli`'s
+description is the wedge sentence — "Test mode for your integrations, built
+for the way agents build." — and its keywords match the repository topics
+(`mcp`, `mcp-server`, `model-context-protocol`, `claude-code`, `codex`,
+`testing`, `sandbox`, `api-mocking`, the five twins). No code changes.
 **`pome --help` opens with the twin door** (F-1838). The first line now says
 what a twin is and names `pome twin start <twin>` as the way in; `twin` is the
 first command listed, and `init`, `run`, `eval`, `inspect`, `fix-prompt`, the
