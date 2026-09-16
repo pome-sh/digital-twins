@@ -47,16 +47,16 @@
     "fidelity:parity": "tsx scripts/fidelity-parity.ts"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.0",
+    "@hono/node-server": "^2.1.1",
     "@pome-sh/sdk": "*",
-    "graphql": "^16.11.0",
-    "hono": "^4.13.0",
-    "zod": "^4.4.3"
+    "graphql": "^16.14.2",
+    "hono": "^4.13.8",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@linear/sdk": "^55.0.0",
-    "@types/node": "^26.1.2",
-    "tsx": "^4.23.5",
+    "@linear/sdk": "^55.2.1",
+    "@types/node": "^26.6.1",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "vitest": "^5.0.1"
   },

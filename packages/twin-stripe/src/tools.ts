@@ -407,10 +407,32 @@ export function stripeToolInputSchema(schema: z.ZodType): unknown {
   const candidate = (z as unknown as { toJSONSchema?: (schema: z.ZodTypeAny) => unknown }).toJSONSchema;
   if (typeof candidate === "function") {
     try {
-      return candidate(schema);
+      return rewriteNullableTypeArray(candidate(schema));
     } catch {
       return {};
     }
   }
   return {};
+}
+
+/** Zod 4.6 emits `{type:["string","null"]}`; the frozen fixture uses `anyOf`. */
+function rewriteNullableTypeArray(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(rewriteNullableTypeArray);
+  if (!value || typeof value !== "object") return value;
+  const rec = value as Record<string, unknown>;
+  const next: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(rec)) {
+    if (
+      key === "type" &&
+      Array.isArray(child) &&
+      child.length === 2 &&
+      child.includes("string") &&
+      child.includes("null")
+    ) {
+      next.anyOf = [{ type: "string" }, { type: "null" }];
+      continue;
+    }
+    next[key] = rewriteNullableTypeArray(child);
+  }
+  return next;
 }

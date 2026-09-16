@@ -27,7 +27,8 @@ import {
 // to the single-rail Base/USDC deposit flow.
 type PaymentIntent_Allow =
   | "source" | "customer_account" | "excluded_payment_method_types" | "hooks"
-  | "managed_payments" | "payment_details" | "presentment_details";
+  | "managed_payments" | "payment_details" | "presentment_details"
+  | "allowed_payment_method_types";
 const _cov_paymentIntentJson: AssertNoUncovered<PaymentIntent, ReturnType<typeof paymentIntentJson>, PaymentIntent_Allow> = true;
 
 // Charge leaves the twin does not model: `source` (legacy), `refunds` (the twin
@@ -45,7 +46,8 @@ const _cov_chargeJson: AssertNoUncovered<Charge, ReturnType<typeof chargeJson>, 
 type Refund_Allow =
   | "description" | "next_action" | "presentment_details"
   | "failure_balance_transaction" | "destination_details" | "failure_reason"
-  | "instructions_email" | "pending_reason";
+  | "instructions_email" | "pending_reason"
+  | "customer" | "payment_method" | "customer_account";
 const _cov_refundJson: AssertNoUncovered<Refund, ReturnType<typeof refundJson>, Refund_Allow> = true;
 
 // BalanceTransaction omits `balance_type` (the twin models a single settlement
@@ -68,9 +70,12 @@ const _cov_balanceJson: AssertNoUncovered<Balance, ReturnType<typeof balanceJson
 
 // The one INPUT anchor. Unlike the lines above it has no `_Allow` union, and that is
 // the point: an accepted-value set has no legitimate "deliberately not.
+// Stripe 22.6 widened Reason with an open-enum brand. Keep only named
+// string literals so a new accepted reason still fails this file by name.
+type NamedString<T> = T extends `${infer L}` ? (string extends L ? never : T) : never;
 const _cov_refundCreateReasons: AssertSameMembers<
   (typeof STRIPE_REFUND_REASONS)[number],
-  Stripe.RefundCreateParams.Reason
+  NamedString<Stripe.RefundCreateParams.Reason>
 > = true;
 
 // Reference the consts so noUnusedLocals (if enabled) stays quiet; zero runtime cost.
