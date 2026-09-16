@@ -158,6 +158,10 @@ See [`packages/README.md`](./packages/README.md) for the package map. See [`CONT
 
 Contributions are welcome, and the easiest first ones are seeds and showcases; [`CONTRIBUTING.md`](./CONTRIBUTING.md) says where to start and what a pull request needs. A new twin is a package that satisfies the runtime contract in [`CONTRACT.md`](./CONTRACT.md). A bug report is most useful with the tape attached (`pome twin tape --json`); a security problem goes to [`SECURITY.md`](./SECURITY.md), not to a public issue.
 
+## Telemetry
+
+The CLI sends one anonymous usage event per day, at most: a random id it minted once and keeps in `~/.pome/telemetry.json`, the CLI version, the OS, the Node major, and the command's name (`twin start`, `init`). Never an argument, a path, a repo name, a seed, a token or anything from a tape. The first send prints a one-line notice. Turn it off with `POME_TELEMETRY=0`; `DO_NOT_TRACK=1` is honoured too, and nothing is sent when `CI` is set or from a build made without an ingest key. The code is [`cli/src/cli/usageTick.ts`](./cli/src/cli/usageTick.ts).
+
 ## Status and license
 
 Pome is in beta. CLI behavior and dependencies can change before version 1.0.
