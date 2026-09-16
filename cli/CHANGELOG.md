@@ -26,6 +26,11 @@ description is the wedge sentence — "Test mode for your integrations, built
 for the way agents build." — and its keywords match the repository topics
 (`mcp`, `mcp-server`, `model-context-protocol`, `claude-code`, `codex`,
 `testing`, `sandbox`, `api-mocking`, the five twins). No code changes.
+**`pome --help` opens with the twin door** (F-1838). The first line now says
+what a twin is and names `pome twin start <twin>` as the way in; `twin` is the
+first command listed, and `init`, `run`, `eval`, `inspect`, `fix-prompt`, the
+hosted commands and `capture-server` sit under a "Going further:" group. No
+command was renamed or removed.
 
 ## 0.44.0 — 2026-09-16
 
