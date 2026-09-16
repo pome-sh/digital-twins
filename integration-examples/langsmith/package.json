@@ -11,8 +11,8 @@
     "task:write": "tsx scripts/write-task.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.105",
-    "ai": "^6.0.241",
+    "@ai-sdk/anthropic": "^4.0.54",
+    "ai": "^7.0.102",
     "langsmith": "^0.9.0",
     "zod": "^4.4.3"
   },
@@ -20,7 +20,7 @@
     "@types/node": "^25.9.5",
     "tsx": "^4.23.5",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.1"
   },
   "engines": {
     "node": ">=24"

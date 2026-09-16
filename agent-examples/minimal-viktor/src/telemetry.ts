@@ -4,7 +4,7 @@
  * `pome run` (hosted) injects POME_OTEL_EXPORTER_OTLP_ENDPOINT — a FULL traces
  * URL (`<base>/v1/sessions/<id>/traces`) — plus POME_OTEL_EXPORTER_OTLP_HEADERS
  * as "k=v,k=v" (carries the team x-api-key). When present, the Vercel AI SDK's
- * experimental_telemetry emits gen_ai.* spans through this tracer and they land
+ * `experimental_telemetry` + `@ai-sdk/otel` emit gen_ai.* spans through this tracer and they land
  * on the run's Agent-telemetry panel. Without the endpoint this module is an
  * inert no-op so the agent also runs standalone.
  */
