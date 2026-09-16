@@ -156,7 +156,7 @@ The shared runtime provides HTTP routing, bearer authentication, MCP dispatch, r
 
 See [`packages/README.md`](./packages/README.md) for the package map. See [`CONTRACT.md`](./CONTRACT.md) for the twin runtime contract.
 
-Contributions are welcome, and the easiest first ones are seeds and showcases. A new twin is a package that satisfies the runtime contract in [`CONTRACT.md`](./CONTRACT.md). A bug report is most useful with the tape attached.
+Contributions are welcome, and the easiest first ones are seeds and showcases; [`CONTRIBUTING.md`](./CONTRIBUTING.md) says where to start and what a pull request needs. A new twin is a package that satisfies the runtime contract in [`CONTRACT.md`](./CONTRACT.md). A bug report is most useful with the tape attached (`pome twin tape --json`); a security problem goes to [`SECURITY.md`](./SECURITY.md), not to a public issue.
 
 ## Status and license
 
