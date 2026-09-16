@@ -246,6 +246,12 @@ jobs:
         if: matrix.enabled == 'true'
         env:
           POME_GIT_SHA: ${{ github.sha }}
+          # The CLI's daily usage tick (F-1832) needs a PostHog project key and
+          # host baked in at build time. Repository VARIABLES, not secrets: a
+          # project key is write-only by design and ships in the public binary
+          # anyway. Unset → the published CLI sends nothing.
+          POME_TELEMETRY_KEY: ${{ vars.POME_TELEMETRY_KEY }}
+          POME_TELEMETRY_HOST: ${{ vars.POME_TELEMETRY_HOST }}
         run: npm run build
       # Every internal @pome-sh/* package is bundled into the two published
       # tarballs, so a third-party dep of an inlined package that is not
