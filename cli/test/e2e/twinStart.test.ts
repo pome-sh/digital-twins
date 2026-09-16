@@ -125,6 +125,13 @@ describe("pome twin start (e2e)", () => {
       });
       expect(viaPrintedToken.status).toBe(200);
 
+      // The connect block names the same MCP URL and token the banner printed,
+      // in the form `claude mcp add` takes as pasted (F-1827).
+      expect(output).toContain(
+        `claude mcp add --transport http pome-github ${base}/s/standalone/mcp --header "Authorization: Bearer ${printed}"`,
+      );
+      expect(output).toContain("[mcp_servers.pome-github]");
+
       // Foreground contract: Ctrl-C stops the server and exits 0.
       child.kill("SIGINT");
       await expect(exited).resolves.toBe(0);

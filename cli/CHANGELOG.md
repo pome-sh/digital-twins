@@ -15,6 +15,15 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
+## Unreleased (patch)
+
+**`pome twin start` prints paste-ready connect snippets** (F-1827). Under the
+banner, after the `POME_*` lines: the `claude mcp add --transport http … --header`
+one-liner, the `[mcp_servers.pome-<twin>]` table for `~/.codex/config.toml`, a
+`.mcp.json` stanza (with `${POME_AUTH_TOKEN}`, so nothing secret lands in the
+repo), and the line that points the vendor SDK at the twin. Nothing already
+printed moves or changes.
+
 ## 0.43.1 — 2026-09-15
 
 **`pome twin start` writes `.pome/twin-status.json` owner-only** (F-1800). The

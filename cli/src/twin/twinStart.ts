@@ -36,6 +36,7 @@ import {
   twinsNamedBy,
 } from "./seedFile.js";
 import { bootTwin } from "./twinHarness.js";
+import { renderConnectSnippets } from "./connectSnippets.js";
 
 /** The fixed session id a standalone twin serves under (`/s/standalone`). */
 const STANDALONE_SID = "standalone";
@@ -330,6 +331,23 @@ export async function runTwinStartCommand(
   // at the root `/healthz`. Print the curl command so copy-paste debugging
   // works without a JWT.
   console.log(`Health check (no auth): curl ${baseUrl}/healthz`);
+  // F-1827 — the URL and token above used to be the whole answer, and the
+  // reader hand-wired them into their client. Print the exact text each
+  // client takes instead, after the env lines so `POME_AUTH_TOKEN=` is still
+  // the first token on the wire for anything that greps for it.
+  console.log("");
+  console.log(
+    renderConnectSnippets({
+      name,
+      envName: harness.envName,
+      port,
+      restUrl,
+      mcpUrl,
+      token,
+      ...(harness.tokenEnvName ? { tokenEnvName: harness.tokenEnvName } : {}),
+    }),
+  );
+  console.log("");
   console.log("Ctrl-C to stop.");
 
   // Foreground server: the bound socket keeps the event loop alive until a
