@@ -7,12 +7,14 @@
 //
 // Twin-agnostic on purpose. Every twin's `exportState()` is a tree of objects
 // whose arrays are collections of rows (repositories, issues, channels,
-// messages, customers, …). Rows are matched by the first identity field the
-// collection carries (`id`, `number`, `full_name`, …), so a row that moved or
-// re-sorted is not an add plus a remove, and a row whose scalar fields
-// changed is "changed" while a row that only gained nested rows reports those
-// under its own path. Nothing here knows a twin's schema; a twin that adds a
-// collection tomorrow diffs the day it ships.
+// messages, customers, …) or memberships of scalars (a channel's member ids).
+// Rows are matched by the first identity field the collection carries
+// (`full_name`, `number`, `name`, …), else by their scalar content (an
+// association table has nothing but ids), so a row that moved or re-sorted is
+// not an add plus a remove, and a row whose scalar fields changed is "changed"
+// while a row that only gained nested rows reports those under its own path.
+// Nothing here knows a twin's schema; a twin that adds a collection tomorrow
+// diffs the day it ships.
 //
 // Pure — no I/O — so the unit test feeds it two trees and reads the entries.
 
@@ -30,13 +32,24 @@ export type CollectionDiff = {
 };
 
 type Row = Record<string, unknown>;
+type Primitive = string | number | boolean | null;
 
 function isRow(value: unknown): value is Row {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function isPrimitive(value: unknown): value is Primitive {
+  return value === null || ["string", "number", "boolean"].includes(typeof value);
+}
+
+/** An array of rows: a collection with identities. */
 function isCollection(value: unknown): value is Row[] {
   return Array.isArray(value) && value.length > 0 && value.every(isRow);
+}
+
+/** An array of scalars: a membership (slack's channel `members`, label ids…). */
+function isMembership(value: unknown): value is Primitive[] {
+  return Array.isArray(value) && value.length > 0 && value.every(isPrimitive);
 }
 
 /**
@@ -59,21 +72,34 @@ export function identityKeyOf(...sides: readonly (readonly Row[])[]): string | u
   return undefined;
 }
 
-function label(row: Row, key: string | undefined, index: number): string {
-  if (key === undefined) return `#${index}`;
+function label(row: Row, key: string, _index: number): string {
   const value = String(row[key]);
   if (key === "number") return `#${value}`;
   return value;
 }
 
-/** A row with its nested collections stripped: what "changed" is judged on. */
+/** A row with its nested collections and memberships stripped: what "changed" is judged on. */
 function scalarsOf(row: Row): Row {
   const out: Row = {};
   for (const [key, value] of Object.entries(row)) {
-    if (isCollection(value) || (Array.isArray(value) && value.length === 0)) continue;
+    if (Array.isArray(value) && (value.length === 0 || isCollection(value) || isMembership(value))) continue;
     out[key] = value;
   }
   return out;
+}
+
+/**
+ * The label of a row that has no identity field: its scalar content, short.
+ * Gmail's message↔label associations are such rows — three ids and nothing
+ * else — and matching them by content is exact, where matching by index
+ * turns one removal into "changed, changed, removed".
+ */
+function contentLabel(row: Row): string {
+  const parts = Object.entries(scalarsOf(row))
+    .slice(0, 3)
+    .map(([key, value]) => `${key}=${typeof value === "string" ? value : JSON.stringify(value)}`);
+  const text = `{${parts.join(", ")}}`;
+  return text.length > 60 ? `${text.slice(0, 59)}…` : text;
 }
 
 function stableStringify(value: unknown): string {
@@ -102,11 +128,17 @@ export function diffState(before: unknown, after: unknown): CollectionDiff[] {
 }
 
 function walk(before: unknown, after: unknown, path: string, out: CollectionDiff[]): void {
-  const beforeRows = isCollection(before) ? before : Array.isArray(before) ? [] : undefined;
-  const afterRows = isCollection(after) ? after : Array.isArray(after) ? [] : undefined;
-  if (beforeRows !== undefined || afterRows !== undefined) {
-    if (beforeRows !== undefined && afterRows !== undefined) {
-      diffCollection(beforeRows, afterRows, path, out);
+  if (Array.isArray(before) || Array.isArray(after)) {
+    const b = Array.isArray(before) ? before : [];
+    const a = Array.isArray(after) ? after : [];
+    if (isMembership(b) || isMembership(a)) {
+      if ((b.length === 0 || isMembership(b)) && (a.length === 0 || isMembership(a))) {
+        diffMembership(b as Primitive[], a as Primitive[], path, out);
+      }
+      return;
+    }
+    if ((b.length === 0 || isCollection(b)) && (a.length === 0 || isCollection(a))) {
+      diffCollection(b as Row[], a as Row[], path, out);
     }
     return;
   }
@@ -118,26 +150,57 @@ function walk(before: unknown, after: unknown, path: string, out: CollectionDiff
   }
 }
 
+/** Scalars in, scalars out: added and removed by value, counted as a multiset. */
+function diffMembership(before: Primitive[], after: Primitive[], path: string, out: CollectionDiff[]): void {
+  const count = (values: Primitive[]) => {
+    const map = new Map<string, number>();
+    for (const value of values) map.set(String(value), (map.get(String(value)) ?? 0) + 1);
+    return map;
+  };
+  const b = count(before);
+  const a = count(after);
+  const entry: CollectionDiff = { path: path || "(root)", added: [], changed: [], removed: [] };
+  for (const [value, n] of a) for (let i = b.get(value) ?? 0; i < n; i += 1) entry.added.push(value);
+  for (const [value, n] of b) for (let i = a.get(value) ?? 0; i < n; i += 1) entry.removed.push(value);
+  if (entry.added.length || entry.removed.length) out.push(entry);
+}
+
 function diffCollection(before: Row[], after: Row[], path: string, out: CollectionDiff[]): void {
   const key = identityKeyOf(before, after);
   const entry: CollectionDiff = { path: path || "(root)", added: [], changed: [], removed: [] };
-  const byId = (rows: Row[]) =>
-    new Map(rows.map((row, index) => [key === undefined ? String(index) : String(row[key]), { row, index }]));
+  // Rows with no identity field are matched by their scalar content (a
+  // repeated identical row gets a counter, so a multiset still matches), and
+  // labelled by it; a row whose content changed is a remove plus an add.
+  const byId = (rows: Row[]) => {
+    const seen = new Map<string, number>();
+    return new Map(
+      rows.map((row, index) => {
+        let id = key === undefined ? stableStringify(scalarsOf(row)) : String(row[key]);
+        if (key === undefined) {
+          const n = seen.get(id) ?? 0;
+          seen.set(id, n + 1);
+          if (n > 0) id = `${id}#${n}`;
+        }
+        return [id, { row, index }] as const;
+      }),
+    );
+  };
+  const name = (row: Row, index: number) => (key === undefined ? contentLabel(row) : label(row, key, index));
   const beforeById = byId(before);
   const afterById = byId(after);
   const nested: Array<{ before: Row; after: Row; label: string }> = [];
   for (const [id, { row, index }] of afterById) {
     const prior = beforeById.get(id);
     if (prior === undefined) {
-      entry.added.push(label(row, key, index));
+      entry.added.push(name(row, index));
     } else {
-      const name = label(row, key, index);
-      if (!sameScalars(prior.row, row)) entry.changed.push(name);
-      nested.push({ before: prior.row, after: row, label: name });
+      const rowName = name(row, index);
+      if (!sameScalars(prior.row, row)) entry.changed.push(rowName);
+      nested.push({ before: prior.row, after: row, label: rowName });
     }
   }
   for (const [id, { row, index }] of beforeById) {
-    if (!afterById.has(id)) entry.removed.push(label(row, key, index));
+    if (!afterById.has(id)) entry.removed.push(name(row, index));
   }
   if (entry.added.length || entry.changed.length || entry.removed.length) out.push(entry);
   for (const pair of nested) {

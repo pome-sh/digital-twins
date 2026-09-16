@@ -38,3 +38,29 @@ describe("writeStandaloneStatusFile", () => {
     expect(JSON.parse(await readFile(path, "utf8"))).toEqual(STATUS);
   });
 });
+
+describe("snapshotStandaloneInitialState", () => {
+  it("removes an earlier boot's snapshot before taking this one, so a failed export leaves none", async () => {
+    const { snapshotStandaloneInitialState, readStandaloneInitialState } = await import(
+      "../../src/twin/twinStatusFile.js"
+    );
+    const dir = join(await mkdtemp(join(tmpdir(), "pome-twin-snapshot-")), "twin-state");
+    await snapshotStandaloneInitialState("github", () => ({ repositories: [] }), dir);
+    expect(await readStandaloneInitialState("github", dir)).toEqual({ repositories: [] });
+
+    const errors: string[] = [];
+    const original = console.error;
+    console.error = (line: string) => { errors.push(line); };
+    try {
+      await snapshotStandaloneInitialState(
+        "github",
+        () => { throw new Error("state introspection is not configured for this twin"); },
+        dir,
+      );
+    } finally {
+      console.error = original;
+    }
+    expect(await readStandaloneInitialState("github", dir)).toBeUndefined();
+    expect(errors.join("\n")).toContain("could not snapshot the github twin's state");
+  });
+});

@@ -68,9 +68,14 @@ const WRITE_VERBS = new Set([
   "transfer", "attach", "detach", "refund", "capture", "confirm", "void", "finalize", "pay",
 ]);
 
+/** `/mcp` (streamable HTTP) and the legacy `/mcp/call`, `/mcp/tools/:name` doors. */
+function isMcpTransport(path: string): boolean {
+  return path === "/mcp" || path.startsWith("/mcp/");
+}
+
 /** Read or write, from the HTTP method for a route and from the verb for an MCP tool. */
 export function requestKind(method: string, path: string, tool: string | null): "read" | "write" {
-  if (tool && path === "/mcp") {
+  if (tool && isMcpTransport(path)) {
     return tool.toLowerCase().split(/[_\-.]/).some((part) => WRITE_VERBS.has(part)) ? "write" : "read";
   }
   return READ_METHODS.has(method) ? "read" : "write";
@@ -128,7 +133,7 @@ export function tapeSummary(rows: readonly TapeRow[]): TapeSummary {
 
 /** What the REQUEST column says: the tool for an MCP call, else the route. */
 export function requestLabel(row: TapeRow): string {
-  if (row.tool && row.path === "/mcp") return row.tool;
+  if (row.tool && isMcpTransport(row.path)) return row.tool;
   if (row.tool) return `${row.method} ${row.path} (${row.tool})`;
   return `${row.method} ${row.path}`;
 }

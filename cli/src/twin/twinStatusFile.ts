@@ -238,9 +238,16 @@ export async function readStandaloneInitialState(
 export async function snapshotStandaloneInitialState(
   name: string,
   exportState: () => unknown | Promise<unknown>,
+  dir: string = STANDALONE_STATE_DIR,
 ): Promise<void> {
+  // An earlier boot's snapshot goes first: if the export or the write fails
+  // below, `--diff` must find nothing rather than silently diff this boot
+  // against the previous one.
+  await unlink(standaloneInitialStatePath(name, dir)).catch((err: NodeJS.ErrnoException) => {
+    if (err.code !== "ENOENT") throw err;
+  });
   try {
-    await writeStandaloneInitialState(name, await exportState());
+    await writeStandaloneInitialState(name, await exportState(), dir);
   } catch (err) {
     console.error(
       `pome twin start: could not snapshot the ${name} twin's state for \`pome twin tape --diff\`: ${(err as Error).message}`,

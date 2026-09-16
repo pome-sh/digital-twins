@@ -78,7 +78,34 @@ describe("diffState", () => {
     const before = { messages: [{ body: "a" }] };
     const after = { messages: [{ body: "a" }, { body: "b" }] };
     expect(diffState(before, after)).toEqual([
-      { path: "messages", added: ["#1"], changed: [], removed: [] },
+      { path: "messages", added: ["{body=b}"], changed: [], removed: [] },
+    ]);
+  });
+
+  it("matches identity-less rows by content, so a removal in the middle is one removal", () => {
+    // Gmail's message↔label associations: three ids, no identity field.
+    const assoc = (message: string, labelId: string) => ({ mailbox_id: "me", message_id: message, label_id: labelId });
+    const before = { messageLabels: [assoc("m1", "INBOX"), assoc("m2", "INBOX"), assoc("m3", "STARRED")] };
+    const after = { messageLabels: [assoc("m1", "INBOX"), assoc("m3", "STARRED")] };
+    expect(diffState(before, after)).toEqual([
+      {
+        path: "messageLabels",
+        added: [],
+        changed: [],
+        removed: ["{mailbox_id=me, message_id=m2, label_id=INBOX}"],
+      },
+    ]);
+    // Two identical rows are a multiset: dropping one of them is one removal.
+    const twice = { rows: [assoc("m1", "INBOX"), assoc("m1", "INBOX")] };
+    const once = { rows: [assoc("m1", "INBOX")] };
+    expect(diffState(twice, once)[0]?.removed).toHaveLength(1);
+  });
+
+  it("diffs a membership of scalars by value, without marking the owner changed", () => {
+    const before = { channels: [{ id: "C1", name: "general", members: ["U1", "U2"] }] };
+    const after = { channels: [{ id: "C1", name: "general", members: ["U2", "U3"] }] };
+    expect(diffState(before, after)).toEqual([
+      { path: "channels[general].members", added: ["U3"], changed: [], removed: ["U1"] },
     ]);
   });
 

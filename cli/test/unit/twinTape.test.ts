@@ -52,6 +52,19 @@ describe("tapeRows", () => {
     expect(rows.map((row) => row.state_mutation)).toEqual([true, false, true, false, false, false]);
   });
 
+  it("classifies a tool by its verb on the legacy /mcp/call and /mcp/tools doors too", async () => {
+    const events = JSON.parse(await readFile(FIXTURE, "utf8")) as Record<string, unknown>[];
+    const listIssues = events[5]!;
+    const viaCall = { ...listIssues, path: "/s/standalone/mcp/call" };
+    const viaTools = { ...listIssues, path: "/s/standalone/mcp/tools/list_issues" };
+    const rows = tapeRows([viaCall, viaTools], "/s/standalone");
+    expect(rows.map((row) => row.kind)).toEqual(["read", "read"]);
+    expect(rows.map((row) => row.note)).toEqual([null, null]);
+    expect(rows.map(requestLabel)).toEqual(["list_issues", "list_issues"]);
+    // A REST route with a stamped tool keeps the HTTP method as the authority.
+    expect(rows.length).toBe(2);
+  });
+
   it("refuses a tape that is not a list, or a row that is not a recorded event", () => {
     expect(() => tapeRows({ events: [] }, "/s/standalone")).toThrow("something other than a list");
     expect(() => tapeRows([{ hello: "world" }], "/s/standalone")).toThrow("event 1 on the tape is not a recorded event");
