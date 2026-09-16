@@ -28,6 +28,11 @@ command's name (`twin start`, `init`); never an argument, a path, a repo name
 or anything from a tape. The first send prints a one-line notice on stderr.
 `POME_TELEMETRY=0` (or `DO_NOT_TRACK=1`) turns it off; nothing is sent when
 `CI` is set, and nothing is sent from a build made without an ingest key.
+**The npm page says what the repo says** (F-1826). `@pome-sh/cli`'s
+description is the wedge sentence — "Test mode for your integrations, built
+for the way agents build." — and its keywords match the repository topics
+(`mcp`, `mcp-server`, `model-context-protocol`, `claude-code`, `codex`,
+`testing`, `sandbox`, `api-mocking`, the five twins). No code changes.
 **`pome --help` opens with the twin door** (F-1838). The first line now says
 what a twin is and names `pome twin start <twin>` as the way in; `twin` is the
 first command listed, and `init`, `run`, `eval`, `inspect`, `fix-prompt`, the
