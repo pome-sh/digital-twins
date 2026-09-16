@@ -2,7 +2,7 @@
   "package": "@pome-sh/wire",
   "version": "0.4.2",
   "zod": {
-    "range": "^4.1.13",
+    "range": "^4.6.5",
     "major": 4
   },
   "exports": {
