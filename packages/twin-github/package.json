@@ -51,18 +51,18 @@
     "fidelity:parity": "tsx scripts/fidelity-parity.ts"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.0",
+    "@hono/node-server": "^2.1.1",
     "@pome-sh/sdk": "*",
     "@pome-sh/wire": "*",
-    "hono": "^4.13.0",
-    "zod": "^4.4.3"
+    "hono": "^4.13.8",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@octokit/openapi-types": "^29.0.1",
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.6.1",
     "@vitest/coverage-v8": "^5.0.1",
-    "tsx": "^4.23.5",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "vitest": "^5.0.1"
   },
