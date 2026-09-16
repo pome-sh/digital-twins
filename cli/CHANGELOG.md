@@ -15,7 +15,7 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
-## Unreleased (minor)
+## 0.44.0 — 2026-09-16
 
 **Adapter signals are no longer captured or uploaded** (F-1822). `pome run` no
 longer sets `POME_ADAPTER_SIGNALS_PATH`, writes `signals.jsonl`, or sends
