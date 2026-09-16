@@ -8,7 +8,7 @@
 // because it carries the bearer JWT (F-1800).
 
 import { chmod, mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import type { TwinName } from "./registry.js";
 
 /** Where `pome twin start` records the running twin, relative to the cwd. */
@@ -178,5 +178,79 @@ export async function readStandaloneStatusFile(
     return JSON.parse(await readFile(path, "utf8")) as unknown;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * Where `twin start` snapshots each twin's state at boot, for
+ * `pome twin tape --diff` (F-1837): the diff is "now against this file", which
+ * is exactly "now against the seed the twin booted with", taken in the same
+ * process so generated ids match. Owner-only like the status file — a state
+ * export can carry seeded secrets even after redaction.
+ */
+export const STANDALONE_STATE_DIR = ".pome/twin-state";
+
+export function standaloneInitialStatePath(
+  name: string,
+  dir: string = STANDALONE_STATE_DIR,
+): string {
+  return join(dir, `${name}.initial.json`);
+}
+
+export async function writeStandaloneInitialState(
+  name: string,
+  state: unknown,
+  dir: string = STANDALONE_STATE_DIR,
+): Promise<void> {
+  const path = standaloneInitialStatePath(name, dir);
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+  const tmp = `${path}.${process.pid}.tmp`;
+  await writeFile(tmp, JSON.stringify(state), { mode: 0o600 });
+  await rename(tmp, path);
+  await chmod(path, 0o600);
+}
+
+/** The boot snapshot, or `undefined` when there is none; a corrupt one is named. */
+export async function readStandaloneInitialState(
+  name: string,
+  dir: string = STANDALONE_STATE_DIR,
+): Promise<unknown> {
+  const path = standaloneInitialStatePath(name, dir);
+  let raw: string;
+  try {
+    raw = await readFile(path, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw err;
+  }
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    throw new Error(`pome twin tape: ${path} is not valid JSON — restart the twin to rewrite it.`);
+  }
+}
+
+/**
+ * `twin start`'s side of the snapshot. A failure here must not stop a boot —
+ * the snapshot only feeds `twin tape --diff` — so it is said on stderr and
+ * the twin serves anyway; `--diff` then says the file is missing.
+ */
+export async function snapshotStandaloneInitialState(
+  name: string,
+  exportState: () => unknown | Promise<unknown>,
+  dir: string = STANDALONE_STATE_DIR,
+): Promise<void> {
+  // An earlier boot's snapshot goes first: if the export or the write fails
+  // below, `--diff` must find nothing rather than silently diff this boot
+  // against the previous one.
+  await unlink(standaloneInitialStatePath(name, dir)).catch((err: NodeJS.ErrnoException) => {
+    if (err.code !== "ENOENT") throw err;
+  });
+  try {
+    await writeStandaloneInitialState(name, await exportState(), dir);
+  } catch (err) {
+    console.error(
+      `pome twin start: could not snapshot the ${name} twin's state for \`pome twin tape --diff\`: ${(err as Error).message}`,
+    );
   }
 }

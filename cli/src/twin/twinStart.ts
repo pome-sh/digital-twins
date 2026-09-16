@@ -31,7 +31,11 @@ import {
 import { bootTwin, type TwinHarness } from "./twinHarness.js";
 import { renderConnectSnippets, type ConnectSnippetInput } from "./connectSnippets.js";
 import { chooseStandalonePorts } from "./twinPorts.js";
-import { updateStandaloneStatusFile, type StandaloneStatus } from "./twinStatusFile.js";
+import {
+  snapshotStandaloneInitialState,
+  updateStandaloneStatusFile,
+  type StandaloneStatus,
+} from "./twinStatusFile.js";
 
 // The status file and the port choice have their own modules; re-exported so
 // `pome twin status` and the tests keep one import path for the command.
@@ -346,6 +350,8 @@ export async function runTwinStartCommand(
         twinBaseUrl: baseUrl,
       });
       booted.push({ twin, port, baseUrl, harness });
+      // The boot snapshot `twin tape --diff` diffs against (F-1837); nothing listens yet.
+      await snapshotStandaloneInitialState(twin, () => harness.exportState());
     }
   } catch (err) {
     for (const entry of booted) await entry.harness.close();
