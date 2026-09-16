@@ -28,6 +28,11 @@ command's name (`twin start`, `init`); never an argument, a path, a repo name
 or anything from a tape. The first send prints a one-line notice on stderr.
 `POME_TELEMETRY=0` (or `DO_NOT_TRACK=1`) turns it off; nothing is sent when
 `CI` is set, and nothing is sent from a build made without an ingest key.
+**`pome --help` opens with the twin door** (F-1838). The first line now says
+what a twin is and names `pome twin start <twin>` as the way in; `twin` is the
+first command listed, and `init`, `run`, `eval`, `inspect`, `fix-prompt`, the
+hosted commands and `capture-server` sit under a "Going further:" group. No
+command was renamed or removed.
 
 ## 0.44.0 — 2026-09-16
 
