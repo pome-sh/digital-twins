@@ -15,6 +15,10 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
+## Unreleased (patch)
+
+The daily usage tick is live in this build. 0.45.0 was published with an empty telemetry key: the release job's own `npm publish` rebuilt the CLI through `prepublishOnly` without the build-time variables, so that version sends nothing and shows no notice. Nothing changes for anyone who set `POME_TELEMETRY=0`, `DO_NOT_TRACK`, or runs in CI.
+
 ## 0.45.0 — 2026-09-16
 
 **The GitHub twin types against `@octokit/openapi-types` v29.** Stacked pull
