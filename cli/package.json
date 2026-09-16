@@ -1,6 +1,6 @@
 {
   "name": "@pome-sh/cli",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "description": "Test mode for your integrations, built for the way agents build. Local, stateful twins of GitHub, Slack, Stripe, Gmail and Linear, over REST and MCP.",
   "keywords": [
     "mcp",

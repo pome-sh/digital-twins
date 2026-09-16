@@ -15,7 +15,7 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
-## Unreleased (minor)
+## 0.45.0 — 2026-09-16
 
 **The GitHub twin types against `@octokit/openapi-types` v29.** Stacked pull
 requests and the `stale` check-run conclusion come from the official schema.

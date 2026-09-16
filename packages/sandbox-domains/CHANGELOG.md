@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.4.1 — 2026-09-16
 
 **`@octokit/openapi-types` is v29.** Shipped GitHub schema types pick up
 stacked pull requests and the `stale` check-run conclusion. No runtime API

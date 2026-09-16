@@ -4,7 +4,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
-## Unreleased (patch)
+## 0.4.3 — 2026-09-16
 
 **Dev-only: vitest 5.** Test runner only; no exported API change.
 
