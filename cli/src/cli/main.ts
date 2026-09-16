@@ -1221,8 +1221,8 @@ export function createProgram() {
   twin
     .command("start")
     .argument(
-      "[name]",
-      `Twin name (${TWIN_NAME_LIST.join(" | ")}). Optional when --seed names exactly one twin.`,
+      "[names...]",
+      `Twin names (${TWIN_NAME_LIST.join(" | ")}). One, or several to boot together (each on its own port). Optional when --seed names exactly one twin.`,
     )
     .option(
       "--port <port>",
@@ -1232,18 +1232,18 @@ export function createProgram() {
         (twin) => TWIN_REGISTRY[twin].portEnvName,
       )
         .map((twin) => `${TWIN_REGISTRY[twin].portEnvName}/${TWIN_REGISTRY[twin].defaultPort} for ${twin}`)
-        .join(", ")}, otherwise 3333)`,
+        .join(", ")}, otherwise 3333). With several twins: the first twin's port; the rest take the next free ports above it. Without it, each twin takes its default port, else the next free one.`,
     )
     .option(
       "--seed <path>",
-      "Boot this twin from a JSON or YAML seed file instead of its default. A seed REPLACES the default; it does not merge. Takes the per-twin envelope { <twin>: { … } } or one twin's flat seed. Overrides POME_SEED_JSON.",
+      "Boot from a JSON or YAML seed file instead of the default. A seed REPLACES the default; it does not merge. Takes the per-twin envelope { <twin>: { … } } or one twin's flat seed (several twins need the envelope, one entry per named twin). Overrides POME_SEED_JSON.",
     )
     .description(
-      "Start a standalone twin as a long-lived foreground server (Ctrl-C to stop)",
+      "Start one or more standalone twins as a long-lived foreground server (Ctrl-C to stop)",
     )
-    .action(async (name: string | undefined, options: { port?: string; seed?: string }) => {
+    .action(async (names: string[], options: { port?: string; seed?: string }) => {
       const { runTwinStartCommand } = await import("../twin/twinStart.js");
-      await runTwinStartCommand(name, options);
+      await runTwinStartCommand(names, options);
     });
 
   twin
@@ -1263,9 +1263,9 @@ export function createProgram() {
 
   twin
     .command("status")
-    .summary("Say whether the local twin is running")
+    .summary("Say whether the local twins are running")
     .description(
-      "Say whether the twin `pome twin start` last booted here is still running, and print its paste-able env lines",
+      "Say whether each twin `pome twin start` booted here is still running, and print its paste-able env lines",
     )
     .action(async () => {
       const statusPath = ".pome/twin-status.json";
@@ -1276,39 +1276,46 @@ export function createProgram() {
       // `twin start` writes this file non-atomically, so a Ctrl-C or a full disk
       // mid-write leaves it truncated. Validate every field this command prints
       // BEFORE printing any of it — one named message, not `Invalid URL` or an
-      // `undefined twin —` line above a TypeError.
-      let status: { name: string; rest_url: string; mcp_url: string; auth_token: string };
-      let origin: string;
+      // `undefined twin —` line above a TypeError. The file holds one entry per
+      // twin under `twins` (F-1836); an older single-twin file is one entry.
+      const { standaloneStatusEntries } = await import("../twin/twinStart.js");
+      let entries: { name: string; rest_url: string; mcp_url: string; auth_token: string; origin: string }[];
       try {
-        status = JSON.parse(await readFile(statusPath, "utf8"));
-        if (typeof status.name !== "string" || status.name === "") throw new Error("no name");
-        origin = new URL(status.rest_url).origin;
+        entries = standaloneStatusEntries(JSON.parse(await readFile(statusPath, "utf8"))).map(
+          (status) => ({ ...status, origin: new URL(status.rest_url).origin }),
+        );
+        if (entries.length === 0 || entries.some((status) => status.name === "")) {
+          throw new Error("no twins");
+        }
       } catch {
         throw new Error(
           `pome twin status: ${statusPath} is unreadable — start a twin with \`pome twin start <${TWIN_NAME_LIST.join("|")}>\`.`,
         );
       }
-      // Nothing deletes the status file, so it outlives Ctrl-C, a SIGKILL and a
-      // failed bind. A 200 alone does not mean the twin is back: 3333/3336/3337
-      // are ordinary dev-server ports, and any other server on one would pass.
-      // `/healthz` names the twin serving it, so that is the discriminator.
-      const running = await fetch(`${origin}/healthz`, {
-        signal: AbortSignal.timeout(1000),
-      }).then(
-        async (res) =>
-          res.ok &&
-          ((await res.json().catch(() => ({}))) as { twin?: string }).twin === status.name,
-        () => false,
-      );
-      console.log(
-        running
-          ? `${status.name} twin — running`
-          : `${status.name} twin — not running (stale ${statusPath})`,
-      );
-      const envName = TWIN_REGISTRY[status.name as TwinName]?.envName ?? status.name.toUpperCase();
-      console.log(`POME_${envName}_REST_URL=${status.rest_url}`);
-      console.log(`POME_${envName}_MCP_URL=${status.mcp_url}`);
-      console.log(`POME_AUTH_TOKEN=${status.auth_token}`);
+      for (const [index, status] of entries.entries()) {
+        // Nothing deletes the status file, so it outlives Ctrl-C, a SIGKILL and a
+        // failed bind. A 200 alone does not mean the twin is back: 3333/3336/3337
+        // are ordinary dev-server ports, and any other server on one would pass.
+        // `/healthz` names the twin serving it, so that is the discriminator.
+        const running = await fetch(`${status.origin}/healthz`, {
+          signal: AbortSignal.timeout(1000),
+        }).then(
+          async (res) =>
+            res.ok &&
+            ((await res.json().catch(() => ({}))) as { twin?: string }).twin === status.name,
+          () => false,
+        );
+        if (index > 0) console.log("");
+        console.log(
+          running
+            ? `${status.name} twin — running`
+            : `${status.name} twin — not running (stale ${statusPath})`,
+        );
+        const envName = TWIN_REGISTRY[status.name as TwinName]?.envName ?? status.name.toUpperCase();
+        console.log(`POME_${envName}_REST_URL=${status.rest_url}`);
+        console.log(`POME_${envName}_MCP_URL=${status.mcp_url}`);
+        console.log(`POME_AUTH_TOKEN=${status.auth_token}`);
+      }
     });
 
   program
