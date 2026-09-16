@@ -23,7 +23,7 @@
 // to ship in a public binary.
 
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, open, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -63,10 +63,16 @@ export function telemetryDestination(env: NodeJS.ProcessEnv = process.env): Usag
   return { key, host };
 }
 
-/** The variable that turned telemetry off, or `undefined` when it is on. */
+/**
+ * The variable that turned telemetry off, or `undefined` when it is on.
+ * `POME_TELEMETRY` is off for `0`/`false`/`off`/`no`. `DO_NOT_TRACK` and `CI`
+ * count as set for any value but empty or `0` — `DO_NOT_TRACK=false` is a
+ * person who typed the variable, and a CI that exports `CI=false` is still a
+ * CI; the conservative reading sends less, never more.
+ */
 export function telemetryOptOut(env: NodeJS.ProcessEnv = process.env): string | undefined {
   const off = (value: string | undefined) => value !== undefined && /^(0|false|off|no)$/i.test(value.trim());
-  const set = (value: string | undefined) => value !== undefined && value !== "" && !/^(0|false)$/i.test(value.trim());
+  const set = (value: string | undefined) => value !== undefined && value.trim() !== "" && value.trim() !== "0";
   if (off(env.POME_TELEMETRY)) return "POME_TELEMETRY";
   if (set(env.DO_NOT_TRACK)) return "DO_NOT_TRACK";
   if (set(env.CI)) return "CI";
@@ -132,6 +138,41 @@ async function writeState(path: string, state: UsageState): Promise<void> {
   await chmod(path, 0o600);
 }
 
+/** A lock a crashed process left behind is taken over after this long. */
+const STALE_LOCK_MS = 30_000;
+
+/**
+ * Exclusive lock around the read-check-write, so two `pome` processes that
+ * start in the same second do not both read "nothing sent today" and both
+ * send (or mint two ids). `open(…, "wx")` is atomic; a holder that is not
+ * released yields "skip", never a wait — the tick is not worth blocking a
+ * command for.
+ */
+async function withStateLock<T>(path: string, fn: () => Promise<T>): Promise<T | "locked"> {
+  const lockPath = `${path}.lock`;
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  try {
+    const handle = await open(lockPath, "wx", 0o600);
+    await handle.close();
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+    const age = await stat(lockPath).then((s) => Date.now() - s.mtimeMs, () => 0);
+    if (age <= STALE_LOCK_MS) return "locked";
+    await unlink(lockPath).catch(() => undefined);
+    try {
+      const handle = await open(lockPath, "wx", 0o600);
+      await handle.close();
+    } catch {
+      return "locked";
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    await unlink(lockPath).catch(() => undefined);
+  }
+}
+
 export type UsageTickOutcome =
   | { sent: true }
   | { sent: false; reason: "opt-out" | "no-key" | "already-today" | "request-failed"; detail?: string };
@@ -160,14 +201,19 @@ export async function maybeSendUsageTick(input: {
   const today = (input.now ?? new Date()).toISOString().slice(0, 10);
   let state: UsageState;
   try {
-    state = await readState(statePath);
-    if (state.last_sent === today) return { sent: false, reason: "already-today" };
-    if (!state.notice_shown) {
-      (input.notify ?? ((line: string) => console.error(line)))(FIRST_RUN_NOTICE);
-      state.notice_shown = true;
-    }
-    state.last_sent = today;
-    await writeState(statePath, state);
+    const claimed = await withStateLock(statePath, async () => {
+      const current = await readState(statePath);
+      if (current.last_sent === today) return undefined;
+      if (!current.notice_shown) {
+        (input.notify ?? ((line: string) => console.error(line)))(FIRST_RUN_NOTICE);
+        current.notice_shown = true;
+      }
+      current.last_sent = today;
+      await writeState(statePath, current);
+      return current;
+    });
+    if (claimed === "locked" || claimed === undefined) return { sent: false, reason: "already-today" };
+    state = claimed;
   } catch (err) {
     // A home directory that cannot be written is not a reason to fail a
     // command, and without the state file there is no once-a-day guarantee,

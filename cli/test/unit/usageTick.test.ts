@@ -42,10 +42,13 @@ describe("telemetryOptOut", () => {
     expect(telemetryOptOut({ CI: "1" })).toBe("CI");
   });
 
-  it("is on when nothing says otherwise, including DO_NOT_TRACK=0 and CI=false", () => {
+  it("is on when nothing says otherwise; DO_NOT_TRACK=0 and an empty CI are unset, anything else counts", () => {
     expect(telemetryOptOut({})).toBeUndefined();
     expect(telemetryOptOut({ POME_TELEMETRY: "1" })).toBeUndefined();
-    expect(telemetryOptOut({ DO_NOT_TRACK: "0", CI: "false" })).toBeUndefined();
+    expect(telemetryOptOut({ DO_NOT_TRACK: "0", CI: "" })).toBeUndefined();
+    // Conservative: a typed `false` is still a person who typed the variable.
+    expect(telemetryOptOut({ DO_NOT_TRACK: "false" })).toBe("DO_NOT_TRACK");
+    expect(telemetryOptOut({ CI: "false" })).toBe("CI");
   });
 });
 
@@ -118,6 +121,22 @@ describe("maybeSendUsageTick", () => {
     expect(await maybeSendUsageTick({ command: "init", version: "0", env: {}, statePath: path, fetchImpl: impl })).toEqual({ sent: false, reason: "no-key" });
     expect(calls).toHaveLength(0);
     await expect(stat(path)).rejects.toThrow();
+  });
+
+  it("two processes starting together send once: the read-check-write is locked", async () => {
+    const path = await statePath();
+    const { calls, impl } = fakeFetch();
+    const day = new Date("2026-09-16T10:00:00Z");
+    const notices: string[] = [];
+    const results = await Promise.all(
+      Array.from({ length: 6 }, () =>
+        maybeSendUsageTick({ command: "twin start", version: "0", env: ENV, now: day, statePath: path, fetchImpl: impl, notify: (l) => notices.push(l) }),
+      ),
+    );
+    expect(results.filter((r) => r.sent)).toHaveLength(1);
+    expect(calls).toHaveLength(1);
+    expect(notices).toHaveLength(1);
+    await expect(stat(`${path}.lock`)).rejects.toThrow();
   });
 
   it("a failed request does not throw and is not retried until tomorrow", async () => {
