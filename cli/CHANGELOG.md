@@ -39,6 +39,11 @@ first command listed, and `init`, `run`, `eval`, `inspect`, `fix-prompt`, the
 hosted commands and `capture-server` sit under a "Going further:" group. No
 command was renamed or removed.
 
+**`.pome/` git-ignores itself** — `pome twin start` writes `.pome/.gitignore`
+containing `*` the first time it creates the directory, so the status file's
+bearer cannot ride a `git add .` into a commit (the F-1806 class of leak). Your
+own `.pome/.gitignore` is never overwritten.
+
 ## 0.44.0 — 2026-09-16
 
 **Adapter signals are no longer captured or uploaded** (F-1822). `pome run` no

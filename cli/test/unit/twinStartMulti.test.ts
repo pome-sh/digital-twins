@@ -296,6 +296,17 @@ describe("updateStandaloneStatusFile", () => {
     expect(existsSync(`${path}.lock`)).toBe(false);
   });
 
+  it("makes .pome/ git-ignore itself, once", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pome-twin-status-ignore-"));
+    const path = join(dir, ".pome", "twin-status.json");
+    await updateStandaloneStatusFile([entry("github", 3333)], path);
+    expect(await readFile(join(dir, ".pome", ".gitignore"), "utf8")).toBe("*\n");
+    // A user's own edit is kept.
+    await writeFile(join(dir, ".pome", ".gitignore"), "twin-status.json\n");
+    await updateStandaloneStatusFile([entry("slack", 3334)], path);
+    expect(await readFile(join(dir, ".pome", ".gitignore"), "utf8")).toBe("twin-status.json\n");
+  });
+
   it("breaks a stale lock a crashed writer left behind", async () => {
     const dir = await mkdtemp(join(tmpdir(), "pome-twin-status-stale-"));
     const path = join(dir, ".pome", "twin-status.json");

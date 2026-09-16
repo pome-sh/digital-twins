@@ -47,6 +47,23 @@ export async function writeStandaloneStatusFile(
   await chmod(path, 0o600);
 }
 
+/**
+ * `.pome/` git-ignores itself. The status file carries a bearer, and the one
+ * time it was committed (F-1806) it was because nothing stopped `git add .`
+ * in a fresh checkout. A `.gitignore` inside the directory with `*` is the
+ * convention `.vercel/` and `.terraform/` use: no edit to the user's own
+ * `.gitignore`, and it travels with the directory. Written once; a user who
+ * deletes it has decided.
+ */
+export async function ensureSelfIgnoring(dir: string): Promise<void> {
+  const path = join(dir, ".gitignore");
+  try {
+    await writeFile(path, "*\n", { flag: "wx", mode: 0o600 });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+  }
+}
+
 /** A lock that a crashed writer left behind is broken after this long. */
 const STALE_LOCK_MS = 10_000;
 
@@ -101,6 +118,7 @@ export async function updateStandaloneStatusFile(
   path: string = STANDALONE_STATUS_PATH,
 ): Promise<StandaloneStatusFile> {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  await ensureSelfIgnoring(dirname(path));
   return await withStatusLock(path, async () => {
     const merged = mergeStandaloneStatus(await readStandaloneStatusFile(path), entries);
     await writeStandaloneStatusFile(merged, path);
