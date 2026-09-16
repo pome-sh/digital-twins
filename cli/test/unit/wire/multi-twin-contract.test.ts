@@ -207,6 +207,14 @@ describe("finalizeRequestSchema.per_twin_state_keys (finalize-shapes.ts) — LIV
       stripe: { state_final_key: "k/st/final" },
     });
   });
+
+  it("preserves the retired adapter-signals key in replayed requests", () => {
+    const parsed = finalizeRequestSchema.parse({
+      ...base,
+      signals_storage_key: "team-t/session-ses_1/signals.jsonl",
+    });
+    expect(parsed.signals_storage_key).toBe("team-t/session-ses_1/signals.jsonl");
+  });
 });
 
 describe("createSessionResponseSchema — legacy (no per_twin) still normalizes", () => {

@@ -40,6 +40,10 @@ export const finalizeRequestSchema = z.object({
   trace_storage_key: z.string().optional(),
   state_initial_storage_key: z.string().optional(),
   state_final_storage_key: z.string().optional(),
+  // Compatibility-only: older CLI releases supplied this optional key. The
+  // current CLI no longer produces adapter signals, but the public request
+  // schema must continue to parse persisted/replayed finalize requests.
+  signals_storage_key: z.string().optional(),
   // Multi-twin (M3): additive per-twin state storage keys, keyed by twin id.
   // Absent on single-twin sessions, which use the flat state_*_storage_key fields
   // above. Unknown to an older cloud, which strips it and scores the primary twin
