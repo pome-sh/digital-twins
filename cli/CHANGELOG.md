@@ -38,6 +38,15 @@ folder adds to it instead of replacing it; the top-level fields still mirror the
 twin just started, so `jq -r .rest_url` keeps working. `pome twin status`
 reports each entry. One twin behaves exactly as before.
 
+**`pome twin tape` shows what the agent did on a local twin** (F-1837). One
+line per request — time, tool or method + path, status, fidelity, whether
+state changed — with calls the twin does not model (`501 unsupported`) and
+writes that landed nothing marked, so "the agent said it did X" and "X
+happened" cannot be confused. `--diff` adds the state diff since boot per
+collection (added, changed, removed), against a snapshot `twin start` now
+writes to `.pome/twin-state/<twin>.initial.json`; `--json` prints one envelope.
+Reads `.pome/twin-status.json`; no account, no hosted call.
+
 ## 0.43.1 — 2026-09-15
 
 **`pome twin start` writes `.pome/twin-status.json` owner-only** (F-1800). The

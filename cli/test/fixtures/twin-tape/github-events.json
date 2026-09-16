@@ -1,0 +1,367 @@
+[
+  {
+    "ts": "2026-09-16T12:18:15.367Z",
+    "run_id": "standalone",
+    "twin": "github",
+    "request_id": "req_d4468fad-1595-46e5-8ce0-f10cc1874285",
+    "correlation_id": "req_d4468fad-1595-46e5-8ce0-f10cc1874285",
+    "task_step_id": null,
+    "scenario_step_id": null,
+    "step_id": null,
+    "tool_call_id": null,
+    "method": "POST",
+    "path": "/s/standalone/mcp",
+    "request_body": {
+      "tool": "create_issue",
+      "arguments": {
+        "owner": "acme",
+        "repo": "api",
+        "title": "Login page returns 500 after the deploy"
+      }
+    },
+    "request_headers": {
+      "accept": "application/json, text/event-stream",
+      "authorization": "[REDACTED]",
+      "content-length": "171",
+      "content-type": "application/json",
+      "host": "127.0.0.1:3441",
+      "user-agent": "curl/8.7.1"
+    },
+    "tool": "create_issue",
+    "status": 200,
+    "response_body": {
+      "id": 1438608116,
+      "node_id": "I_1438608116",
+      "number": 2,
+      "title": "Login page returns 500 after the deploy",
+      "body": "",
+      "state": "open",
+      "locked": false,
+      "user": {
+        "login": "pome-agent",
+        "id": 2513727887,
+        "node_id": "U_2513727887",
+        "avatar_url": "https://avatars.githubusercontent.com/u/2513727887?v=4",
+        "html_url": "https://github.com/pome-agent",
+        "type": "User",
+        "site_admin": false
+      },
+      "labels": [],
+      "assignee": null,
+      "assignees": [],
+      "comments": 0,
+      "html_url": "https://github.com/acme/api/issues/2",
+      "repository_url": "https://api.github.com/repos/acme/api",
+      "labels_url": "https://api.github.com/repos/acme/api/issues/2/labels{/name}",
+      "comments_url": "https://api.github.com/repos/acme/api/issues/2/comments",
+      "created_at": "2026-09-16T12:18:15.367Z",
+      "updated_at": "2026-09-16T12:18:15.367Z",
+      "closed_at": null
+    },
+    "latency_ms": 1,
+    "fidelity": "semantic",
+    "state_mutation": true,
+    "state_delta": {
+      "before": null,
+      "after": {
+        "repo": "acme/api",
+        "number": 2,
+        "title": "Login page returns 500 after the deploy",
+        "body": "",
+        "state": "open",
+        "user_login": "pome-agent",
+        "assignee_login": null,
+        "labels": [],
+        "assignees": [],
+        "created_at": "2026-09-16T12:18:15.367Z",
+        "updated_at": "2026-09-16T12:18:15.367Z",
+        "closed_at": null
+      }
+    },
+    "error": null
+  },
+  {
+    "ts": "2026-09-16T12:18:15.382Z",
+    "run_id": "standalone",
+    "twin": "github",
+    "request_id": "req_63873eab-08ae-437b-9d3d-dd077766603a",
+    "correlation_id": "req_63873eab-08ae-437b-9d3d-dd077766603a",
+    "task_step_id": null,
+    "scenario_step_id": null,
+    "step_id": null,
+    "tool_call_id": null,
+    "method": "GET",
+    "path": "/s/standalone/repos/acme/api",
+    "request_body": null,
+    "request_headers": {
+      "accept": "*/*",
+      "authorization": "[REDACTED]",
+      "host": "127.0.0.1:3441",
+      "user-agent": "curl/8.7.1"
+    },
+    "tool": null,
+    "status": 200,
+    "response_body": {
+      "id": 1,
+      "node_id": "R_1",
+      "name": "api",
+      "full_name": "acme/api",
+      "owner": {
+        "login": "acme",
+        "id": 2988346,
+        "node_id": "U_2988346",
+        "avatar_url": "https://avatars.githubusercontent.com/u/2988346?v=4",
+        "html_url": "https://github.com/acme",
+        "type": "Organization",
+        "site_admin": false
+      },
+      "private": false,
+      "html_url": "https://github.com/acme/api",
+      "description": "Example API service used by GitHub twin tests.",
+      "fork": false,
+      "url": "https://api.github.com/repos/acme/api",
+      "contents_url": "https://api.github.com/repos/acme/api/contents/{+path}",
+      "issues_url": "https://api.github.com/repos/acme/api/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/acme/api/pulls{/number}",
+      "default_branch": "main",
+      "created_at": "2026-09-16T12:18:14.070Z",
+      "updated_at": "2026-09-16T12:18:14.070Z",
+      "pushed_at": "2026-09-16T12:18:14.070Z"
+    },
+    "latency_ms": 1,
+    "fidelity": "semantic",
+    "state_mutation": false,
+    "state_delta": null,
+    "error": null
+  },
+  {
+    "ts": "2026-09-16T12:18:15.395Z",
+    "run_id": "standalone",
+    "twin": "github",
+    "request_id": "req_096ef1f3-92bc-4f0b-bceb-eb09044df5fb",
+    "correlation_id": "req_096ef1f3-92bc-4f0b-bceb-eb09044df5fb",
+    "task_step_id": null,
+    "scenario_step_id": null,
+    "step_id": null,
+    "tool_call_id": null,
+    "method": "POST",
+    "path": "/s/standalone/repos/acme/api/labels",
+    "request_body": {
+      "name": "p0",
+      "color": "ff0000"
+    },
+    "request_headers": {
+      "accept": "*/*",
+      "authorization": "[REDACTED]",
+      "content-length": "30",
+      "content-type": "application/json",
+      "host": "127.0.0.1:3441",
+      "user-agent": "curl/8.7.1"
+    },
+    "tool": null,
+    "status": 201,
+    "response_body": {
+      "id": 3520,
+      "node_id": "LA_3520",
+      "url": "https://api.github.com/labels/p0",
+      "name": "p0",
+      "color": "ff0000",
+      "default": false,
+      "description": ""
+    },
+    "latency_ms": 3,
+    "fidelity": "semantic",
+    "state_mutation": true,
+    "state_delta": {
+      "before": null,
+      "after": {
+        "repo": "acme/api",
+        "name": "p0",
+        "color": "ff0000",
+        "description": ""
+      }
+    },
+    "error": null
+  },
+  {
+    "ts": "2026-09-16T12:18:15.407Z",
+    "run_id": "standalone",
+    "twin": "github",
+    "request_id": "req_fa8eb7d9-3f05-497a-96ba-869ed9342a59",
+    "correlation_id": "req_fa8eb7d9-3f05-497a-96ba-869ed9342a59",
+    "task_step_id": null,
+    "scenario_step_id": null,
+    "step_id": null,
+    "tool_call_id": null,
+    "method": "POST",
+    "path": "/s/standalone/repos/acme/api/issues/999/comments",
+    "request_body": {
+      "body": "looking"
+    },
+    "request_headers": {
+      "accept": "*/*",
+      "authorization": "[REDACTED]",
+      "content-length": "18",
+      "content-type": "application/json",
+      "host": "127.0.0.1:3441",
+      "user-agent": "curl/8.7.1"
+    },
+    "tool": "add_issue_comment",
+    "status": 404,
+    "response_body": {
+      "message": "Issue not found",
+      "documentation_url": "https://docs.github.com/rest/issues/comments#create-an-issue-comment",
+      "status": "404"
+    },
+    "latency_ms": 1,
+    "fidelity": "semantic",
+    "state_mutation": false,
+    "state_delta": null,
+    "error": "Issue not found"
+  },
+  {
+    "ts": "2026-09-16T12:18:15.418Z",
+    "run_id": "standalone",
+    "twin": "github",
+    "request_id": "req_ae63f7ca-70c7-43d5-8390-f236d05bc14a",
+    "correlation_id": "req_ae63f7ca-70c7-43d5-8390-f236d05bc14a",
+    "task_step_id": null,
+    "scenario_step_id": null,
+    "step_id": null,
+    "tool_call_id": null,
+    "method": "GET",
+    "path": "/s/standalone/nope/unmodelled",
+    "request_body": null,
+    "request_headers": {
+      "accept": "*/*",
+      "authorization": "[REDACTED]",
+      "host": "127.0.0.1:3441",
+      "user-agent": "curl/8.7.1"
+    },
+    "tool": null,
+    "status": 501,
+    "response_body": {
+      "message": "This endpoint is not supported by this GitHub twin.",
+      "_twin": {
+        "fidelity": "unsupported",
+        "supported_surfaces": [
+          "GitHub-shaped REST",
+          "POST /s/:sid/mcp",
+          "GET /s/:sid/mcp/tools",
+          "POST /s/:sid/mcp/tools/:name",
+          "POST /s/:sid/mcp/call"
+        ]
+      }
+    },
+    "latency_ms": 1,
+    "fidelity": "unsupported",
+    "state_mutation": false,
+    "state_delta": null,
+    "error": "This endpoint is not supported by this GitHub twin."
+  },
+  {
+    "ts": "2026-09-16T12:18:15.427Z",
+    "run_id": "standalone",
+    "twin": "github",
+    "request_id": "req_4fea8f3b-3127-4c7a-a616-51d4d818835e",
+    "correlation_id": "req_4fea8f3b-3127-4c7a-a616-51d4d818835e",
+    "task_step_id": null,
+    "scenario_step_id": null,
+    "step_id": null,
+    "tool_call_id": null,
+    "method": "POST",
+    "path": "/s/standalone/mcp",
+    "request_body": {
+      "tool": "list_issues",
+      "arguments": {
+        "owner": "acme",
+        "repo": "api"
+      }
+    },
+    "request_headers": {
+      "accept": "application/json, text/event-stream",
+      "authorization": "[REDACTED]",
+      "content-length": "120",
+      "content-type": "application/json",
+      "host": "127.0.0.1:3441",
+      "user-agent": "curl/8.7.1"
+    },
+    "tool": "list_issues",
+    "status": 200,
+    "response_body": [
+      {
+        "id": 1438608115,
+        "node_id": "I_1438608115",
+        "number": 1,
+        "title": "500 error on POST /orders after deploy",
+        "body": "Started failing right after the 14:00 deploy. Stack trace points to OrderController#create.",
+        "state": "open",
+        "locked": false,
+        "user": {
+          "login": "pome-agent",
+          "id": 2513727887,
+          "node_id": "U_2513727887",
+          "avatar_url": "https://avatars.githubusercontent.com/u/2513727887?v=4",
+          "html_url": "https://github.com/pome-agent",
+          "type": "User",
+          "site_admin": false
+        },
+        "labels": [
+          {
+            "id": 97908,
+            "node_id": "LA_97908",
+            "url": "https://api.github.com/labels/bug",
+            "name": "bug",
+            "color": "d73a4a",
+            "default": false,
+            "description": "Something is not working"
+          }
+        ],
+        "assignee": null,
+        "assignees": [],
+        "comments": 0,
+        "html_url": "https://github.com/acme/api/issues/1",
+        "repository_url": "https://api.github.com/repos/acme/api",
+        "labels_url": "https://api.github.com/repos/acme/api/issues/1/labels{/name}",
+        "comments_url": "https://api.github.com/repos/acme/api/issues/1/comments",
+        "created_at": "2026-09-16T12:18:14.071Z",
+        "updated_at": "2026-09-16T12:18:14.071Z",
+        "closed_at": null
+      },
+      {
+        "id": 1438608116,
+        "node_id": "I_1438608116",
+        "number": 2,
+        "title": "Login page returns 500 after the deploy",
+        "body": "",
+        "state": "open",
+        "locked": false,
+        "user": {
+          "login": "pome-agent",
+          "id": 2513727887,
+          "node_id": "U_2513727887",
+          "avatar_url": "https://avatars.githubusercontent.com/u/2513727887?v=4",
+          "html_url": "https://github.com/pome-agent",
+          "type": "User",
+          "site_admin": false
+        },
+        "labels": [],
+        "assignee": null,
+        "assignees": [],
+        "comments": 0,
+        "html_url": "https://github.com/acme/api/issues/2",
+        "repository_url": "https://api.github.com/repos/acme/api",
+        "labels_url": "https://api.github.com/repos/acme/api/issues/2/labels{/name}",
+        "comments_url": "https://api.github.com/repos/acme/api/issues/2/comments",
+        "created_at": "2026-09-16T12:18:15.367Z",
+        "updated_at": "2026-09-16T12:18:15.367Z",
+        "closed_at": null
+      }
+    ],
+    "latency_ms": 1,
+    "fidelity": "semantic",
+    "state_mutation": false,
+    "state_delta": null,
+    "error": null
+  }
+]

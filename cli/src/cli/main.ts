@@ -1217,7 +1217,9 @@ export function createProgram() {
   const twin = program
     .command("twin")
     .summary("Run a twin on this machine")
-    .description("Start a twin on this machine, print its status or a starter seed file");
+    .description(
+      "Start a twin on this machine, print its status, show its tape, or write a starter seed file",
+    );
   twin
     .command("start")
     .argument(
@@ -1316,6 +1318,27 @@ export function createProgram() {
         console.log(`POME_${envName}_MCP_URL=${status.mcp_url}`);
         console.log(`POME_AUTH_TOKEN=${status.auth_token}`);
       }
+    });
+
+  twin
+    .command("tape")
+    .argument(
+      "[name]",
+      `Twin name (${TWIN_NAME_LIST.join(" | ")}). Optional when one twin is recorded in .pome/twin-status.json.`,
+    )
+    .option(
+      "--diff",
+      "Also print the state diff since the twin booted — its seed, default or --seed — per collection: added, changed, removed.",
+      false,
+    )
+    .option("--json", "Print the tape (and the diff, with --diff) as one JSON envelope.", false)
+    .summary("Show what the agent did on a local twin")
+    .description(
+      "Print the running twin's tape: one line per request with status, fidelity and whether state changed, so a call that claimed success but landed nothing stands out. Reads the twin's address and token from .pome/twin-status.json; no account, no hosted call.",
+    )
+    .action(async (name: string | undefined, options: { diff?: boolean; json?: boolean }) => {
+      const { runTwinTapeCommand } = await import("../twin/twinTape.js");
+      await runTwinTapeCommand(name, options);
     });
 
   program
