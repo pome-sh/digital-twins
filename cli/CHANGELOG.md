@@ -21,6 +21,14 @@ one it corrects.
 requests and the `stale` check-run conclusion come from the official schema.
 The HTTP tape is unchanged.
 
+## Unreleased (patch)
+
+**`pome --help` opens with the twin door** (F-1838). The first line now says
+what a twin is and names `pome twin start <twin>` as the way in; `twin` is the
+first command listed, and `init`, `run`, `eval`, `inspect`, `fix-prompt`, the
+hosted commands and `capture-server` sit under a "Going further:" group. No
+command was renamed or removed.
+
 ## 0.44.0 — 2026-09-16
 
 **Adapter signals are no longer captured or uploaded** (F-1822). `pome run` no
