@@ -29,7 +29,7 @@ npm run typecheck
 
 Twin tests import the SDK from `packages/sdk/dist`, so after editing anything under `packages/sdk/src` run `npm run build -w packages/sdk` before the twin suites will see it. The end-to-end suites boot twins on real ports; another twin already listening on 3333, 3336, 3337 or 3401–3405 will make them fail in confusing ways, so check `pgrep -fl "twin start"` before chasing your own diff.
 
-The map of packages is in [`packages/README.md`](./packages/README.md).
+The map of packages is in [`packages/README.md`](./packages/README.md). If a coding agent is doing the work with you, [`AGENTS.md`](./AGENTS.md) is the file it reads: the domain language, the boundaries, and the rules the lint enforces.
 
 ## What a pull request needs
 
