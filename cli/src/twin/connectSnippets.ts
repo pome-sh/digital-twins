@@ -89,10 +89,14 @@ export function sdkLines(input: ConnectSnippetInput): { label: string; lines: st
         lines: [`new WebClient(process.env.POME_AUTH_TOKEN, { slackApiUrl: ${rest} + "/" })`],
       };
     case "stripe":
+      // Stripe's client takes host/port/protocol and no base path (the twin
+      // answers `/v1/*` at the root for exactly that reason), so the port is
+      // read out of the printed REST URL rather than baked in — a restart on
+      // another port then needs a re-export, not an edit.
       return {
         label: "Stripe's SDK",
         lines: [
-          `new Stripe(process.env.POME_AUTH_TOKEN, { host: "127.0.0.1", port: ${input.port}, protocol: "http" })`,
+          `new Stripe(process.env.POME_AUTH_TOKEN, { host: "127.0.0.1", port: Number(new URL(${rest}).port), protocol: "http" })`,
         ],
       };
     case "gmail":
@@ -113,6 +117,23 @@ export function sdkLines(input: ConnectSnippetInput): { label: string; lines: st
   }
 }
 
+/**
+ * One `export` line carrying every `POME_*` value the banner printed. The
+ * banner's own `NAME=value` lines are kept as they are (things grep for them),
+ * but pasted as-is they set shell variables that no child process — codex,
+ * claude, your own script — can see. This line is the paste that makes the
+ * Codex, `.mcp.json` and SDK snippets below actually find the token.
+ */
+export function exportLine(input: ConnectSnippetInput): string {
+  const pairs = [
+    `POME_${input.envName}_REST_URL=${input.restUrl}`,
+    `POME_${input.envName}_MCP_URL=${input.mcpUrl}`,
+    `POME_AUTH_TOKEN=${input.token}`,
+    ...(input.tokenEnvName ? [`${input.tokenEnvName}=${input.token}`] : []),
+  ];
+  return `export ${pairs.join(" ")}`;
+}
+
 function indent(text: string): string {
   return text
     .split("\n")
@@ -129,10 +150,13 @@ export function renderConnectSnippets(input: ConnectSnippetInput): string {
     "Claude Code:",
     indent(claudeCodeCommand(input)),
     "",
-    "Codex (append to ~/.codex/config.toml; codex reads POME_AUTH_TOKEN from the shell it runs in):",
+    "Codex, .mcp.json and the SDK line below read the token from your shell. Export it once:",
+    indent(exportLine(input)),
+    "",
+    "Codex (append to ~/.codex/config.toml):",
     indent(codexConfigBlock(input)),
     "",
-    ".mcp.json (Claude Code project scope, in the repo; export POME_AUTH_TOKEN first):",
+    ".mcp.json (Claude Code project scope, in the repo):",
     indent(mcpJsonStanza(input)),
     "",
     `Your own code, through ${sdk.label}:`,

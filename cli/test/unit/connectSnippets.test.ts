@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   claudeCodeCommand,
   codexConfigBlock,
+  exportLine,
   mcpJsonStanza,
   mcpServerName,
   renderConnectSnippets,
@@ -74,7 +75,8 @@ describe("connect snippets", () => {
     const expectations: Record<ConnectSnippetInput["name"], string> = {
       github: "new Octokit({ baseUrl: process.env.POME_GITHUB_REST_URL, auth: process.env.POME_AUTH_TOKEN })",
       slack: 'new WebClient(process.env.POME_AUTH_TOKEN, { slackApiUrl: process.env.POME_SLACK_REST_URL + "/" })',
-      stripe: 'new Stripe(process.env.POME_AUTH_TOKEN, { host: "127.0.0.1", port: 3335, protocol: "http" })',
+      stripe:
+        'new Stripe(process.env.POME_AUTH_TOKEN, { host: "127.0.0.1", port: Number(new URL(process.env.POME_STRIPE_REST_URL).port), protocol: "http" })',
       gmail: 'gmail.users.messages.list({ userId: "me" }, { rootUrl: process.env.POME_GMAIL_REST_URL + "/" });',
       linear: 'new LinearClient({ apiKey: process.env.POME_LINEAR_TOKEN, apiUrl: process.env.POME_LINEAR_REST_URL + "/graphql" })',
     };
@@ -86,18 +88,31 @@ describe("connect snippets", () => {
     expect(sdkLines(inputFor("gmail")).lines[0]).toContain("access_token = POME_GMAIL_TOKEN");
   });
 
-  it("renders the block in the order a reader picks a client, token only in the Claude Code line", () => {
+  it("prints one export line with every POME_* value, so child processes see the token", () => {
+    expect(exportLine(inputFor("github"))).toBe(
+      `export POME_GITHUB_REST_URL=http://127.0.0.1:3333/s/standalone POME_GITHUB_MCP_URL=http://127.0.0.1:3333/s/standalone/mcp POME_AUTH_TOKEN=${TOKEN}`,
+    );
+    // Twins with a provider-specific alias export that too.
+    expect(exportLine(inputFor("linear"))).toContain(` POME_LINEAR_TOKEN=${TOKEN}`);
+    expect(exportLine(inputFor("gmail"))).toContain(` POME_GMAIL_TOKEN=${TOKEN}`);
+  });
+
+  it("renders the block in the order a reader picks a client; the token appears only where it is pasted into a shell", () => {
     const block = renderConnectSnippets(inputFor("github"));
     const at = (needle: string) => {
       const i = block.indexOf(needle);
       expect(i, needle).toBeGreaterThanOrEqual(0);
       return i;
     };
-    expect(at("Claude Code:")).toBeLessThan(at("Codex ("));
+    expect(at("Claude Code:")).toBeLessThan(at("Export it once:"));
+    expect(at("Export it once:")).toBeLessThan(at("Codex ("));
     expect(at("Codex (")).toBeLessThan(at(".mcp.json ("));
     expect(at(".mcp.json (")).toBeLessThan(at("Your own code, through GitHub's SDK (Octokit):"));
-    expect(block.split(TOKEN).length - 1).toBe(1);
+    // Twice: the `claude mcp add` line and the `export` line. Never in the
+    // Codex table or the .mcp.json stanza, which land in files.
+    expect(block.split(TOKEN).length - 1).toBe(2);
     expect(block).toContain(claudeCodeCommand(inputFor("github")));
+    expect(block).toContain(exportLine(inputFor("github")));
     // Pasted lines carry only leading whitespace, which every target ignores.
     for (const line of block.split("\n")) expect(line).not.toMatch(/\s$/);
   });
