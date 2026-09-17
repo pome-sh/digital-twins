@@ -168,8 +168,14 @@ describe("pome checks", () => {
     const body = JSON.parse(captured.log.join("\n")) as {
       twin: string;
       digest: string;
-      checks: Array<{ id: string; description: string; params: Array<{ example: string }> }>;
+      checks: Array<{
+        id: string;
+        description: string;
+        params: Array<{ example: string }>;
+      }>;
     };
+    // pome-cloud shells `checks <twin> --json` and reads these three keys.
+    expect(Object.keys(body)).toEqual(["twin", "digest", "checks"]);
     expect(body.twin).toBe("github");
     expect(body.digest).toMatch(/^sha256:[0-9a-f]{64}$/);
     // Look the check up by id rather than by index.
@@ -178,6 +184,25 @@ describe("pome checks", () => {
     // Every declaration must carry a description an authoring surface can show, so assert it of ALL of them rather than of whichever sorts first.
     for (const check of body.checks) {
       expect(check.description.length, `${check.id} declares no description`).toBeGreaterThan(0);
+      // Compiled check patterns stay off the envelope; the digest hashes them.
+      expect(check).not.toHaveProperty("pattern");
+    }
+  });
+
+  it("--json without a twin is a collection of the same per-twin records", async () => {
+    const indexCaptured = captureConsole();
+    await createProgram().parseAsync(["node", "pome", "checks", "--json"]);
+    const index = JSON.parse(indexCaptured.log.join("\n")) as {
+      twins: Array<{ twin: string; digest: string; checks: unknown[] }>;
+    };
+    expect(Object.keys(index)).toEqual(["twins"]);
+    expect(index.twins.length).toBeGreaterThan(0);
+
+    for (const record of index.twins) {
+      expect(Object.keys(record)).toEqual(["twin", "digest", "checks"]);
+      const oneCaptured = captureConsole();
+      await createProgram().parseAsync(["node", "pome", "checks", record.twin, "--json"]);
+      expect(record).toEqual(JSON.parse(oneCaptured.log.join("\n")));
     }
   });
 });
