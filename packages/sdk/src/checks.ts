@@ -9,9 +9,9 @@
 // imports those declarations from npm; there is no second copy to
 // reconcile.
 //
-// Lives in `@pome-sh/sdk`, not `@pome-sh/checks`. Twins and the CLI import
-// this module to WRITE declarations. `@pome-sh/checks` sits above the twins
-// and re-exports those declarations; moving the grammar there would cycle
+// Lives in `@pome-sh/sdk`, not `@pome-sh/checks`. Twins write declarations
+// against it; the CLI renders and binds them. `@pome-sh/checks` sits above the
+// twins and re-exports those declarations; moving the grammar there would cycle
 // (twins → checks → twins). The published door is `checks/src/dsl.ts`
 // (`export *`), not a second source.
 
