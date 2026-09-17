@@ -377,20 +377,44 @@ describe("parse — locations", () => {
     expect(many.body.payment_method_types).toEqual(["card", "link"]);
   });
 
-  it("reads an empty bracket before a sub-key as the array's one element", async () => {
+  it("walks the array for an empty bracket before a sub-key", async () => {
     const declaration = declareRouteInputs({
       method: "POST",
       path: "/v1/checkout/sessions",
       bodyEncoding: "form",
-      body: { line_items: z.array(z.object({ price: z.string(), quantity: z.string() })) },
+      body: {
+        line_items: z.array(z.object({ price: z.string(), quantity: z.string().optional() })),
+      },
     });
-    const parsed = await declaration.parse(
-      request({
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        form: { "line_items[][price]": ["price_1"], "line_items[][quantity]": ["2"] },
+    const parse = async (form: Record<string, unknown>) =>
+      (
+        await declaration.parse(
+          request({ headers: { "content-type": "application/x-www-form-urlencoded" }, form })
+        )
+      ).body;
+
+    // One sub-key each → one element.
+    expect(
+      await parse({ "line_items[][price]": ["price_1"], "line_items[][quantity]": ["2"] })
+    ).toEqual({ line_items: [{ price: "price_1", quantity: "2" }] });
+
+    // The same sub-key twice → TWO elements, not one element holding a list.
+    expect(await parse({ "line_items[][price]": ["price_1", "price_2"] })).toEqual({
+      line_items: [{ price: "price_1" }, { price: "price_2" }],
+    });
+
+    // The n-th value of each key belongs to the n-th element.
+    expect(
+      await parse({
+        "line_items[][price]": ["price_1", "price_2"],
+        "line_items[][quantity]": ["1", "5"],
       })
-    );
-    expect(parsed.body).toEqual({ line_items: [{ price: "price_1", quantity: "2" }] });
+    ).toEqual({
+      line_items: [
+        { price: "price_1", quantity: "1" },
+        { price: "price_2", quantity: "5" },
+      ],
+    });
   });
 
   it("drops prototype-walking form keys, which the undeclared check then refuses", async () => {

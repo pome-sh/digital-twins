@@ -786,8 +786,18 @@ function setPath(
  * itself: hono's `all: true` has already grouped every occurrence of that one
  * literal key, so its values are the elements — and they stay a list when
  * there is one of them, because `[]` is the caller saying "array" where a
- * plain key says nothing. An inner `[]` (`line_items[][price]`) names the
- * array's one element, index 0.
+ * plain key says nothing.
+ *
+ * An INNER `[]` (`line_items[][price]`) walks the array: the n-th value of
+ * that key belongs to the n-th element, so `line_items[][price]=a&
+ * line_items[][price]=b` is two line items and `line_items[][price]=a&
+ * line_items[][quantity]=2` is one. That agrees with Rack's
+ * `parse_nested_query`, which is what a Ruby vendor's parser is, on every
+ * body whose elements all carry the same sub-keys. A RAGGED body (two prices,
+ * one quantity) is where the implementations disagree — Rack hangs the odd
+ * value off the last element, this hangs it off the first — and nobody has
+ * measured the vendor there, so it is not claimed either way: what the caller
+ * gets is the twin's validator on the shape, naming the field.
  *
  * Until F-1778 an empty bracket built a `{ "": … }` object instead, so a
  * caller using Stripe's own syntax was told "expected array, received object"
@@ -815,7 +825,6 @@ function expandBrackets(form: Record<string, unknown>): Record<string, unknown> 
     }
     const appended = segments.length > 1 && segments.at(-1) === "";
     if (appended) segments.pop();
-    const path = segments.map((segment) => (segment === "" ? 0 : segment));
     // hono's `all: true` hands back a single-element array for a key that
     // appeared once; flatten it so `amount=1` is `"1"`, not `["1"]`. A key
     // spelled `[]` is exempt — there the list IS the value.
@@ -826,19 +835,48 @@ function expandBrackets(form: Record<string, unknown>): Record<string, unknown> 
       : Array.isArray(value) && value.length === 1
         ? value[0]
         : value;
-    let cursor: Record<string | number, unknown> = out;
-    for (let index = 0; index < path.length; index += 1) {
-      const key = path[index]!;
-      if (index === path.length - 1) {
-        cursor[key] = decoded;
-        break;
+    const walks = segments.indexOf("") >= 0 && !appended && Array.isArray(decoded);
+    if (walks) {
+      // One assignment per value, each into its own element.
+      for (const [element, one] of (decoded as unknown[]).entries()) {
+        assignAt(out, elementPath(segments, element), one);
       }
-      const nextKey = path[index + 1]!;
-      if (cursor[key] === undefined) cursor[key] = typeof nextKey === "number" ? [] : {};
-      cursor = cursor[key] as Record<string | number, unknown>;
+      continue;
     }
+    assignAt(out, elementPath(segments, 0), decoded);
   }
   return out;
+}
+
+/** Segments with every empty bracket resolved to an array index. The FIRST one
+ *  is the element being walked; a second (`a[][b][]`) has no separate values of
+ *  its own to walk, so it stays at 0. */
+function elementPath(segments: ReadonlyArray<string | number>, element: number): Array<string | number> {
+  let first = true;
+  return segments.map((segment) => {
+    if (segment !== "") return segment;
+    const index = first ? element : 0;
+    first = false;
+    return index;
+  });
+}
+
+function assignAt(
+  out: Record<string, unknown>,
+  path: ReadonlyArray<string | number>,
+  value: unknown,
+): void {
+  let cursor: Record<string | number, unknown> = out;
+  for (let index = 0; index < path.length; index += 1) {
+    const key = path[index]!;
+    if (index === path.length - 1) {
+      cursor[key] = value;
+      return;
+    }
+    const nextKey = path[index + 1]!;
+    if (cursor[key] === undefined) cursor[key] = typeof nextKey === "number" ? [] : {};
+    cursor = cursor[key] as Record<string | number, unknown>;
+  }
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
