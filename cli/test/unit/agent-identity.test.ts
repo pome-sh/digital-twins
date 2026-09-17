@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resolveRunAgentIdentity } from "../../src/cli/agent-identity.js";
 import { writeLinkCache } from "../../src/cli/link-cache.js";
+import { HostedAuthError } from "../../src/hosted/errors.js";
 
 const tempDirs: string[] = [];
 const savedKey = process.env.POME_API_KEY;
@@ -135,5 +136,21 @@ describe("resolveRunAgentIdentity", () => {
     // No cache, resolution 500s → agentId undefined, but version still flows.
     expect(id.agentId).toBeUndefined();
     expect(id.agentVersion).toBe("0.2.0");
+  });
+
+  it("rethrows a rejected API key so hosted callers can exit 3", async () => {
+    const dir = await makeProject({ agent: { slug: "pr-review-agent", version: "0.2.0" } });
+    const credentialsPath = await writeCreds(dir, "tm_team");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      response({ error: { type: "invalid_auth", message: "bad key" } }, 401),
+    );
+
+    await expect(
+      resolveRunAgentIdentity({
+        startDir: dir,
+        apiBaseUrl: "https://api.example.com",
+        credentialsPath,
+      }),
+    ).rejects.toBeInstanceOf(HostedAuthError);
   });
 });

@@ -28,7 +28,7 @@ import {
   runScoreLine,
   scoreStatus,
 } from "../hosted/evalResultView.js";
-import { HostedUsageError, exitCodeFor } from "../hosted/errors.js";
+import { HostedAuthError, HostedUsageError, exitCodeFor } from "../hosted/errors.js";
 import { resolveCredentials, clearLocalCredentials } from "./credentials.js";
 import { loginWithClerk } from "./login.js";
 import { runDocsCommand } from "./docs.js";
@@ -630,7 +630,7 @@ export function createProgram() {
           });
         } catch (err) {
           console.error(friendlyHostedError(err));
-          process.exitCode = 2;
+          process.exitCode = exitCodeFor(err);
         }
       },
     );
@@ -697,7 +697,7 @@ export function createProgram() {
           });
         } catch (err) {
           console.error(friendlyHostedError(err));
-          process.exitCode = 2;
+          process.exitCode = exitCodeFor(err);
         }
       },
     );
@@ -740,7 +740,7 @@ export function createProgram() {
           });
         } catch (err) {
           console.error(friendlyHostedError(err));
-          process.exitCode = 2;
+          process.exitCode = exitCodeFor(err);
         }
       },
     );
@@ -1076,6 +1076,14 @@ export function createProgram() {
               if (result.exitCode !== 0) worstExit = result.exitCode;
             } catch (err) {
               const code = exitCodeFor(err);
+              if (err instanceof HostedAuthError) {
+                console.error(err.message);
+                console.error(
+                  "Tip: `pome login` to run against Pome cloud (which returns a verdict), or `pome run --local <path>` to run a self-hosted twin and capture a trace only.",
+                );
+                process.exitCode = code;
+                return;
+              }
               console.error(`ERROR ${file}`);
               console.error(`  ${err instanceof Error ? err.message : String(err)}`);
               if (code > worstExit) worstExit = code;

@@ -192,7 +192,7 @@ describe("resolveCredentials", () => {
     }
   });
 
-  it("throws when the credentials file is missing api_key", async () => {
+  it("throws HostedAuthError when the credentials file is missing api_key", async () => {
     const tmp = await mkdtemp(join(tmpdir(), "pome-cred-"));
     try {
       await writeTestCredFile(join(tmp, "credentials.json"), {});
@@ -201,7 +201,7 @@ describe("resolveCredentials", () => {
           apiBaseUrl: "https://api.example.com",
           credentialsPath: join(tmp, "credentials.json"),
         })
-      ).rejects.toThrow(/missing "api_key"/);
+      ).rejects.toBeInstanceOf(HostedAuthError);
     } finally {
       await rm(tmp, { recursive: true, force: true });
     }
