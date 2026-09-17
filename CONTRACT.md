@@ -122,6 +122,11 @@ A plain Node.js start must load compiled JavaScript.
 
 A provider-specific no-seed variable takes precedence over `POME_SEED_JSON` and skips all boot seeding.
 
+`pome twin start` reads each twin's own `*_DB` and `*_NO_SEED` too, so a path
+that persists state for the packaged entry persists it at the CLI front door.
+A graded `pome run --local` reads neither: its twins are always in memory, so a
+run can neither begin from nor write over a database an operator saved.
+
 ## Shared Control Plane
 
 These requirements apply to all twins.

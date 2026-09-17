@@ -26,6 +26,17 @@ import {
 const REPO_ROOT = fileURLToPath(new URL("../../../..", import.meta.url));
 const read = (...parts: string[]) => readFileSync(join(REPO_ROOT, ...parts), "utf8");
 
+/** CONTRACT.md's documented per-twin SQLite path + no-seed variables. Both are
+ *  read on the container path by each twin's own `src/server.ts` and, since
+ *  F-1758, by `pome twin start` — from these entries. */
+const CONTRACT_DB_ENVS: Record<TwinName, { db: string; noSeed: string }> = {
+  github: { db: "GITHUB_CLONE_DB", noSeed: "GITHUB_CLONE_NO_SEED" },
+  slack: { db: "SLACK_CLONE_DB", noSeed: "SLACK_CLONE_NO_SEED" },
+  stripe: { db: "STRIPE_CLONE_DB", noSeed: "STRIPE_CLONE_NO_SEED" },
+  gmail: { db: "GMAIL_TWIN_DB", noSeed: "GMAIL_TWIN_NO_SEED" },
+  linear: { db: "LINEAR_TWIN_DB", noSeed: "LINEAR_TWIN_NO_SEED" },
+};
+
 /** CONTRACT.md's documented `pome twin start` port defaults + env overrides. */
 const CONTRACT_PORTS: Record<TwinName, { port: number; portEnv?: string }> = {
   github: { port: 3333 },
@@ -56,6 +67,8 @@ describe("TWIN_REGISTRY completeness", () => {
       expect(entry.defaultPort, name).toBeLessThanOrEqual(65535);
       expect(typeof entry.defaultSeed, name).toBe("function");
       expect(typeof entry.boot, name).toBe("function");
+      expect(entry.dbEnvName, name).toBeTruthy();
+      expect(entry.noSeedEnvName, name).toBeTruthy();
     }
   });
 
@@ -91,6 +104,29 @@ describe("TWIN_REGISTRY vs the frozen CONTRACT.md env surface", () => {
     // Only gmail and linear carry their own documented defaults.
     expect(new Set(TWIN_NAME_LIST.map((n) => TWIN_REGISTRY[n].defaultPort))).toEqual(
       new Set([3333, 3336, 3337]),
+    );
+  });
+
+  it("db path and no-seed env vars match CONTRACT.md", () => {
+    // These two are what make `pome twin start` persist state the way the
+    // container does (F-1758), so the names have to be the container's. A
+    // rename on one side only is the same silent divergence, reversed.
+    const contract = read("CONTRACT.md");
+    for (const name of TWIN_NAME_LIST) {
+      const entry = TWIN_REGISTRY[name];
+      expect(entry.dbEnvName, name).toBe(CONTRACT_DB_ENVS[name].db);
+      expect(entry.noSeedEnvName, name).toBe(CONTRACT_DB_ENVS[name].noSeed);
+      expect(contract, `CONTRACT.md does not document ${entry.dbEnvName}`).toContain(
+        entry.dbEnvName,
+      );
+      expect(contract, `CONTRACT.md does not document ${entry.noSeedEnvName}`).toContain(
+        `${entry.noSeedEnvName}=1`,
+      );
+    }
+    // Each variable belongs to exactly one twin: two entries sharing a path
+    // would have two twins writing one db file.
+    expect(new Set(TWIN_NAME_LIST.map((n) => TWIN_REGISTRY[n].dbEnvName)).size).toBe(
+      TWIN_NAME_LIST.length,
     );
   });
 

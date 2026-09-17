@@ -15,6 +15,24 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
+## Unreleased (minor)
+
+**`pome twin start` keeps state where the twin's own `*_DB` says** (F-1758).
+`SLACK_CLONE_DB`, `STRIPE_CLONE_DB`, `GMAIL_TWIN_DB` and `LINEAR_TWIN_DB` were
+dead on this path: the registry booted those four twins in `":memory:"`, so a
+reader who set one, wrote rows through their agent and restarted silently got
+the seed back. Set one now and the twin writes there; add that twin's
+`*_NO_SEED=1` and the next boot serves the file instead of re-seeding over it,
+the same pair the packaged entry reads. `--seed` together with a `*_NO_SEED=1`
+is refused, naming both, rather than silently picked between — and the boot
+banner's new `State:` line says where the rows are going either way.
+
+**`pome run --local` and `pome doctor` ignore an ambient `*_DB`.** The github
+twin inherited `GITHUB_CLONE_DB` on those paths, so a graded run re-seeded —
+and so wiped — a database an operator had saved. Their twins are in memory
+whatever the environment says; the path is now an argument, and only
+`pome twin start` fills it.
+
 ## Unreleased (patch)
 
 **Hosted authentication failures exit 3 on every hosted command.** `pome sandbox create`, `pome sandbox list`, and `pome register agent` used to report a missing or rejected API key as exit 2. An invalid key on `pome run` now stops immediately with exit 3 instead of printing per-task `ERROR` rows that looked like a score failure.

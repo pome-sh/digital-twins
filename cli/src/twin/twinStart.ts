@@ -29,6 +29,7 @@ import {
   twinsNamedBy,
 } from "./seedFile.js";
 import { bootTwin, type TwinHarness } from "./twinHarness.js";
+import { renderStateLines, resolveStandaloneDbs } from "./twinDb.js";
 import { renderConnectSnippets, type ConnectSnippetInput } from "./connectSnippets.js";
 import { chooseStandalonePorts } from "./twinPorts.js";
 import {
@@ -325,6 +326,9 @@ export async function runTwinStartCommand(
       ? undefined
       : readSeedFileText(options.seed, "pome twin start --seed");
   const twins = resolveStandaloneTwins(names, options.seed, seedText);
+  // Each twin's db first: a `--seed` contradicting its `*_NO_SEED` is refused
+  // before a port is probed, let alone a db file created.
+  const dbs = resolveStandaloneDbs(twins, options.seed, process.env);
   const ports = await chooseStandalonePorts(twins, options.port, process.env);
 
   // Resolve every seed BEFORE the auth secret and any listener: a refused seed
@@ -348,6 +352,8 @@ export async function runTwinStartCommand(
         seedState: seeds.get(twin)!.seedState,
         runId: STANDALONE_SID,
         twinBaseUrl: baseUrl,
+        dbPath: dbs.get(twin)!.dbPath,
+        noSeed: dbs.get(twin)!.noSeed,
       });
       booted.push({ twin, port, baseUrl, harness });
       // The boot snapshot `twin tape --diff` diffs against (F-1837); nothing listens yet.
@@ -428,21 +434,8 @@ export async function runTwinStartCommand(
     const { twin: name, port, baseUrl, harness } = entry;
     const restUrl = `${baseUrl}/s/${STANDALONE_SID}`;
     const mcpUrl = `${restUrl}/mcp`;
-    const world = seeds.get(name)!;
     console.log(`Pome ${name} twin listening at ${restUrl}`);
-    // "Did my seed land?" is the question a user-authored seed creates, and the
-    // twin cannot answer it after the fact — every seeded twin looks seeded.
-    if (world.source === "file") {
-      console.log(`Seed: ${world.path} (replaces the ${name} twin's default).`);
-    } else if (world.source === "env") {
-      console.log(
-        `Seed: POME_SEED_JSON (replaces the ${name} twin's default; --seed <path> overrides it).`,
-      );
-    } else {
-      console.log(
-        `Seed: the ${name} twin's default (pass --seed <path>, or write one with \`pome twin new-seed ${name}\`).`,
-      );
-    }
+    console.log(renderStateLines(name, seeds.get(name)!, dbs.get(name)!));
     // One secret per process, so the persisted-secret line is said once.
     if (index === 0 && resolved.source === "persisted") {
       console.log(

@@ -12,6 +12,11 @@
 //   - `events`      recorded twin HTTP events (one shared recorder buffer)
 //   - `close`       tear down the underlying SQLite handle
 //
+// One thing it does NOT own: where that SQLite lives. `dbPath` is an argument,
+// so the in-memory default belongs to whoever boots rather than to the twin's
+// env — `pome twin start` fills it from the twin's `*_DB`, `pome run --local`
+// leaves it empty (F-1758).
+//
 // Everything twin-specific — which package to import, the seed shape, the env
 // prefix, the extra JWT claims — lives in that twin's registry entry. This file
 // owns only the recorder lifecycle, which is shared across twins.
@@ -61,6 +66,14 @@ export async function bootTwin(opts: {
   runId: string;
   twinBaseUrl?: string;
   /**
+   * SQLite path this twin opens; omitted is `":memory:"`. `pome twin start`
+   * passes the twin's own `*_DB`; a graded run passes nothing, so it can
+   * neither begin from nor wipe a file an operator saved.
+   */
+  dbPath?: string;
+  /** Serve the db as it stands — skip boot seeding (the twin's `*_NO_SEED`). */
+  noSeed?: boolean;
+  /**
    * When set, twin HTTP events stream to this NDJSON path via the
    * twin-core durable recorder (same file capture-server appends to).
    */
@@ -89,6 +102,8 @@ export async function bootTwin(opts: {
     seedState: opts.seedState,
     runId: opts.runId,
     twinBaseUrl: opts.twinBaseUrl,
+    dbPath: opts.dbPath,
+    noSeed: opts.noSeed,
     recorder,
   });
 
