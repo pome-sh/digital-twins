@@ -125,8 +125,11 @@ actually parses it, not on the chance that something might.
 
 **No bare `import.meta.main` in an entry guard.** It is `undefined` before Node
 24.2 and `engines` allows `>=24`, so the guard exits 0 having run nothing.
-Compare a realpath'd `process.argv[1]` against `import.meta.url` and throw on a
-miss — copy the guard in `contract/run.mjs`.
+Bumping `engines` is not a substitute: npm treats the field as advisory unless
+`engine-strict` is set, and TypeScript entry points launched via `tsx` leave
+the property undefined even on Node versions that implement it. Compare a
+realpath'd `process.argv[1]` against `import.meta.url` and throw on a miss —
+copy the guard in `contract/run.mjs`.
 
 **Every scheduled workflow needs a failure alarm.** A `schedule:` trigger with
 no alarm reds CI. A scheduled run that fails silently reads exactly like one

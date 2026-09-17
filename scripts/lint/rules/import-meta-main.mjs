@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // `import.meta.main` is undefined before Node 24.2 and `engines` allows >=24, so a
-// bare guard exits 0 having run nothing. Requires a realpath'd `process.argv[1]`
-// compared against `import.meta.url`, on BOTH sides — one-sided is the vacuous pass.
+// bare guard exits 0 having run nothing. An engines bump cannot replace the
+// realpath guard: npm's `engines` field is advisory unless `engine-strict` is
+// set (this repo does not set it), and TypeScript entry points launched via
+// `tsx` leave the property undefined even on Node versions that implement it.
+// Requires a realpath'd `process.argv[1]` compared against `import.meta.url`,
+// on BOTH sides — one-sided is the vacuous pass.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";
