@@ -6,6 +6,7 @@
 import barrels from "./rules/barrels.mjs";
 import bundledDeps from "./rules/bundled-deps.mjs";
 import fileSize from "./rules/file-size.mjs";
+import markdownSize from "./rules/markdown-size.mjs";
 import firstPartyTwins from "./rules/first-party-twins.mjs";
 import noCatch from "./rules/no-catch.mjs";
 import noEval from "./rules/no-eval.mjs";
@@ -64,6 +65,7 @@ export const RULES = [
   taskFormatDoc,
   firstPartyTwins,
   fileSize,
+  markdownSize,
   parentVocab,
   taskClass,
   noEval,
