@@ -295,16 +295,18 @@ export function createProgram() {
     .option(
       "--diff",
       "Also print the state diff since the twin booted — its seed, default or --seed — per collection: added, changed, removed.",
-      false,
     )
-    .option("--json", "Print the tape (and the diff, with --diff) as one JSON envelope.", false)
+    .option("--json", "Print the tape (and the diff, with --diff) as one JSON envelope.")
     .summary("Show what the agent did on a local twin")
     .description(
       "Print the running twin's tape: one line per request with status, fidelity and whether state changed, so a call that claimed success but landed nothing stands out. Reads the twin's address and token from .pome/twin-status.json; no account, no hosted call.",
     )
     .action(async (name: string | undefined, options: { diff?: boolean; json?: boolean }) => {
       const { runTwinTapeCommand } = await import("../twin/twinTape.js");
-      await runTwinTapeCommand(name, options);
+      await runTwinTapeCommand(name, {
+        diff: options.diff ?? false,
+        json: options.json ?? false,
+      });
     });
 
   program.commandsGroup("Going further:");
@@ -485,7 +487,6 @@ export function createProgram() {
     .option(
       "--url",
       "Print the URL instead of opening the interactive topic picker.",
-      false,
     )
     .description(
       "Navigate canonical narrative docs on docs.pome.sh",
@@ -504,12 +505,10 @@ export function createProgram() {
     .option(
       "--copy",
       "Copy the twin's runnable tasks into the local project.",
-      false,
     )
     .option(
       "--force",
       "With --copy, overwrite existing files in the destination.",
-      false,
     )
     .option(
       "--dest <dir>",
@@ -521,11 +520,11 @@ export function createProgram() {
     .action(
       async (
         twin: string | undefined,
-        opts: { copy: boolean; force: boolean; dest?: string },
+        opts: { copy?: boolean; force?: boolean; dest?: string },
       ) => {
         await runTasksCommand(twin, {
-          copy: opts.copy,
-          force: opts.force,
+          copy: opts.copy ?? false,
+          force: opts.force ?? false,
           dest: opts.dest,
         });
       },
@@ -539,12 +538,12 @@ export function createProgram() {
     .command("checks")
     .summary("List, add, and lint a twin's checks")
     .argument("[twin]", "Twin id (e.g. github). Omit to list twins that declare checks.")
-    .option("--json", "Emit the declaration as JSON (for skills and agents).", false)
+    .option("--json", "Emit the declaration as JSON (for skills and agents).")
     .description(
       "Browse the typed checks a twin declares — the closed set a [code] criterion is graded by",
     )
-    .action(async (twin: string | undefined, opts: { json: boolean }) => {
-      await runChecksCommand(twin, { json: opts.json });
+    .action(async (twin: string | undefined, opts: { json?: boolean }) => {
+      await runChecksCommand(twin, { json: opts.json ?? false });
     });
 
   checks
@@ -584,12 +583,12 @@ export function createProgram() {
     .command("compile-seeds")
     .summary("Compile prose seed state to JSON via Claude")
     .argument("[target]", "Task .md file or directory (defaults to ./tasks)")
-    .option("--force", "Recompile even if the sidecar's source hash matches", false)
+    .option("--force", "Recompile even if the sidecar's source hash matches")
     .description(
       "Compile prose `## Seed State` sections into sidecar .seed.json files — one Claude call per file, billed to your ANTHROPIC_API_KEY",
     )
-    .action(async (target: string | undefined, opts: { force: boolean }) => {
-      const code = await runCompileSeeds(target, { force: opts.force });
+    .action(async (target: string | undefined, opts: { force?: boolean }) => {
+      const code = await runCompileSeeds(target, { force: opts.force ?? false });
       if (code !== 0) process.exitCode = code;
     });
 
@@ -606,7 +605,6 @@ export function createProgram() {
     .option(
       "--force",
       "Re-resolve the agent even when .pome/link.json already links one",
-      false,
     )
     .option(
       "--twins <list>",
@@ -618,7 +616,7 @@ export function createProgram() {
     .action(
       async (
         name: string,
-        opts: { force: boolean; twins?: string },
+        opts: { force?: boolean; twins?: string },
         cmd: Command,
       ) => {
         try {
@@ -627,7 +625,7 @@ export function createProgram() {
             dashboardBaseUrl:
               process.env.POME_DASHBOARD_URL ?? DEFAULT_DASHBOARD_URL,
             name,
-            force: opts.force,
+            force: opts.force ?? false,
             twins: normalizeRegisterTwins(opts.twins),
           });
         } catch (err) {
@@ -678,13 +676,13 @@ export function createProgram() {
       "--secrets-file <path>",
       "Write shell exports containing session secrets to a local file with mode 0600",
     )
-    .option("--json", "Print the sandbox as JSON instead of the human summary.", false)
+    .option("--json", "Print the sandbox as JSON instead of the human summary.")
     .action(
       async (
         opts: {
           twin?: string[];
           secretsFile?: string;
-          json: boolean;
+          json?: boolean;
           seed?: string;
         },
         cmd: Command,
@@ -693,7 +691,7 @@ export function createProgram() {
           await runSessionCreate({
             apiBaseUrl: globals(cmd).apiUrl,
             twins: opts.twin ?? [],
-            json: opts.json,
+            json: opts.json ?? false,
             secretsFile: opts.secretsFile,
             seedPath: opts.seed,
           });
@@ -713,10 +711,10 @@ export function createProgram() {
       "Filter by sandbox state: running, ready, done, expired, or all. `running` also matches the server-side `ready` state, the way the dashboard shows them in one column.",
       "running",
     )
-    .option("--json", "Print the sandboxes as JSON.", false)
+    .option("--json", "Print the sandboxes as JSON.")
     .action(
       async (
-        opts: { limit: string; state: string; json: boolean },
+        opts: { limit: string; state: string; json?: boolean },
         cmd: Command,
       ) => {
         const validStates: SessionListStateFilter[] = [
@@ -738,7 +736,7 @@ export function createProgram() {
             apiBaseUrl: globals(cmd).apiUrl,
             limit: Number.parseInt(opts.limit, 10) || 20,
             state: opts.state as SessionListStateFilter,
-            json: opts.json,
+            json: opts.json ?? false,
           });
         } catch (err) {
           console.error(friendlyHostedError(err));
@@ -754,7 +752,6 @@ export function createProgram() {
     .option(
       "--discard",
       "Confirm destroying a session whose run has not been graded",
-      false,
     )
     .action(
       async (
