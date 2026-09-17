@@ -520,7 +520,7 @@ export function createProgram() {
     .action(
       async (
         twin: string | undefined,
-        opts: { copy: boolean; force: boolean; dest?: string },
+        opts: { copy?: boolean; force?: boolean; dest?: string },
       ) => {
         await runTasksCommand(twin, {
           copy: opts.copy ?? false,
@@ -542,7 +542,7 @@ export function createProgram() {
     .description(
       "Browse the typed checks a twin declares — the closed set a [code] criterion is graded by",
     )
-    .action(async (twin: string | undefined, opts: { json: boolean }) => {
+    .action(async (twin: string | undefined, opts: { json?: boolean }) => {
       await runChecksCommand(twin, { json: opts.json ?? false });
     });
 
@@ -587,7 +587,7 @@ export function createProgram() {
     .description(
       "Compile prose `## Seed State` sections into sidecar .seed.json files — one Claude call per file, billed to your ANTHROPIC_API_KEY",
     )
-    .action(async (target: string | undefined, opts: { force: boolean }) => {
+    .action(async (target: string | undefined, opts: { force?: boolean }) => {
       const code = await runCompileSeeds(target, { force: opts.force ?? false });
       if (code !== 0) process.exitCode = code;
     });
@@ -616,7 +616,7 @@ export function createProgram() {
     .action(
       async (
         name: string,
-        opts: { force: boolean; twins?: string },
+        opts: { force?: boolean; twins?: string },
         cmd: Command,
       ) => {
         try {
@@ -682,7 +682,7 @@ export function createProgram() {
         opts: {
           twin?: string[];
           secretsFile?: string;
-          json: boolean;
+          json?: boolean;
           seed?: string;
         },
         cmd: Command,
@@ -714,7 +714,7 @@ export function createProgram() {
     .option("--json", "Print the sandboxes as JSON.")
     .action(
       async (
-        opts: { limit: string; state: string; json: boolean },
+        opts: { limit: string; state: string; json?: boolean },
         cmd: Command,
       ) => {
         const validStates: SessionListStateFilter[] = [
