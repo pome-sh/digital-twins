@@ -207,7 +207,12 @@ export function createProgram() {
       "Boot from a JSON or YAML seed file instead of the default. A seed REPLACES the default; it does not merge. Takes the per-twin envelope { <twin>: { … } } or one twin's flat seed (several twins need the envelope, one entry per named twin). Overrides POME_SEED_JSON.",
     )
     .description(
-      "Start one or more standalone twins as a long-lived foreground server (Ctrl-C to stop)",
+      // The db variables are the registry's, not this text's: naming them here
+      // is how the reader learns state is in memory by default BEFORE the boot
+      // banner says so.
+      `Start one or more standalone twins as a long-lived foreground server (Ctrl-C to stop). Each twin's state is in memory unless its own db variable names a file (${TWIN_NAME_LIST.map(
+        (twin) => TWIN_REGISTRY[twin].dbEnvName,
+      ).join(", ")}); with one set, the twin's matching *_NO_SEED=1 serves what the file holds instead of re-seeding over it.`,
     )
     .action(async (names: string[], options: { port?: string; seed?: string }) => {
       const { runTwinStartCommand } = await import("../twin/twinStart.js");

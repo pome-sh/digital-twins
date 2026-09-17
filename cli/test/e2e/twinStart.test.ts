@@ -35,12 +35,15 @@ async function freePort(): Promise<number> {
 }
 
 /** One-shot run for the cases that only read the command's output. */
-async function runCli(args: string[]): Promise<{ code: number | null; output: string }> {
+async function runCli(
+  args: string[],
+  extraEnv: NodeJS.ProcessEnv = {},
+): Promise<{ code: number | null; output: string }> {
   const cwd = await mkdtemp(join(tmpdir(), "pome-twin-start-cli-e2e-"));
   return await new Promise((resolve, reject) => {
     const proc = spawn(TSX_BIN, [MAIN_TS, ...args], {
       cwd,
-      env: process.env,
+      env: { ...process.env, ...extraEnv },
       stdio: ["ignore", "pipe", "pipe"],
     });
     let output = "";
@@ -49,6 +52,65 @@ async function runCli(args: string[]): Promise<{ code: number | null; output: st
     proc.once("error", reject);
     proc.once("exit", (code) => resolve({ code, output }));
   });
+}
+
+/**
+ * Boot `pome twin start` and wait until it is both listening and has printed
+ * its token. Two boots of the same twin is what the persistence case needs, so
+ * the wait loops the three cases below inline are factored out here rather
+ * than copied a fourth and fifth time.
+ */
+async function startTwin(
+  args: string[],
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+): Promise<{
+  proc: ChildProcess;
+  base: string;
+  token: string;
+  output: () => string;
+  stop: () => Promise<number | null>;
+}> {
+  const port = await freePort();
+  const proc = spawn(TSX_BIN, [MAIN_TS, ...args, "--port", String(port)], {
+    cwd,
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let output = "";
+  proc.stdout?.on("data", (chunk) => { output += chunk; });
+  proc.stderr?.on("data", (chunk) => { output += chunk; });
+  const exited = new Promise<number | null>((resolve) => proc.once("exit", (code) => resolve(code)));
+
+  const base = `http://127.0.0.1:${port}`;
+  const deadline = Date.now() + 60_000;
+  for (;;) {
+    try {
+      if ((await fetch(`${base}/healthz`)).status === 200) break;
+    } catch {
+      // not listening yet
+    }
+    if (Date.now() > deadline) {
+      throw new Error(`${args.join(" ")} never answered /healthz 200\n--- output ---\n${output}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  const tokenDeadline = Date.now() + 5_000;
+  while (!/POME_AUTH_TOKEN=/.test(output) && Date.now() < tokenDeadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  const token = output.match(/POME_AUTH_TOKEN=(\S+)/)?.[1];
+  expect(token, `${args.join(" ")} printed no token`).toBeTruthy();
+  return {
+    proc,
+    base,
+    token: token!,
+    output: () => output,
+    stop: async () => {
+      proc.kill("SIGINT");
+      return await exited;
+    },
+  };
 }
 
 let child: ChildProcess | undefined;
@@ -213,6 +275,62 @@ describe("pome twin start (e2e)", () => {
       expect(output).toContain(`Seed: ${seedPath} (replaces the github twin's default).`);
     },
     90_000,
+  );
+
+  it(
+    "keeps an issue the agent created across a restart, when GITHUB_CLONE_DB names a file",
+    async () => {
+      const cwd = await mkdtemp(join(tmpdir(), "pome-twin-start-db-e2e-"));
+      const dbPath = join(cwd, "github.db");
+      const env: NodeJS.ProcessEnv = { ...process.env, GITHUB_CLONE_DB: dbPath };
+
+      const first = await startTwin(["twin", "start", "github"], cwd, env);
+      // The banner says where the rows are going, and what the next boot will
+      // do to them — the question `:memory:` made unanswerable (F-1758).
+      expect(first.output()).toContain(
+        `State: ${dbPath} (GITHUB_CLONE_DB), re-seeded on every boot — GITHUB_CLONE_NO_SEED=1 keeps what is there.`,
+      );
+      const created = await fetch(`${first.base}/s/standalone/repos/acme/api/issues`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${first.token}`, "content-type": "application/json" },
+        body: JSON.stringify({ title: "Survives a restart" }),
+      });
+      expect(created.status).toBe(201);
+      const number = ((await created.json()) as { number: number }).number;
+      await expect(first.stop()).resolves.toBe(0);
+      expect(existsSync(dbPath)).toBe(true);
+
+      const second = await startTwin(["twin", "start", "github"], cwd, {
+        ...env,
+        GITHUB_CLONE_NO_SEED: "1",
+      });
+      expect(second.output()).toContain("Seed: not applied (GITHUB_CLONE_NO_SEED=1).");
+      expect(second.output()).toContain(`State: ${dbPath} (GITHUB_CLONE_DB), served as it stands.`);
+      const reread = await fetch(`${second.base}/s/standalone/repos/acme/api/issues/${number}`, {
+        headers: { Authorization: `Bearer ${second.token}` },
+      });
+      expect(reread.status).toBe(200);
+      expect(((await reread.json()) as { title: string }).title).toBe("Survives a restart");
+      await expect(second.stop()).resolves.toBe(0);
+    },
+    120_000,
+  );
+
+  it(
+    "refuses --seed and the twin's no-seed variable together, before binding a port",
+    async () => {
+      const cwd = await mkdtemp(join(tmpdir(), "pome-twin-start-contradiction-e2e-"));
+      const seedPath = join(cwd, "seed.json");
+      await writeFile(seedPath, JSON.stringify({ users: [{ login: "vakoi", type: "Organization" }] }));
+      const { code, output } = await runCli(["twin", "start", "github", "--seed", seedPath], {
+        GITHUB_CLONE_NO_SEED: "1",
+      });
+      expect(code).not.toBe(0);
+      expect(output).toContain(
+        `--seed ${seedPath} and GITHUB_CLONE_NO_SEED=1 contradict each other`,
+      );
+    },
+    60_000,
   );
 
   it(
