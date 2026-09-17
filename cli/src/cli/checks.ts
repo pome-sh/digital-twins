@@ -18,6 +18,7 @@ import { GMAIL_CHECKS } from "@pome-sh/twin-gmail/checks";
 import { LINEAR_CHECKS } from "@pome-sh/twin-linear/checks";
 import { SLACK_CHECKS } from "@pome-sh/twin-slack/checks";
 import { STRIPE_CHECKS } from "@pome-sh/twin-stripe/checks";
+import { bold, dim } from "./tty-color.js";
 
 // Args erased, exactly as pome-cloud's registry does it: the declarations are a
 // heterogeneous tuple that every consumer here handles uniformly.
@@ -162,18 +163,6 @@ export const SUBSTRATE_HELP: Record<string, string> = {
   "seed+final": "the seed and the final state",
   tape: "the recorded call tape",
 };
-
-function useColor(): boolean {
-  return Boolean(process.stdout.isTTY && !process.env.NO_COLOR);
-}
-
-function dim(s: string): string {
-  return useColor() ? `\x1b[2m${s}\x1b[0m` : s;
-}
-
-function bold(s: string): string {
-  return useColor() ? `\x1b[1m${s}\x1b[0m` : s;
-}
 
 export function argFlagsFor(def: DeclaredCheck): string {
   return templateSlots(def.template)

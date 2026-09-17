@@ -10,18 +10,7 @@ import { createInterface } from "node:readline";
 
 import { DEFAULT_DOCS_SITE_ORIGIN } from "./defaults.js";
 import { DOCS_TOPICS, type DocsTopic } from "./docs-topics.js";
-
-function useColor(): boolean {
-  return Boolean(process.stdout.isTTY && !process.env.NO_COLOR);
-}
-
-function dim(s: string): string {
-  return useColor() ? `\x1b[2m${s}\x1b[0m` : s;
-}
-
-function bold(s: string): string {
-  return useColor() ? `\x1b[1m${s}\x1b[0m` : s;
-}
+import { bold, dim } from "./tty-color.js";
 
 function wrapLine(text: string, width: number): string[] {
   if (text.length <= width) return [text];
