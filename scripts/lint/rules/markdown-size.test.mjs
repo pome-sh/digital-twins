@@ -20,6 +20,8 @@ const exactBytes = (limit) => {
   return line.repeat(n) + "y".repeat(limit - n * line.length);
 };
 
+const CRLF_AT_LF_BYTE_LIMIT = exactBytes(FILE_BYTE_LIMIT).replaceAll("\n", "\r\n");
+
 const REQUIRED = {
   "AGENTS.md": SMALL,
   "README.md": SMALL,
@@ -74,6 +76,12 @@ const cases = [
     expect: "green",
   },
   {
+    name: "CRLF bytes count toward the file budget",
+    files: tree({ "AGENTS.md": CRLF_AT_LF_BYTE_LIMIT }),
+    expect: "red",
+    contains: `${Buffer.byteLength(CRLF_AT_LF_BYTE_LIMIT, "utf8")} bytes exceeds ${FILE_BYTE_LIMIT}`,
+  },
+  {
     name: "a prose line over the column budget is a violation, named with its line",
     files: tree({ "AGENTS.md": `# Title\n\n${"x".repeat(PROSE_LINE_LIMIT + 1)}\n` }),
     expect: "red",
@@ -115,6 +123,12 @@ const cases = [
     contains: "columns exceeds",
   },
   {
+    name: "pipe-leading prose without a table delimiter is not a table row",
+    files: tree({ "CONTRIBUTING.md": `# T\n\n| ${"x".repeat(PROSE_LINE_LIMIT)} |\n` }),
+    expect: "red",
+    contains: "columns exceeds",
+  },
+  {
     name: "a generated changelog in the scan set is exempt even when huge",
     files: tree({
       "docs/CHANGELOG.md": `${"x".repeat(FILE_BYTE_LIMIT + 1)}\n${"y".repeat(PROSE_LINE_LIMIT + 1)}\n`,
@@ -127,6 +141,13 @@ const cases = [
       "docs/huge.md": `${"x".repeat(FILE_BYTE_LIMIT + 1)}\n${"y".repeat(PROSE_LINE_LIMIT + 1)}\n`,
     }),
     untracked: ["docs/huge.md"],
+    expect: "green",
+  },
+  {
+    name: "a nested package README is outside the one-directory front-door scope",
+    files: tree({
+      "packages/sdk/fixtures/README.md": `${"x".repeat(FILE_BYTE_LIMIT + 1)}\n${"y".repeat(PROSE_LINE_LIMIT + 1)}\n`,
+    }),
     expect: "green",
   },
   {

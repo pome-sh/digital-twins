@@ -60,7 +60,7 @@ export const EXCEPTION_POLICY = [
     id: "table-row",
     applies: "line",
     reason: "a markdown table row is a record, not prose",
-    match: (_rel, line) => isTableLine(line),
+    match: (_rel, _line, isTableRow) => isTableRow,
   },
   {
     id: "generated-changelog",
@@ -93,13 +93,15 @@ export default {
     }
 
     for (const rel of tracked) {
-      const text = ctx.read(ctx.abs(rel)).replace(/\r\n/g, "\n");
+      const text = ctx.read(ctx.abs(rel));
       const fileException = EXCEPTION_POLICY.find((entry) => entry.applies === "file" && entry.match(rel));
       if (fileException) {
         filesExempt += 1;
         continue;
       }
 
+      // The byte ceiling is on the file as checked out. Normalize only after
+      // measuring so CRLF cannot spend fewer bytes than it occupies on disk.
       const bytes = Buffer.byteLength(text, "utf8");
       if (bytes > FILE_BYTE_LIMIT) {
         violations.push(
@@ -108,13 +110,14 @@ export default {
         );
       }
 
-      const lines = text.split("\n");
+      const lines = text.replace(/\r\n/g, "\n").split("\n");
+      const tableRows = findTableRows(lines);
       const last = lines.length > 0 && lines.at(-1) === "" ? lines.length - 1 : lines.length;
       for (let index = 0; index < last; index += 1) {
         const line = lines[index];
         if (line.length <= PROSE_LINE_LIMIT) continue;
         const lineException = EXCEPTION_POLICY.find(
-          (entry) => entry.applies === "line" && entry.match(rel, line),
+          (entry) => entry.applies === "line" && entry.match(rel, line, tableRows.has(index)),
         );
         if (lineException) {
           linesExempt += 1;
@@ -154,7 +157,10 @@ function assertGitRoot(root) {
 }
 
 function listTracked(root, pathspecs) {
-  const stdout = execFileSync("git", ["ls-files", "-z", "--", ...pathspecs], {
+  // `:(glob)` makes `*` match one path component. Default Git pathspecs let it
+  // cross `/`, which would pull fixture READMEs into this front-door policy.
+  const globPathspecs = pathspecs.map((pathspec) => `:(glob)${pathspec}`);
+  const stdout = execFileSync("git", ["ls-files", "-z", "--", ...globPathspecs], {
     cwd: root,
     encoding: "utf8",
   });
@@ -170,11 +176,28 @@ function isGeneratedChangelog(rel) {
   return /(^|\/)CHANGELOG\.md$/.test(rel.replaceAll("\\", "/"));
 }
 
-function isTableLine(line) {
+function findTableRows(lines) {
+  const rows = new Set();
+  for (let index = 1; index < lines.length; index += 1) {
+    if (!isTableDelimiter(lines[index]) || !isTableRow(lines[index - 1])) continue;
+    rows.add(index - 1);
+    rows.add(index);
+    for (let body = index + 1; body < lines.length && isTableRow(lines[body]); body += 1) {
+      rows.add(body);
+    }
+  }
+  return rows;
+}
+
+function isTableRow(line) {
   const trimmed = line.trim();
-  if (!trimmed.startsWith("|")) return false;
-  if (/^\|[\s:|-]+\|$/.test(trimmed)) return true;
-  return trimmed.includes("|", 1);
+  return trimmed.startsWith("|") && trimmed.includes("|", 1);
+}
+
+function isTableDelimiter(line) {
+  const cells = line.trim().split("|").slice(1);
+  if (line.trim().endsWith("|")) cells.pop();
+  return cells.length > 0 && cells.every((cell) => /^\s*:?-+:?\s*$/.test(cell));
 }
 
 function isLongBecauseOfUrl(line) {
