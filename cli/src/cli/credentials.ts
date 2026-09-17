@@ -152,7 +152,13 @@ export async function resolveCredentials(
     typeof parsed.api_key !== "string" ||
     parsed.api_key.trim().length === 0
   ) {
-    throw new Error(`${path} is missing "api_key".`);
+    // A parseable credentials record without a usable key is equivalent to no
+    // login: no request can authenticate. Keep malformed JSON and unsafe file
+    // permissions as operational errors, but classify this missing credential
+    // through the documented auth exit code.
+    throw new HostedAuthError(
+      `${path} is missing "api_key". Run \`pome login\` or set POME_API_KEY.`,
+    );
   }
   return {
     apiKey: parsed.api_key.trim(),
