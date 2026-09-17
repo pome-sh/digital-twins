@@ -24,9 +24,10 @@ cli/                  the `pome` CLI
 packages/
   twin-{github,gmail,linear,slack,stripe}/
   sdk/                the HTTP + MCP server every twin mounts, route input
-                      declaration, seed loading
+                      declaration, seed loading; check DSL source
   wire/               event and trace types crossing a process boundary
-  checks/             the check DSL and the twins' check declarations
+  checks/             published re-export of that DSL and the twins'
+                      check declarations (pome-cloud)
   sandbox-domains/    the same twins with no server — domain object, SQLite
                       opener, seed parser, for reading state in-process
 contract/             cross-package tests against a booted twin

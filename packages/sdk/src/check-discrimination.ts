@@ -7,6 +7,11 @@
 // declaration against the worlds it named. Consumers still import
 // `probeDiscrimination` from `@pome-sh/sdk/checks`, which re-exports it.
 //
+// Stays in this package because it is part of that same surface — twin
+// contract tests import it from `@pome-sh/sdk/checks`; `@pome-sh/checks/dsl`
+// re-exports it. See `checks.ts` for why the surface cannot live in
+// `@pome-sh/checks`.
+//
 // Pure — no vitest, no ledger. Each twin's contract test owns the admitted-null
 // half, so a twin cannot satisfy the gate by shipping an empty ledger.
 

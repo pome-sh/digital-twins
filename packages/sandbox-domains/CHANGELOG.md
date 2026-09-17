@@ -1,5 +1,9 @@
 # @pome-sh/sandbox-domains
 
+## Unreleased (patch)
+
+**No consumer-visible change.** Comment-only headers on the bundled `@pome-sh/sdk/checks` grammar (F-1589). No export or behaviour change.
+
 ## 0.4.1 — 2026-09-16
 
 **`@octokit/openapi-types` is v29.** Shipped GitHub schema types pick up
