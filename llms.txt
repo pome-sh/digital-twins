@@ -1,6 +1,6 @@
-# Pome Digital Twins
+# Pome
 
-> Test mode for your integrations, built for the way agents build. Local, stateful twins of GitHub, Slack, Stripe, Gmail and Linear, over REST, GraphQL and MCP, backed by real SQLite state. No test account, no OAuth app, no API key. Every request lands on a tape: the twin's own record of every call and what it changed, so a step the agent only claimed shows up as a step that did not happen. 5 twins, 115 MCP tools, Apache-2.0.
+> Test mode for your integrations, built for the way agents build. Local, stateful twins of GitHub, Slack, Stripe, Gmail and Linear, over REST, GraphQL and MCP, backed by real SQLite state. No test account, no OAuth app, no API key. Every request lands on a tape: the twin's own record of every call and what it changed, so a step the agent only claimed shows up as a step that did not happen. 5 digital twins, 115 MCP tools, Apache-2.0.
 
 ## Getting started
 

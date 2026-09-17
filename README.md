@@ -2,7 +2,7 @@
 
 <img src="./assets/pome-logo.svg" alt="Pome" width="76" height="76" />
 
-# Pome Digital Twins
+# Pome
 
 **Test mode for your integrations, built for the way agents build.**
 
