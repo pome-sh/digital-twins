@@ -109,6 +109,36 @@ describe("pome checks", () => {
     expect(pinLabel("@pome-sh/no-such-package")).toBe("@pome-sh/no-such-package");
   });
 
+  it("wraps the checks header only when stdout is a TTY and NO_COLOR is unset", () => {
+    const stdoutTty = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+    const restore = () => {
+      vi.unstubAllEnvs();
+      if (stdoutTty) Object.defineProperty(process.stdout, "isTTY", stdoutTty);
+      else delete (process.stdout as { isTTY?: boolean }).isTTY;
+    };
+    try {
+      Object.defineProperty(process.stdout, "isTTY", {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: true,
+      });
+      vi.stubEnv("NO_COLOR", "");
+      expect(checksHeader("github", 16, undefined)).toBe(
+        "\x1b[1mgithub — 16 declared checks\x1b[0m",
+      );
+      expect(checksHeader("github", 16, "0.12.0")).toBe(
+        "\x1b[1mgithub — 16 declared checks\x1b[0m \x1b[2m(@pome-sh/twin-github 0.12.0)\x1b[0m",
+      );
+      vi.stubEnv("NO_COLOR", "1");
+      expect(checksHeader("github", 16, "0.12.0")).toBe(
+        "github — 16 declared checks (@pome-sh/twin-github 0.12.0)",
+      );
+    } finally {
+      restore();
+    }
+  });
+
   // The published tarball has no workspace to fall back to, so the build must
   // bake the versions in. Assert the map the tsup config defines, not the
   // bundling itself: every inlined @pome-sh package, each with a real version.

@@ -17,6 +17,8 @@ one it corrects.
 
 ## Unreleased (patch)
 
+**`pome tasks`, `pome checks` and `pome docs` share one copy of their TTY color helpers.** Terminal output is unchanged: bold and dim on a TTY, plain text when stdout is not a TTY or `NO_COLOR` is set.
+
 **Boolean flags no longer print `(default: false)`.** Commander already treats an omitted boolean as off, so the annotation burned a help line. Absent `--json` / `--force` / `--diff` / `--copy` / `--url` / `--discard` still mean false; only the help text is shorter.
 
 ## 0.45.1 — 2026-09-16

@@ -19,6 +19,7 @@ import {
   type CatalogTask,
   type TaskTwin,
 } from "./tasks-catalog.js";
+import { bold, dim } from "./tty-color.js";
 
 export interface TasksCommandOptions {
   copy?: boolean;
@@ -27,18 +28,6 @@ export interface TasksCommandOptions {
 }
 
 const DEFAULT_DEST_DIR = "tasks";
-
-function useColor(): boolean {
-  return Boolean(process.stdout.isTTY && !process.env.NO_COLOR);
-}
-
-function dim(s: string): string {
-  return useColor() ? `\x1b[2m${s}\x1b[0m` : s;
-}
-
-function bold(s: string): string {
-  return useColor() ? `\x1b[1m${s}\x1b[0m` : s;
-}
 
 export async function runTasksCommand(
   twinArg: string | undefined,
