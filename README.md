@@ -15,7 +15,9 @@
 
 </div>
 
-Pome gives you local, stateful twins of GitHub, Slack, Stripe, Gmail and Linear. Your agent, or your own code, calls a twin the way it calls the real API, over REST or MCP. There is no test account, no OAuth app and no API key. Every request lands on a tape: the twin's own record of every call and what it changed. A step the agent only claimed appears on the tape as a step that did not happen. Stripe has a test mode. GitHub and Slack do not, and none of them hands you the tape.
+Pome gives you local, stateful twins of GitHub, Slack, Stripe, Gmail and Linear. Your agent, or your own code, calls a twin the way it calls the real API, over REST or MCP. There is no test account, no OAuth app and no API key.
+
+Every request lands on a tape: the twin's own record of every call and what it changed. A step the agent only claimed appears on the tape as a step that did not happen. Stripe has a test mode. GitHub and Slack do not, and none of them hands you the tape.
 
 <p align="center">
   <img src="./assets/readme/how-it-works.svg" width="100%" alt="How Pome works: start a twin, connect your agent, let it act, read the tape, then swap to the real API.">
@@ -33,36 +35,81 @@ It prints:
 
 ```text
 Pome github twin listening at http://127.0.0.1:3333/s/standalone
-Seed: the github twin's default (pass --seed <path>, or write one with `pome twin new-seed github`).
 POME_GITHUB_REST_URL=http://127.0.0.1:3333/s/standalone
 POME_GITHUB_MCP_URL=http://127.0.0.1:3333/s/standalone/mcp
 POME_AUTH_TOKEN=eyJ…
-Health check (no auth): curl http://127.0.0.1:3333/healthz
-
-Connect your agent (pick one):
 
 Claude Code:
-  claude mcp add --transport http pome-github http://127.0.0.1:3333/s/standalone/mcp --header "Authorization: Bearer eyJ…"
-
-Codex, .mcp.json and the SDK line below read the token from your shell. Export it once:
-  export POME_GITHUB_REST_URL=http://127.0.0.1:3333/s/standalone POME_GITHUB_MCP_URL=http://127.0.0.1:3333/s/standalone/mcp POME_AUTH_TOKEN=eyJ…
-
-Codex (append to ~/.codex/config.toml):
-  [mcp_servers.pome-github]
-  url = "http://127.0.0.1:3333/s/standalone/mcp"
-  bearer_token_env_var = "POME_AUTH_TOKEN"
-…
+  claude mcp add --transport http pome-github \
+    http://127.0.0.1:3333/s/standalone/mcp \
+    --header "Authorization: Bearer eyJ…"
 ```
 
-The output continues with a `.mcp.json` stanza and the line for the vendor's own SDK. The twin mints the token when it starts. It is not an account credential. The twin listens on port 3333, and `--port` picks another. It serves everything under `/s/standalone`, the one session a standalone twin has.
+<details>
+<summary>The rest of the connect block — Codex, <code>.mcp.json</code>, your own code</summary>
 
-The twin starts with one repository, `acme/api`, and one open issue, so your agent has something to act on before you write a seed. State lives in the twin's process and is gone when you stop it. `--seed` decides where it starts. The twin also writes these values to `.pome/twin-status.json` in the folder you ran it from, readable only by you. `.pome/` git-ignores itself.
+Codex, `.mcp.json` and the SDK line read the token from your shell. Export it once:
 
-Several twins at once is one command: `twin start github slack linear`. Each twin takes its own port. One connect block covers all of them. `.pome/twin-status.json` lists them under `twins`, and its top-level fields describe the twin you started last.
+```bash
+export POME_GITHUB_REST_URL=http://127.0.0.1:3333/s/standalone \
+       POME_GITHUB_MCP_URL=http://127.0.0.1:3333/s/standalone/mcp \
+       POME_AUTH_TOKEN=eyJ…
+```
+
+Codex, appended to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.pome-github]
+url = "http://127.0.0.1:3333/s/standalone/mcp"
+bearer_token_env_var = "POME_AUTH_TOKEN"
+```
+
+`.mcp.json`, project scope, in the repo. Claude Code expands `${POME_AUTH_TOKEN}`, so the file you commit carries no token:
+
+```json
+{
+  "mcpServers": {
+    "pome-github": {
+      "type": "http",
+      "url": "http://127.0.0.1:3333/s/standalone/mcp",
+      "headers": { "Authorization": "Bearer ${POME_AUTH_TOKEN}" }
+    }
+  }
+}
+```
+
+Your own code, through GitHub's SDK (Octokit):
+
+```js
+new Octokit({
+  baseUrl: process.env.POME_GITHUB_REST_URL,
+  auth: process.env.POME_AUTH_TOKEN,
+})
+```
+
+</details>
+
+The twin mints the token when it starts. It is not an account credential. The twin starts with one repository, `acme/api`, and one open issue, so your agent has something to act on before you write a seed.
+
+State lives in the twin's process and is gone when you stop it. `--seed` decides where it starts.
+
+Several twins at once is one command: `twin start github slack linear`. Each twin takes its own port, and one connect block covers all of them.
+
+<details>
+<summary>Ports, paths, and the file the twin writes</summary>
+
+- The twin listens on port 3333. `--port` picks another.
+- It serves everything under `/s/standalone`, the one session a standalone twin has.
+- It writes its address and token to `.pome/twin-status.json` in the folder you ran it from, readable only by you. `.pome/` git-ignores itself.
+- Started with several twins, that file lists them under `twins`, and its top-level fields describe the twin you started last.
+
+</details>
 
 ## Connect your agent
 
-Paste the block for your client, exactly as printed. Claude Code takes the one-liner. Codex takes the table. Any client that reads `.mcp.json` takes the stanza. The stanza reads the token from `POME_AUTH_TOKEN` in your shell, so run the printed `export` line first. Your own code takes the SDK line. GitHub's Octokit, Slack's `WebClient`, Stripe's client, googleapis for Gmail and Linear's SDK each get their own. The [connect guide](https://docs.pome.sh/docs/mcp/connect) covers Cursor and the other clients.
+Paste the block for your client, exactly as printed. Claude Code takes the one-liner. Codex takes the table. Any client that reads `.mcp.json` takes the stanza, and the stanza reads the token from your shell, so run the printed `export` line first.
+
+Your own code takes the SDK line. GitHub's Octokit, Slack's `WebClient`, Stripe's client, googleapis for Gmail and Linear's SDK each get their own. The [connect guide](https://docs.pome.sh/docs/mcp/connect) covers Cursor and the other clients.
 
 If your client already has a real GitHub MCP server, the twin registers under its own name, `pome-github`. Disable the real one while you test. Otherwise the agent picks whichever it likes.
 
@@ -80,7 +127,7 @@ github twin at http://127.0.0.1:3333/s/standalone — 3 requests
 TIME          REQUEST            STATUS  FIDELITY  STATE
 19:04:49.743  list_issues        200     semantic  read
 19:04:53.762  create_issue       200     semantic  changed
-19:05:00.780  add_issue_comment  404     semantic  no change  ← write did not land (404); error: Issue not found
+19:05:00.780  add_issue_comment  404     semantic  no change  ← did not land
 
 3 requests: 1 changed state · 1 write did not land · 1 read
 
@@ -89,9 +136,13 @@ State diff since boot (seed → now):
   repositories[acme/api].issues  +1 added: #2
 ```
 
-One line per request, REST or MCP. A call through Octokit shows as `POST /repos/acme/api/issues`. In the STATE column, `changed` means the write landed in the twin's state, and `no change` on a write is a step that did not happen. In the FIDELITY column, `unsupported` is a route the twin does not model, answered with `501` rather than a guess.
+One line per request, REST or MCP. A call through Octokit shows as `POST /repos/acme/api/issues`. In the STATE column, `changed` means the write landed in the twin's state, and `no change` on a write is a step that did not happen.
 
-Here the agent listed the issues, created #2, then commented on issue #17, which does not exist. An agent that reports "commented" after that is what the tape is for. The diff is what the run left behind, measured against the state the twin booted with. `--json` prints the same as one object.
+Here the agent listed the issues, created #2, then commented on issue #17, which does not exist, so the twin answered `404`. An agent that reports "commented" after that is what the tape is for.
+
+The diff is what the run left behind, measured against the state the twin booted with. `--json` prints the same as one object.
+
+If the tape showed you a step that did not happen, star the repo. That is how the next person finds it.
 
 ## Run it in CI
 
@@ -103,18 +154,24 @@ The same command works in a GitHub Actions job. The job below starts the twin, w
     node-version: 24
 - name: Start the GitHub twin
   run: |
-    npx @pome-sh/cli@0.45 twin start github > twin.log 2>&1 &
-    for i in $(seq 1 60); do curl -fsS http://127.0.0.1:3333/healthz >/dev/null 2>&1 && break; sleep 1; done
-    echo "POME_GITHUB_REST_URL=$(jq -r .rest_url .pome/twin-status.json)" >> "$GITHUB_ENV"
-    echo "POME_GITHUB_MCP_URL=$(jq -r .mcp_url .pome/twin-status.json)" >> "$GITHUB_ENV"
-    echo "POME_AUTH_TOKEN=$(jq -r .auth_token .pome/twin-status.json)" >> "$GITHUB_ENV"
+    npx @pome-sh/cli@0.45.1 twin start github > twin.log 2>&1 &
+    for _ in $(seq 60); do
+      curl -fsS http://127.0.0.1:3333/healthz >/dev/null && break
+      sleep 1
+    done
+    status=.pome/twin-status.json
+    echo "POME_GITHUB_REST_URL=$(jq -r .rest_url $status)" >> "$GITHUB_ENV"
+    echo "POME_GITHUB_MCP_URL=$(jq -r .mcp_url $status)" >> "$GITHUB_ENV"
+    echo "POME_AUTH_TOKEN=$(jq -r .auth_token $status)" >> "$GITHUB_ENV"
 - run: npm test
 - name: What the tests did
   if: always()
-  run: npx @pome-sh/cli@0.45 twin tape --diff
+  run: npx @pome-sh/cli@0.45.1 twin tape --diff
 ```
 
-The twin from the first step keeps running for the rest of the job. This repository's own CI starts its twins the same way. `twin tape` finds the twin through `.pome/twin-status.json`. There is no account and no secret in the repository: the twin mints the token on the runner, and the token dies with the twin. Your tests read `POME_GITHUB_REST_URL` and `POME_AUTH_TOKEN` the way they would read a real base URL and token.
+The twin from the first step keeps running for the rest of the job, and `twin tape` finds it through `.pome/twin-status.json`. This repository's own CI starts its twins the same way.
+
+There is no account and no secret in the repository: the twin mints the token on the runner, and the token dies with the twin. Your tests read `POME_GITHUB_REST_URL` and `POME_AUTH_TOKEN` the way they would read a real base URL and token.
 
 ## Supported twins
 
@@ -134,7 +191,9 @@ Each route has one of these fidelity levels:
 - `shape`: The response has the provider's shape.
 - `unsupported`: The twin returns `501`.
 
-The twins answer requests. They do not call your app. No twin delivers webhooks today. Stripe's twin exposes `/v1/events` to poll. Linear's twin records webhook registrations and does not deliver them. A flow that starts from a vendor event needs you to post that event to your app yourself.
+The twins answer requests. They do not call your app, and no twin delivers webhooks today. Stripe's twin exposes `/v1/events` to poll, and Linear's twin records webhook registrations without delivering them.
+
+A flow that starts from a vendor event needs you to post that event to your app yourself.
 
 ## Swap to the real API
 
@@ -159,7 +218,9 @@ The Emulate column comes from its README as of 2026-09-16. Emulate targets appli
 
 ## Going further
 
-`pome` below is the same CLI. `npm install -g @pome-sh/cli` puts it on your PATH, or keep using `npx @pome-sh/cli@latest`. Everything above runs locally with no account. Hosted grading is optional. Nothing leaves your machine unless you use it, apart from the daily usage event (see Telemetry).
+`pome` below is the same CLI. `npm install -g @pome-sh/cli` puts it on your PATH, or keep using `npx @pome-sh/cli@latest`.
+
+Everything above runs locally with no account. Hosted grading is optional. Nothing leaves your machine unless you use it, apart from the daily usage event (see [Telemetry](#telemetry)).
 
 - Your own world: `pome twin new-seed github --out seed.json`, edit it, then `pome twin start github --seed seed.json`. Several twins from one file: `pome twin new-seed github slack --out seed.json`, then `pome twin start github slack --seed seed.json`. See the [local twin guide](https://docs.pome.sh/run-a-twin).
 - Graded tasks, locally: `npx @pome-sh/cli@latest init` scaffolds a project. `pome run --local tasks/01-bug-happy-path.md` records a run. `pome inspect latest` reads it. A local run records evidence and does not score.
@@ -180,11 +241,15 @@ The shared runtime provides HTTP routing, bearer authentication, MCP dispatch, r
 
 See [`packages/README.md`](./packages/README.md) for the package map. See [`CONTRACT.md`](./CONTRACT.md) for the twin runtime contract.
 
-Contributions are welcome, and the easiest first ones are seeds and showcases. [`CONTRIBUTING.md`](./CONTRIBUTING.md) says where to start and what a pull request needs. A new twin is a package that satisfies the runtime contract in [`CONTRACT.md`](./CONTRACT.md). A bug report is most useful with the tape attached (`pome twin tape --json`). A security problem goes to [`SECURITY.md`](./SECURITY.md), not to a public issue.
+Contributions are welcome, and the easiest first ones are seeds and showcases. The [good first issues](https://github.com/pome-sh/digital-twins/labels/good%20first%20issue) are the shortest way in, and [`CONTRIBUTING.md`](./CONTRIBUTING.md) says what a pull request needs.
+
+A new twin is a package that satisfies the runtime contract in [`CONTRACT.md`](./CONTRACT.md). A bug report is most useful with the tape attached (`pome twin tape --json`). A security problem goes to [`SECURITY.md`](./SECURITY.md), not to a public issue.
 
 ## Telemetry
 
-The CLI sends one anonymous usage event per day, at most. The event carries a random id, the CLI version, the OS, the Node major, and the command's name (`twin start`, `init`). The CLI mints the id once and keeps it in `~/.pome/telemetry.json`. The event never carries an argument, a path, a repo name, a seed, a token or anything from a tape. The first send prints a one-line notice.
+The CLI sends one anonymous usage event per day, at most. The event carries a random id, the CLI version, the OS, the Node major, and the command's name (`twin start`, `init`). The CLI mints the id once and keeps it in `~/.pome/telemetry.json`.
+
+The event never carries an argument, a path, a repo name, a seed, a token or anything from a tape. The first send prints a one-line notice.
 
 Turn it off with `POME_TELEMETRY=0`. The CLI also honours `DO_NOT_TRACK=1`. It sends nothing when `CI` is set, and nothing from a build made without an ingest key. The code is [`cli/src/cli/usageTick.ts`](./cli/src/cli/usageTick.ts).
 
@@ -193,3 +258,7 @@ Turn it off with `POME_TELEMETRY=0`. The CLI also honours `DO_NOT_TRACK=1`. It s
 Pome is in beta. CLI behavior and dependencies can change before version 1.0.
 
 This repository uses the [Apache-2.0 license](./LICENSE).
+
+## Star history
+
+[![Star History Chart](https://api.star-history.com/svg?repos=pome-sh/digital-twins&type=Date)](https://star-history.com/#pome-sh/digital-twins&Date)
