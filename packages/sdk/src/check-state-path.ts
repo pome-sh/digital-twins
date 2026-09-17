@@ -15,6 +15,10 @@
 // is already at the 500-line health limit. Consumers import both from
 // `@pome-sh/sdk/checks`, which re-exports these.
 //
+// Stays in this package: twin declarations call `statePath` / `childStatePath`
+// from that specifier. See `checks.ts` for why it cannot move to
+// `@pome-sh/checks`.
+//
 // ─── Why RFC 6901, and why not a friendlier syntax ──────────────────────────
 //
 // A pointer here is a JSON Pointer over the tree the twin's `exportState()`

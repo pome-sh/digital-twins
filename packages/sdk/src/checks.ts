@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The assertable check vocabulary (milestone A2b).
+// The assertable check vocabulary. Binding cannot fail: there is no
+// `pattern` field — the matcher is GENERATED from `template`, so a
+// declaration and its regex cannot drift.
 //
-// Position 2: the author selects a typed check and the system RENDERS the
-// English. Binding cannot fail, because the sentence is what the check
-// produced. That is why there is no `pattern` field here — the matcher is
-// GENERATED from `template`, so a declaration and its regex cannot drift
-// apart, and an author can neither write nor break one.
+// Twin-agnostic grammar. Each twin declares its own checks next to the
+// state they read, because the twin owns that state's shape. pome-cloud
+// imports those declarations from npm; there is no second copy to
+// reconcile.
 //
-// This module is twin-agnostic. Each twin declares its own checks next to the
-// state they read (`packages/twin-<x>/src/checks.ts`), because the twin owns
-// that state's shape; pome-cloud imports those declarations from npm and
-// adapts them onto its existing predicate engine. There is no second copy to
-// reconcile — the drift gate's job is catching a pin that fell behind, not
-// reconciling two hand-maintained vocabularies.
+// Lives in `@pome-sh/sdk`, not `@pome-sh/checks`. Twins write declarations
+// against it; the CLI renders and binds them. `@pome-sh/checks` sits above the
+// twins and re-exports those declarations; moving the grammar there would cycle
+// (twins → checks → twins). The published door is `checks/src/dsl.ts`
+// (`export *`), not a second source.
 
 import { createHash } from "node:crypto";
 

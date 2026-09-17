@@ -17,6 +17,8 @@ one it corrects.
 
 ## Unreleased (patch)
 
+**Comment only.** `@pome-sh/sdk/checks` headers record why the check grammar lives in the sdk rather than `@pome-sh/checks` (F-1589). No CLI behaviour change.
+
 **`pome checks --json` uses one record shape with or without a twin** (F-1760). `pome checks <twin> --json` is still `{ twin, digest, checks }`. Without a twin it is `{ twins: [{ twin, digest, checks }, ...] }` instead of `{ twins: ["github", ...] }`. A parser that understands one record understands the collection.
 
 **`pome tasks`, `pome checks` and `pome docs` share one copy of their TTY color helpers.** Terminal output is unchanged: bold and dim on a TTY, plain text when stdout is not a TTY or `NO_COLOR` is set.

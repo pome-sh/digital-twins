@@ -1,5 +1,9 @@
 # @pome-sh/checks
 
+## Unreleased (patch)
+
+**No consumer-visible change.** Source comments record why the check grammar is authored in `@pome-sh/sdk` and re-exported here (F-1589). Twins write declarations against that grammar; this package sits above the twins. No export, check id or template moved.
+
 ## 0.4.3 — 2026-09-16
 
 **Dev-only: vitest 5.** Test runner only; no exported API change.

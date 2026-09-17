@@ -5,6 +5,8 @@
 // sentinels. Re-exported verbatim from `@pome-sh/sdk/checks`, which is already a
 // curated module (the sdk keeps the internal split behind that one subpath on
 // purpose, so consumers ask the vocabulary module about the vocabulary).
+// The source stays in the sdk because twins import it to write declarations;
+// this package sits above the twins and cannot be their dependency.
 //
 // `export *` rather than an enumerated list, deliberately: an enumerated list is
 // a second registration seam that drifts silently. A symbol added to

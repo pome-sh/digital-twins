@@ -20,6 +20,10 @@
 //
 // This module measures the class.
 //
+// Stays in this package: `isRedacted` is called from twin declarations and
+// the probe from twin contract tests, both via `@pome-sh/sdk/checks`.
+// See `checks.ts` for why that surface cannot live in `@pome-sh/checks`.
+//
 // ─── The question, and why it takes BOTH worlds to ask ──────────────────────
 //
 // The naive probe destroys a slot's literal in the check's passing world and
