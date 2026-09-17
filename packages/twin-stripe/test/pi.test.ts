@@ -32,6 +32,55 @@ describe("PaymentIntents — state machine + happy paths", () => {
     );
   });
 
+  it("creates the same PI from Stripe's []-append form encoding", async () => {
+    const app = await createStripeApp();
+    // The curl Stripe's own docs print. It used to 400 with "expected array,
+    // received object" on payment_method_types — the twin calling the caller's
+    // encoding the caller's mistake (F-1778).
+    const form = new URLSearchParams();
+    form.set("amount", "4200");
+    form.set("currency", "usd");
+    form.append("payment_method_types[]", "crypto");
+    form.set("payment_method_options[crypto][mode]", "deposit");
+    form.append("payment_method_options[crypto][deposit_options][networks][]", "base");
+    const response = await app.app.request(`${app.base}/v1/payment_intents`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${app.token}`,
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: form.toString(),
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { id: string; status: string; amount: number };
+    expect(body.id).toMatch(/^pi_/);
+    expect(body.status).toBe("requires_action");
+    expect(body.amount).toBe(4_200);
+  });
+
+  it("names the missing field, not the encoding, when an []-append body is short one", async () => {
+    const app = await createStripeApp();
+    // Same body with `networks[]` left off. The declaration now takes the
+    // encoding, so the caller is told the one thing that is actually wrong.
+    const form = new URLSearchParams();
+    form.set("amount", "4200");
+    form.set("currency", "usd");
+    form.append("payment_method_types[]", "crypto");
+    form.set("payment_method_options[crypto][mode]", "deposit");
+    const response = await app.app.request(`${app.base}/v1/payment_intents`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${app.token}`,
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: form.toString(),
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { message: string; param?: string } };
+    expect(body.error.message).toContain("networks");
+    expect(body.error.param).not.toBe("payment_method_types");
+  });
+
   it("retrieves a PI by id", async () => {
     const app = await createStripeApp();
     const created = await rest(app, "POST", "/v1/payment_intents", {
