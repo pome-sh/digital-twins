@@ -182,7 +182,23 @@ export function checksHeader(twin: string, count: number, version: string | unde
   return version === undefined ? label : `${label} ${dim(`(@pome-sh/twin-${twin} ${version})`)}`;
 }
 
-function jsonView(twin: string) {
+/** One twin's `--json` envelope. `pome checks <twin> --json` prints this object;
+ *  `pome checks --json` prints `{ twins: ChecksJsonRecord[] }`. The three keys
+ *  are load-bearing for pome-cloud. Compiled check patterns stay off this
+ *  object — `checksDigest` hashes them, JSON does not. */
+interface ChecksJsonRecord {
+  twin: string;
+  digest: string;
+  checks: Array<{
+    id: string;
+    template: string;
+    description: string;
+    substrate: string;
+    params: Array<{ name: string; pattern: string; example: string }>;
+  }>;
+}
+
+function jsonView(twin: string): ChecksJsonRecord {
   return {
     twin,
     digest: localDigest(twin),
@@ -206,7 +222,7 @@ export async function runChecksCommand(
 ): Promise<void> {
   if (!twinArg) {
     if (opts.json) {
-      console.log(JSON.stringify({ twins: twinsWithChecks() }, null, 2));
+      console.log(JSON.stringify({ twins: twinsWithChecks().map(jsonView) }, null, 2));
       return;
     }
     console.log(bold("Pome checks"));
