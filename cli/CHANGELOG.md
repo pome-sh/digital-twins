@@ -17,6 +17,8 @@ one it corrects.
 
 ## Unreleased (patch)
 
+**Hosted authentication failures exit 3 on every hosted command.** `pome sandbox create`, `pome sandbox list`, and `pome register agent` used to report a missing or rejected API key as exit 2. An invalid key on `pome run` now stops immediately with exit 3 instead of printing per-task `ERROR` rows that looked like a score failure.
+
 **Comment only.** `@pome-sh/sdk/checks` headers record why the check grammar lives in the sdk rather than `@pome-sh/checks` (F-1589). No CLI behaviour change.
 
 **`pome checks --json` uses one record shape with or without a twin** (F-1760). `pome checks <twin> --json` is still `{ twin, digest, checks }`. Without a twin it is `{ twins: [{ twin, digest, checks }, ...] }` instead of `{ twins: ["github", ...] }`. A parser that understands one record understands the collection.

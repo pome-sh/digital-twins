@@ -8,7 +8,8 @@
 // a fork or team switch silently re-resolves the slug via `POST /v1/agents` so
 // a run never sends a foreign `agt_` id and self-onboards with zero extra
 // commands. A resolver hiccup degrades to "unattributed" rather than blocking a
-// local twin run.
+// local twin run. A rejected API key is not a hiccup: HostedAuthError must
+// reach the caller so hosted commands can exit 3.
 
 import { dirname } from "node:path";
 
@@ -16,6 +17,7 @@ import {
   postAgentResolver,
   resolveSeams,
 } from "./agent-resolver.js";
+import { HostedAuthError } from "../hosted/errors.js";
 import { resolveCredentials } from "./credentials.js";
 import {
   ensurePomeGitignored,
@@ -97,6 +99,7 @@ export async function resolveRunAgentIdentity(
     }
     return { ...base, agentId: resolved.id };
   } catch (err) {
+    if (err instanceof HostedAuthError) throw err;
     console.error(
       `pome: could not resolve agent identity (${
         err instanceof Error ? err.message : String(err)

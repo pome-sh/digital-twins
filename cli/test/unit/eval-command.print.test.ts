@@ -62,7 +62,9 @@ vi.mock("../../src/hosted/client.js", () => ({
   createHostedClient: () => stub.client,
 }));
 
+import { resolveCredentials } from "../../src/cli/credentials.js";
 import { runEvalCommand } from "../../src/cli/eval.js";
+import { HostedAuthError } from "../../src/hosted/errors.js";
 
 const META = {
   run_id: "ses_orig",
@@ -258,5 +260,56 @@ describe("pome eval terminal output", () => {
     expect(out).not.toContain("advisory");
     expect(out).not.toContain("~ [model]");
     expect(process.exitCode).toBe(1);
+  });
+
+  it("missing credentials → exit 3 with login tip, not a FAIL row", async () => {
+    const runDir = await writeRunDir(tmp);
+    vi.mocked(resolveCredentials).mockRejectedValueOnce(
+      new HostedAuthError("Hosted mode requires authentication."),
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    });
+
+    await runEvalCommand(runDir, {
+      artifactsDir: "runs",
+      apiUrl: "http://no-cloud.invalid",
+      agent: "triage-bot",
+    });
+
+    const out = lines.join("\n");
+    expect(process.exitCode).toBe(3);
+    expect(out).toContain("Hosted mode requires authentication.");
+    expect(out).toMatch(/pome login/);
+    expect(out).not.toMatch(/FAIL /);
+  });
+
+  it("a rejected API key → exit 3, not a score failure", async () => {
+    const runDir = await writeRunDir(tmp);
+    const original = stub.client.createEvalSession;
+    stub.client.createEvalSession = async () => {
+      throw new HostedAuthError("bad key");
+    };
+    const lines: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    });
+
+    try {
+      await runEvalCommand(runDir, {
+        artifactsDir: "runs",
+        apiUrl: "http://no-cloud.invalid",
+        agent: "triage-bot",
+      });
+    } finally {
+      stub.client.createEvalSession = original;
+    }
+
+    const out = lines.join("\n");
+    expect(process.exitCode).toBe(3);
+    expect(out).toContain("bad key");
+    expect(out).toMatch(/pome login/);
+    expect(out).not.toMatch(/FAIL /);
   });
 });
