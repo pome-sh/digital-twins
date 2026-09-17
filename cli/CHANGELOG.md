@@ -35,6 +35,11 @@ whatever the environment says; the path is now an argument, and only
 
 ## Unreleased (patch)
 
+**`pome twin start stripe` takes Stripe's `[]`-append form bodies** (F-1778).
+`-d "payment_method_types[]=crypto"` answered 400 `expected array, received
+object`; the indexed form and a JSON body were the only two that worked. From
+`@pome-sh/sdk`, which this package inlines — nothing to do differently.
+
 **Hosted authentication failures exit 3 on every hosted command.** `pome sandbox create`, `pome sandbox list`, and `pome register agent` used to report a missing or rejected API key as exit 2. An invalid key on `pome run` now stops immediately with exit 3 instead of printing per-task `ERROR` rows that looked like a score failure.
 
 **Comment only.** `@pome-sh/sdk/checks` headers record why the check grammar lives in the sdk rather than `@pome-sh/checks` (F-1589). No CLI behaviour change.

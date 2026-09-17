@@ -4,6 +4,16 @@
 
 ## Unreleased (minor)
 
+**A `form` body takes Stripe's `[]`-append encoding** (F-1778).
+`payment_method_types[]=crypto` is the array syntax Stripe's own curl examples
+print, and `expandBrackets` decoded it to `{ payment_method_types: { "": "crypto" } }`
+— so the twin answered `expected array, received object`, naming the caller's
+encoding as the caller's mistake. An empty bracket is now an array slot: a
+trailing one carries every occurrence of that key as the elements (and stays a
+list when there is one of them, unlike a plain key), and an inner one
+(`line_items[][price]`) names the array's one element. Indexed brackets and
+`created[gte]=…` are unchanged.
+
 `resolveAuthSecret()` fails closed: with `TWIN_AUTH_SECRET` unset it throws
 unless `POME_ALLOW_DEV_SECRETS=1`, and `NODE_ENV` no longer decides (F-1801).
 `ensureTwinAuthSecret()` mints a per-process secret for a loopback bind instead

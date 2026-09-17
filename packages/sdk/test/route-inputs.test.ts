@@ -335,6 +335,88 @@ describe("parse — locations", () => {
     });
   });
 
+  it("takes Stripe's []-append form for an array input", async () => {
+    const declaration = declareRouteInputs({
+      method: "POST",
+      path: "/v1/payment_intents",
+      bodyEncoding: "form",
+      body: {
+        amount: integerInput(),
+        payment_method_types: z.array(z.string()).min(1),
+        payment_method_options: z.record(z.string(), z.unknown()).optional(),
+      },
+    });
+    // `-d "payment_method_types[]=crypto"` is the form Stripe's own curl
+    // examples print, so it is the form an agent's training data is full of.
+    // It used to decode to `{ "": "crypto" }` and the twin told the caller it
+    // had sent an object (F-1778).
+    const one = await declaration.parse(
+      request({
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        form: {
+          amount: ["4200"],
+          "payment_method_types[]": ["crypto"],
+          "payment_method_options[crypto][mode]": ["deposit"],
+        },
+      })
+    );
+    expect(one.body).toEqual({
+      amount: 4200,
+      payment_method_types: ["crypto"],
+      payment_method_options: { crypto: { mode: "deposit" } },
+    });
+    // Repeated: hono groups every occurrence of the one literal key, so those
+    // values ARE the elements. One occurrence still decodes to an array of
+    // one — that is what `[]` says, and what tells it apart from a plain key.
+    const many = await declaration.parse(
+      request({
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        form: { amount: ["4200"], "payment_method_types[]": ["card", "link"] },
+      })
+    );
+    expect(many.body.payment_method_types).toEqual(["card", "link"]);
+  });
+
+  it("walks the array for an empty bracket before a sub-key", async () => {
+    const declaration = declareRouteInputs({
+      method: "POST",
+      path: "/v1/checkout/sessions",
+      bodyEncoding: "form",
+      body: {
+        line_items: z.array(z.object({ price: z.string(), quantity: z.string().optional() })),
+      },
+    });
+    const parse = async (form: Record<string, unknown>) =>
+      (
+        await declaration.parse(
+          request({ headers: { "content-type": "application/x-www-form-urlencoded" }, form })
+        )
+      ).body;
+
+    // One sub-key each → one element.
+    expect(
+      await parse({ "line_items[][price]": ["price_1"], "line_items[][quantity]": ["2"] })
+    ).toEqual({ line_items: [{ price: "price_1", quantity: "2" }] });
+
+    // The same sub-key twice → TWO elements, not one element holding a list.
+    expect(await parse({ "line_items[][price]": ["price_1", "price_2"] })).toEqual({
+      line_items: [{ price: "price_1" }, { price: "price_2" }],
+    });
+
+    // The n-th value of each key belongs to the n-th element.
+    expect(
+      await parse({
+        "line_items[][price]": ["price_1", "price_2"],
+        "line_items[][quantity]": ["1", "5"],
+      })
+    ).toEqual({
+      line_items: [
+        { price: "price_1", quantity: "1" },
+        { price: "price_2", quantity: "5" },
+      ],
+    });
+  });
+
   it("drops prototype-walking form keys, which the undeclared check then refuses", async () => {
     const declaration = declareRouteInputs({
       method: "POST",
