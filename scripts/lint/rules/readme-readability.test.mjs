@@ -121,6 +121,13 @@ const cases = [
     expect: "green",
   },
   {
+    name: "a nested tag is stripped whole — one pass would leave <span> behind",
+    files: {
+      "README.md": page(`<<span>span>${words(PROSE_CHAR_LIMIT)}`),
+    },
+    expect: "green",
+  },
+  {
     name: "a table row is a record, not prose",
     files: {
       "README.md": page(`| Twin | Notes |\n| --- | --- |\n| GitHub | ${words(PROSE_CHAR_LIMIT + 50)} |`),

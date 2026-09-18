@@ -154,17 +154,39 @@ function isTableRow(line) {
 
 /** The text github.com paints, with the markup that costs no screen width removed. */
 function renderedText(source) {
-  return source
-    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/, "")
-    .replace(/^\s*>\s?/, "")
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/<\/?[a-zA-Z][^>]*>/g, "")
+  return stripTags(
+    source
+      .replace(/^\s*(?:[-*+]|\d+[.)])\s+/, "")
+      .replace(/^\s*>\s?/, "")
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1"),
+  )
     .replace(/`([^`]*)`/g, "$1")
     .replace(/(\*\*|__)(.*?)\1/g, "$2")
     .replace(/(?<![\w*])\*(?!\s)([^*]+?)(?<!\s)\*(?![\w*])/g, "$1")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Remove inline HTML tags, repeatedly.
+ *
+ * One pass is not enough: `<<span>span>` becomes `<span>`, and a single-pass
+ * strip would then charge the budget for markup that renders as nothing — or,
+ * read the other way, hand a caller a string it believed was tag-free. Each
+ * pass strictly shortens the string or changes nothing, so this terminates.
+ *
+ * Block-level HTML never reaches here; `parse()` drops those lines whole. This
+ * is for `<code>` and `<br>` sitting inside a sentence.
+ */
+function stripTags(text) {
+  let out = text;
+  let previous;
+  do {
+    previous = out;
+    out = out.replace(/<\/?[a-zA-Z][^>]*>/g, "");
+  } while (out !== previous);
+  return out;
 }
 
 function assertGitRoot(root) {
