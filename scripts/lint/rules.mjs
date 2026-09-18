@@ -12,6 +12,7 @@ import noCatch from "./rules/no-catch.mjs";
 import noEval from "./rules/no-eval.mjs";
 import noNative from "./rules/no-native.mjs";
 import parentVocab from "./rules/parent-vocab.mjs";
+import readmeReadability from "./rules/readme-readability.mjs";
 import routeInputs from "./rules/route-inputs.mjs";
 import skillManifest from "./rules/skill-manifest.mjs";
 import taskClass from "./rules/task-class.mjs";
@@ -66,6 +67,7 @@ export const RULES = [
   firstPartyTwins,
   fileSize,
   markdownSize,
+  readmeReadability,
   parentVocab,
   taskClass,
   noEval,

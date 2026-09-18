@@ -1,30 +1,43 @@
-# Pome Digital Twins
+# Pome
 
-> Testing infrastructure for AI agents. Open-source, local, stateful digital twins of the APIs your agent calls — GitHub, Stripe, Slack, Gmail, and Linear — answering the same REST, GraphQL, and MCP calls as production, backed by real SQLite state. 115 MCP tools in total, all deterministic, resettable, and requiring no live infrastructure. The `pome` CLI runs your agent against a twin and captures the trace; evaluation is a hosted feature at pome.sh.
+> Test mode for your integrations, built for the way agents build. Local, stateful twins of GitHub, Slack, Stripe, Gmail and Linear, over REST, GraphQL and MCP, backed by real SQLite state. No test account, no OAuth app, no API key. Every request lands on a tape: the twin's own record of every call and what it changed, so a step the agent only claimed shows up as a step that did not happen. 5 digital twins, 115 MCP tools, Apache-2.0.
+
+## Getting started
+
+- Start a twin: `npx @pome-sh/cli@latest twin start github`. It prints its address, a token it mints itself, and the connect block for Claude Code, Codex, `.mcp.json` and the vendor's own SDK. There is no account and no login.
+- Read what the agent did: `npx @pome-sh/cli@latest twin tape --diff`. One line per request, REST or MCP, with the state each one changed. A write that did not land reads `no change`.
+- Several twins at once: `npx @pome-sh/cli@latest twin start github slack linear`. Each takes its own port, and one connect block covers all of them.
+- Your own starting state: `npx @pome-sh/cli@latest twin new-seed github --out seed.json`, edit it, then `twin start github --seed seed.json`. The twin is named on the command line, not in the file, and the seed REPLACES the twin's default state rather than merging into it.
+- Requires Node.js 24 or newer. The twins run on Node's built-in SQLite.
+
+## Twins
+
+Every route carries one fidelity level: `semantic` (the route implements and tests provider behavior), `shape` (the response has the provider's shape), `unsupported` (the twin returns `501` rather than a guess). Pome replays the same requests against the real vendor API daily and publishes the result per route at [status.pome.sh](https://status.pome.sh).
+
+- [twin-github](./packages/twin-github/FIDELITY.md): 36 MCP tools — repositories, issues, pull requests, reviews, merges (push-access gated)
+- [twin-stripe](./packages/twin-stripe/FIDELITY.md): 26 MCP tools — PaymentIntents, refunds, charges, balances, events, and x402 crypto payments
+- [twin-slack](./packages/twin-slack/FIDELITY.md): 18 MCP tools — channels, messages, threads, reactions, search
+- [twin-gmail](./packages/twin-gmail/FIDELITY.md): 13 MCP tools — frozen Gmail v1: messages, drafts, threads, labels, uploads
+- [twin-linear](./packages/twin-linear/FIDELITY.md): 22 MCP tools — GraphQL, OAuth with PKCE, and signed webhook registration
+
+The twins answer requests. They do not call your app, and no twin delivers webhooks today.
 
 ## Docs
 
 - [Documentation](https://docs.pome.sh): full guides, CLI reference, and per-package details
+- [Connect guide](https://docs.pome.sh/docs/mcp/connect): the stanza for Cursor and the other clients
 - [Runtime contract](./CONTRACT.md): the frozen v1.6.0 twin contract every twin honors
-- [Endpoint-tier rubric](./packages/sdk/ENDPOINT-TIERS.md): semantic / shape / 501 fidelity tiers
+- [Endpoint-tier rubric](./packages/sdk/ENDPOINT-TIERS.md): what semantic, shape and unsupported mean per route
 - [Contributor & agent conventions](./AGENTS.md): how to work in this repo
 - [Internal package architecture](./packages/README.md): the twin registry, the shared `@pome-sh/wire` trace surface, and which packages are private vs. published
 
-## Twins
-
-- [twin-github](./packages/twin-github/FIDELITY.md): 65 MCP tools, 62 REST routes — repos, issues, PRs, reviews, merges (push-access gated)
-- [twin-stripe](./packages/twin-stripe/FIDELITY.md): 26 MCP tools, 43 REST routes — card + x402 crypto PaymentIntents, refunds, charges, balance, events
-- [twin-slack](./packages/twin-slack/FIDELITY.md): 11 MCP tools, 50 REST routes — channels, messages, threads, reactions, search
-- [twin-gmail](./packages/twin-gmail/FIDELITY.md): 13 MCP tools — frozen Gmail v1 REST: messages, drafts, threads, labels, uploads
-- [twin-linear](./packages/twin-linear/FIDELITY.md): 22 MCP tools — GraphQL + OAuth (PKCE) + signed webhooks; the first GraphQL twin
-
 ## Packages
 
-- [@pome-sh/cli](https://www.npmjs.com/package/@pome-sh/cli): the `pome` CLI — run tasks, inspect traces, upload for evaluation. The twin engine and all five twins ship inside it; there is nothing else to install.
+- [@pome-sh/cli](https://www.npmjs.com/package/@pome-sh/cli): the `pome` CLI — start twins, read tapes, run tasks. The twin engine and all five twins ship inside it; there is nothing else to install.
 
-## Getting started
+## Going further
 
-- Run an agent task with no install: `npx @pome-sh/cli init && npx @pome-sh/cli run --local tasks/01-bug-happy-path.md`
-- Start a standalone twin: `npx @pome-sh/cli twin start github`
-- Start one from your own world: `npx @pome-sh/cli twin new-seed github --out seed.json` then `npx @pome-sh/cli twin start github --seed seed.json` — the twin is named on the command line, not in the file. The seed file is one twin's own fields, or `{ "<twin>": { … } }` for several, and it REPLACES the twin's default state rather than merging into it. The same file seeds a hosted sandbox via `pome sandbox create --twin github --seed seed.json`, or a graded task, dropped beside it as `<task>.seed.json`. A flat single-twin file names no twin, so `twin start` and `sandbox create` both need it named on the command line.
-- The hosted platform (hosted twins, grading, observability): https://pome.sh
+- Swap to the real API: the base URL and the credential change, plus whatever vendor-side setup the twin never asked for. Nothing else in your code should.
+- Run it in CI: the same `twin start` command in a GitHub Actions job, with the token minted on the runner and dying with the twin. No secret in the repository.
+- Graded tasks, locally: `npx @pome-sh/cli@latest init` scaffolds a project, `pome run --local tasks/01-bug-happy-path.md` records a run, and `pome inspect latest` reads it. A local run records evidence and does not score.
+- Hosted twins, scoring and observability are optional, and live at [pome.sh](https://pome.sh).
