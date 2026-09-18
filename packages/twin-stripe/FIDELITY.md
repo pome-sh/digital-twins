@@ -426,9 +426,10 @@ way of JSON Schema. Nothing here is hand-written, so nothing here can drift from
 the handler.
 
 All 39 routes are mounted from their declarations. `parseListQuery` and `readBodyForm` are
-gone: pagination is declared per surface, and Stripe's bracket form encoding
-(`items[0][price]=x`) plus its `created[gte]=…` deepObject range are handled by the shared
-mechanism. `created` is declared as ONE input rather than five, because Stripe's own
+gone: pagination is declared per surface, and Stripe's bracket form encoding — indexed
+(`items[0][price]=x`) and the append form its own curl examples print
+(`payment_method_types[]=crypto`) — plus its `created[gte]=…` deepObject range are handled
+by the shared mechanism. `created` is declared as ONE input rather than five, because Stripe's own
 description declares one — five would report drift that is not real.
 
 The published artifact is

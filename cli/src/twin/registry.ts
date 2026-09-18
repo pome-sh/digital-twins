@@ -68,6 +68,20 @@ export type TwinApp = {
 export type TwinBootContext = {
   /** Already twin-shaped seed state. `undefined` means "the twin's default". */
   seedState: unknown;
+  /**
+   * SQLite path the twin opens; `undefined` is `":memory:"`. Only
+   * `pome twin start` fills it, from the twin's own `dbEnvName` — a graded
+   * `pome run --local` stays in memory on purpose, so a run can neither begin
+   * from nor wipe a file an operator saved.
+   */
+  dbPath?: string;
+  /**
+   * Serve the db as it stands: skip boot seeding entirely. The other half of
+   * a file db, since a path is only worth keeping if the next boot can read
+   * what is in it instead of resetting to the seed. `seedState` is still
+   * parsed when set — gmail's and linear's JWT claims are read off it.
+   */
+  noSeed?: boolean;
   runId: string;
   twinBaseUrl?: string;
   /** Shared recorder — every twin in one local run buffers into one stream. */
@@ -93,6 +107,22 @@ export type TwinEntry = {
   readonly defaultPort: number;
   /** Twin-specific port override env var, when CONTRACT.md defines one. */
   readonly portEnvName?: string;
+  /**
+   * The twin's SQLite path env var — the SAME one its container entry reads
+   * (each twin's own `src/server.ts`), so a path that persists state there
+   * persists it under `pome twin start` too.
+   *
+   * Until F-1758 four of the five entries below passed the literal
+   * `":memory:"` into `boot`, and those four variables meant nothing on this
+   * path: a reader who set `STRIPE_CLONE_DB`, wrote rows through their agent
+   * and restarted silently got the seed back. github only escaped because its
+   * entry called `openGitHubCloneDatabase()` with no argument and inherited
+   * the twin's own default.
+   */
+  readonly dbEnvName: string;
+  /** The twin's "do not seed at boot" env var, CONTRACT.md's companion to
+   *  `dbEnvName`: what makes a second boot serve the saved rows. */
+  readonly noSeedEnvName: string;
   /** Provider-specific bearer alias, when the provider SDK expects one. */
   readonly tokenEnvName?: string;
   /** The twin package's OWN version, inlined at build time. */
@@ -138,21 +168,28 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
   github: {
     envName: "GITHUB",
     defaultPort: 3333,
+    dbEnvName: "GITHUB_CLONE_DB",
+    noSeedEnvName: "GITHUB_CLONE_NO_SEED",
     version: githubManifest.version,
     defaultSeed: async () => (await import("@pome-sh/twin-github/seed")).defaultSeedState(),
     parseSeed: async (input) => (await import("@pome-sh/twin-github/seed")).parseSeed(input),
     seedFields: async () =>
       Object.keys((await import("@pome-sh/twin-github/seed")).seedSchema.shape),
-    async boot({ seedState, runId, recorder }) {
+    async boot({ seedState, runId, recorder, dbPath, noSeed }) {
       const {
         createGitHubCloneApp,
         defaultSeedState,
         GitHubDomain,
         openGitHubCloneDatabase,
       } = await import("@pome-sh/twin-github");
-      const db = openGitHubCloneDatabase();
+      // Passed explicitly, not left to the twin's own env default: the path is
+      // the CALLER's decision here, and `pome run --local` must not inherit
+      // one from the shell.
+      const db = openGitHubCloneDatabase(dbPath ?? ":memory:");
       const domain = new GitHubDomain(db as never);
-      domain.seed((seedState === undefined ? defaultSeedState() : seedState) as never);
+      if (!noSeed) {
+        domain.seed((seedState === undefined ? defaultSeedState() : seedState) as never);
+      }
       const app = (await createGitHubCloneApp({
         db,
         recorder,
@@ -169,20 +206,22 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
   slack: {
     envName: "SLACK",
     defaultPort: 3333,
+    dbEnvName: "SLACK_CLONE_DB",
+    noSeedEnvName: "SLACK_CLONE_NO_SEED",
     version: slackManifest.version,
     defaultSeed: async () => (await import("@pome-sh/twin-slack/seed")).defaultSeedState(),
     parseSeed: async (input) => (await import("@pome-sh/twin-slack/seed")).parseSeed(input),
     seedFields: async () =>
       Object.keys((await import("@pome-sh/twin-slack/seed")).seedSchema.shape),
-    async boot({ seedState, runId, recorder }) {
+    async boot({ seedState, runId, recorder, dbPath, noSeed }) {
       const { createSlackTwinApp, openSlackTwinDatabase, SlackDomain } =
         await import("@pome-sh/twin-slack");
-      const db = openSlackTwinDatabase(":memory:");
+      const db = openSlackTwinDatabase(dbPath ?? ":memory:");
       const domain = new SlackDomain(db);
       // `applySeed` runs the twin's own `parseSeed` (regex/shape validation +
       // default-filling) before seeding, so the permissive scenario-side
       // `slackSeedStateSchema` is tightened to the twin's contract here.
-      domain.applySeed(seedState);
+      if (!noSeed) domain.applySeed(seedState);
       const app = createSlackTwinApp({
         db,
         domain,
@@ -202,12 +241,14 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
   stripe: {
     envName: "STRIPE",
     defaultPort: 3333,
+    dbEnvName: "STRIPE_CLONE_DB",
+    noSeedEnvName: "STRIPE_CLONE_NO_SEED",
     version: stripeManifest.version,
     defaultSeed: async () => (await import("@pome-sh/twin-stripe/seed")).defaultSeed(),
     parseSeed: async (input) => (await import("@pome-sh/twin-stripe/seed")).parseSeed(input),
     seedFields: async () =>
       Object.keys((await import("@pome-sh/twin-stripe/seed")).seedSchema.shape),
-    async boot({ seedState, runId, recorder, twinBaseUrl }) {
+    async boot({ seedState, runId, recorder, twinBaseUrl, dbPath, noSeed }) {
       // Engine-based twin: the factory owns middleware, MCP mount, and
       // the failure-injection store — seed rules ride in via `seed` and land in
       // the same store the session middleware reads, so e.g.
@@ -223,7 +264,7 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
         parseSeed: parseStripeSeed,
         StripeDomain,
       } = stripeTwin;
-      const db = openTwinStripeDatabase(":memory:");
+      const db = openTwinStripeDatabase(dbPath ?? ":memory:");
       const domain = new StripeDomain(db);
       const seed = parseStripeSeed(seedState);
       const baseUrl = twinBaseUrl ?? "http://127.0.0.1:3333";
@@ -241,13 +282,13 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
             db,
             recorder,
             runId,
-            seed,
+            seed: noSeed ? undefined : seed,
           })
         : (() => {
             // Older published twin-stripe packages predate the additive `seed`
             // app option. Seed explicitly so local runs don't boot an empty
             // credential store when the CLI resolves that package.
-            applyStripeSeed(db, seed);
+            if (!noSeed) applyStripeSeed(db, seed);
             return createTwinStripeApp({
               db,
               recorder:
@@ -269,19 +310,29 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
     envName: "GMAIL",
     defaultPort: 3336,
     portEnvName: "GMAIL_TWIN_PORT",
+    dbEnvName: "GMAIL_TWIN_DB",
+    noSeedEnvName: "GMAIL_TWIN_NO_SEED",
     tokenEnvName: "POME_GMAIL_TOKEN",
     version: gmailManifest.version,
     defaultSeed: async () => (await import("@pome-sh/twin-gmail/seed")).defaultSeedState(),
     parseSeed: async (input) => (await import("@pome-sh/twin-gmail/seed")).parseSeed(input),
     seedFields: async () =>
       Object.keys((await import("@pome-sh/twin-gmail/seed")).gmailSeedSchema.shape),
-    async boot({ seedState, runId, recorder }) {
+    async boot({ seedState, runId, recorder, dbPath, noSeed }) {
       const { createGmailTwinApp, GmailDomain, openGmailTwinDatabase, parseSeed } =
         await import("@pome-sh/twin-gmail");
-      const db = openGmailTwinDatabase(":memory:");
+      const db = openGmailTwinDatabase(dbPath ?? ":memory:");
+      // Parsed even under `noSeed`, and not applied: the minted token's
+      // `gmail_email` claim has to name a mailbox, and the seed is the only
+      // declaration of which one this twin serves.
       const seed = parseSeed(seedState);
       const domain = new GmailDomain(db);
-      const app = createGmailTwinApp({ db, seed, recorder, runId }) as TwinApp;
+      const app = createGmailTwinApp({
+        db,
+        seed: noSeed ? undefined : seed,
+        recorder,
+        runId,
+      }) as TwinApp;
       return {
         app,
         exportState: () => domain.exportState(),
@@ -295,13 +346,15 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
     envName: "LINEAR",
     defaultPort: 3337,
     portEnvName: "LINEAR_TWIN_PORT",
+    dbEnvName: "LINEAR_TWIN_DB",
+    noSeedEnvName: "LINEAR_TWIN_NO_SEED",
     tokenEnvName: "POME_LINEAR_TOKEN",
     version: linearManifest.version,
     defaultSeed: async () => (await import("@pome-sh/twin-linear/seed")).defaultSeedState(),
     parseSeed: async (input) => (await import("@pome-sh/twin-linear/seed")).parseSeed(input),
     seedFields: async () =>
       Object.keys((await import("@pome-sh/twin-linear/seed")).linearSeedSchema.shape),
-    async boot({ seedState, runId, recorder }) {
+    async boot({ seedState, runId, recorder, dbPath, noSeed }) {
       const {
         createLinearTwinApp,
         DEFAULT_LINEAR_EMAIL,
@@ -309,10 +362,18 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
         openLinearTwinDatabase,
         parseSeed,
       } = await import("@pome-sh/twin-linear");
-      const db = openLinearTwinDatabase(":memory:");
+      const db = openLinearTwinDatabase(dbPath ?? ":memory:");
+      // Parsed even under `noSeed` — the `linear_email` claim below is read
+      // off it, the way gmail's mailbox claim is.
       const seed = parseSeed(seedState);
       const domain = new LinearDomain(db);
-      const app = createLinearTwinApp({ db, seed, recorder, runId }) as TwinApp;
+      const app = createLinearTwinApp({
+        db,
+        seed,
+        noSeed,
+        recorder,
+        runId,
+      }) as TwinApp;
       const primaryEmail =
         seed.users.find((user) => user.admin)?.email ??
         seed.users[0]?.email ??

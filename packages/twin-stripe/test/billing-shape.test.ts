@@ -257,6 +257,37 @@ describe("subscriptions (warm, shape)", () => {
     expect(byCustomer.body.data).toHaveLength(2);
   });
 
+  it("reads repeated []-append items as separate subscription items", async () => {
+    // `items[][price]` twice is two items, not one item holding a list of
+    // prices — the shape Stripe's own append syntax asks for (F-1778).
+    const app = await createStripeApp();
+    const customer = await rest(app, "POST", "/v1/customers", {});
+    const first = await createPrice(app);
+    const second = await createPrice(app);
+    const form = new URLSearchParams();
+    form.set("customer", customer.body.id);
+    form.append("items[][price]", first.body.id);
+    form.append("items[][price]", second.body.id);
+    form.append("items[][quantity]", "3");
+    form.append("items[][quantity]", "7");
+    const response = await app.app.request(`${app.base}/v1/subscriptions`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${app.token}`,
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: form.toString(),
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      items: { data: Array<{ price: { id: string }; quantity: number }> };
+    };
+    expect(body.items.data.map((item) => [item.price.id, item.quantity])).toEqual([
+      [first.body.id, 3],
+      [second.body.id, 7],
+    ]);
+  });
+
   it("accepts Stripe's bracket form encoding (stripe-node wire shape)", async () => {
     const app = await createStripeApp();
     const customer = await rest(app, "POST", "/v1/customers", {});

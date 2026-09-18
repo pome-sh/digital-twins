@@ -13,7 +13,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { resolveStandaloneSeed } from "../../src/twin/twinStart.js";
+import { resolveStandaloneSeed, resolveStandaloneSeeds } from "../../src/twin/twinStart.js";
 
 const FLAT = {
   users: [{ login: "vakoi", type: "Organization", name: "Vakoi" }],
@@ -185,5 +185,36 @@ describe("resolveStandaloneSeed — the per-twin envelope", () => {
     await expect(resolveStandaloneSeed("github", path, {})).rejects.toThrow(
       /declares no github seed \(it names slack\)/,
     );
+  });
+});
+
+describe("resolveStandaloneSeed under the twin's no-seed variable", () => {
+  it("ignores POME_SEED_JSON instead of letting it refuse the boot", async () => {
+    // CONTRACT.md gives `*_NO_SEED` precedence over POME_SEED_JSON, so a stale
+    // or schema-invalid envelope left in the shell must not stop a twin from
+    // serving the db it was told to serve.
+    const env = { POME_SEED_JSON: '{"repositories": [{"owner": 42}]}' };
+    await expect(resolveStandaloneSeed("github", undefined, env)).rejects.toThrow();
+    const resolved = await resolveStandaloneSeed("github", undefined, env, undefined, true);
+    expect(resolved.source).toBe("default");
+  });
+
+  it("leaves a no-seed twin out of what the envelope has to name", async () => {
+    // `pome twin start stripe gmail` with STRIPE_CLONE_NO_SEED=1: stripe
+    // applies none of the envelope, so it is not stripe's absence from it that
+    // should refuse gmail's boot.
+    const env = { POME_SEED_JSON: JSON.stringify({ gmail: { primaryMailbox: { email: "a@b.test" } } }) };
+    await expect(resolveStandaloneSeeds(["stripe", "gmail"], undefined, env)).rejects.toThrow(
+      /stripe/,
+    );
+    const seeds = await resolveStandaloneSeeds(
+      ["stripe", "gmail"],
+      undefined,
+      env,
+      undefined,
+      (twin) => twin === "stripe",
+    );
+    expect(seeds.get("stripe")?.source).toBe("default");
+    expect(seeds.get("gmail")?.source).toBe("env");
   });
 });
