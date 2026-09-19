@@ -60,14 +60,14 @@
     "check:manifest-schema": "node scripts/emit-manifest-schema.mjs --check"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.54",
-    "@ai-sdk/gateway": "^4.0.82",
-    "@ai-sdk/google": "^4.0.72",
-    "@ai-sdk/openai": "^4.0.67",
-    "@anthropic-ai/sdk": "^0.126.0",
+    "@ai-sdk/anthropic": "^4.0.58",
+    "@ai-sdk/gateway": "^4.0.87",
+    "@ai-sdk/google": "^4.0.76",
+    "@ai-sdk/openai": "^4.0.71",
+    "@anthropic-ai/sdk": "^0.127.0",
     "@hono/node-server": "^2.1.1",
-    "@openrouter/ai-sdk-provider": "^3.0.0",
-    "ai": "^7.0.102",
+    "@openrouter/ai-sdk-provider": "^3.1.0",
+    "ai": "^7.0.107",
     "commander": "^15.0.0",
     "graphql": "^16.14.2",
     "hono": "^4.13.8",
@@ -83,13 +83,13 @@
     "@pome-sh/twin-linear": "*",
     "@pome-sh/twin-slack": "*",
     "@pome-sh/twin-stripe": "*",
-    "@types/node": "^26.6.1",
+    "@types/node": "^26.6.2",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "vitest": "^5.0.1",
     "tsup": "^8.5.1"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=24.21.0"
   }
 }

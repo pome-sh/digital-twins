@@ -73,13 +73,13 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@types/node": "^26.6.1",
+    "@types/node": "^26.6.2",
     "stripe": "22.6.2",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "vitest": "^5.0.1"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=24.21.0"
   }
 }
