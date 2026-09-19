@@ -34,22 +34,50 @@ const HEIGHT = 800;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// A failed await anywhere below ends the run with its reason on one line, the
+// way `fail()` does, rather than as a stack trace.
+process.on("uncaughtException", (error) => fail(error.message));
+process.on("unhandledRejection", (error) => fail(error instanceof Error ? error.message : String(error)));
+
 // ── The film ────────────────────────────────────────────────────────────────
 // The same three steps the README's tape section narrates: list the issues,
 // open #2, comment on #17 — which does not exist.
 const REPO = { owner: "acme", repo: "api" };
+//
+// Every reply is checked. This file overwrites the README's hero, so a twin
+// that regressed must stop the recording, not publish a film whose story is no
+// longer true: the first two calls have to succeed and the last has to be
+// refused, exactly as the page is about to say.
 async function choreography(call) {
   await sleep(2200); // the empty state: "Nothing recorded yet", and how to connect
-  await call("list_issues", REPO);
+  expectOk(await call("list_issues", REPO), "list_issues");
   await sleep(2200); // a read, which the page lets recede
-  await call("create_issue", {
-    ...REPO,
-    title: "Login page returns 500 after the deploy",
-    body: "Started after the 14:02 deploy. Reproduces on every login attempt.",
-  });
+  expectOk(
+    await call("create_issue", {
+      ...REPO,
+      title: "Login page returns 500 after the deploy",
+      body: "Started after the 14:02 deploy. Reproduces on every login attempt.",
+    }),
+    "create_issue",
+  );
   await sleep(2600); // the world ticks: issues 1 → 2
-  await call("add_issue_comment", { ...REPO, issue_number: 17, body: "Looking into it now." });
+  expectRefused(
+    await call("add_issue_comment", { ...REPO, issue_number: 17, body: "Looking into it now." }),
+    "add_issue_comment on #17, which does not exist",
+  );
   await sleep(5000); // hold on the write that did not land
+}
+
+function expectOk(reply, what) {
+  if (reply.error || reply.result?.isError) {
+    fail(`${what} failed, so the film would not show what the README says: ${JSON.stringify(reply.error ?? reply.result).slice(0, 240)}`);
+  }
+}
+
+function expectRefused(reply, what) {
+  if (reply.error || !reply.result?.isError) {
+    fail(`${what} was expected to be refused by the twin and was not, so the film's last beat would be false.`);
+  }
 }
 
 // ── Preconditions ───────────────────────────────────────────────────────────
@@ -119,7 +147,7 @@ const frames = [];
 cdp.on("Page.screencastFrame", (params, from) => {
   if (from !== sessionId) return;
   frames.push({ data: params.data, t: params.metadata.timestamp });
-  cdp.send("Page.screencastFrameAck", { sessionId: params.sessionId }, sessionId);
+  cdp.send("Page.screencastFrameAck", { sessionId: params.sessionId }, sessionId).catch(() => {});
 });
 await page("Page.startScreencast", { format: "png", maxWidth: WIDTH, maxHeight: HEIGHT, everyNthFrame: 4 });
 
@@ -127,6 +155,11 @@ const mcp = await mcpClient(mcpUrl, token);
 await choreography(mcp.call);
 const stoppedAt = Date.now() / 1000;
 await page("Page.stopScreencast");
+// The API said the right things; the page has to have shown them too.
+const shown = await page("Runtime.evaluate", { expression: "document.body.innerText", returnByValue: true });
+if (!/1 write did not land/.test(shown.result.value)) {
+  fail("the dashboard never showed the refused write, so the film's last frame would not say what the README claims.");
+}
 if (frames.length < 10) fail(`only ${frames.length} frame(s) captured — the page did not repaint as calls landed`);
 frames.forEach((frame, i) => {
   frame.file = join(work, `f${String(i).padStart(5, "0")}.png`);
@@ -196,12 +229,26 @@ function readUntil(child, done, timeoutMs, what, stream = "stdout") {
   });
 }
 
-/** A DevTools-protocol connection over Node's built-in WebSocket. */
+/**
+ * A DevTools-protocol connection over Node's built-in WebSocket.
+ *
+ * Every request is bounded, and a socket that closes or errors fails every
+ * request still waiting on it: a browser that dies mid-film has to end the run
+ * with an error, not leave it waiting on replies that will never come.
+ */
 function connect(url) {
   const socket = new WebSocket(url);
   const pending = new Map();
   const listeners = new Map();
   let id = 0;
+  let dead = null;
+  const failPending = (error) => {
+    dead ??= error;
+    for (const waiter of pending.values()) waiter.reject(error);
+    pending.clear();
+  };
+  socket.addEventListener("close", () => failPending(new Error("Chrome closed the DevTools connection")));
+  socket.addEventListener("error", () => failPending(new Error("the DevTools connection failed")));
   socket.addEventListener("message", (event) => {
     const message = JSON.parse(event.data);
     if (message.id !== undefined) {
@@ -216,19 +263,29 @@ function connect(url) {
       if (typeof listener === "function") listener(message.params, message.sessionId);
     }
   });
-  return new Promise((resolveSocket) =>
+  return new Promise((resolveSocket, rejectSocket) => {
+    socket.addEventListener("error", () => rejectSocket(new Error(`could not open DevTools at ${url}`)), { once: true });
     socket.addEventListener("open", () =>
       resolveSocket({
         send: (method, params = {}, sessionId) =>
           new Promise((settle, reject) => {
-            pending.set(++id, { resolve: settle, reject });
-            socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+            if (dead) return reject(dead);
+            const requestId = ++id;
+            const timer = setTimeout(() => {
+              pending.delete(requestId);
+              reject(new Error(`DevTools did not answer ${method} within 15 s`));
+            }, 15_000);
+            pending.set(requestId, {
+              resolve: (value) => (clearTimeout(timer), settle(value)),
+              reject: (error) => (clearTimeout(timer), reject(error)),
+            });
+            socket.send(JSON.stringify({ id: requestId, method, params, ...(sessionId ? { sessionId } : {}) }));
           }),
         on: (method, listener) => listeners.set(method, listener),
         close: () => socket.close(),
       }),
-    ),
-  );
+    );
+  });
 }
 
 /** MCP over streamable HTTP: the handshake, then `tools/call`. */
@@ -245,7 +302,9 @@ async function mcpClient(url, bearer) {
         ...(session ? { "mcp-session-id": session } : {}),
       },
       body: JSON.stringify(notification ? { jsonrpc: "2.0", method, params } : { jsonrpc: "2.0", id: ++id, method, params }),
+      signal: AbortSignal.timeout(15_000),
     });
+    if (!response.ok) fail(`the twin answered ${method} with HTTP ${response.status}`);
     session = response.headers.get("mcp-session-id") ?? session;
     const body = await response.text();
     if (notification) return null;
