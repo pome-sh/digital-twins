@@ -5,7 +5,8 @@
 ## Getting started
 
 - Start a twin: `npx @pome-sh/cli@latest twin start github`. It prints its address, a token it mints itself, and the connect block for Claude Code, Codex, `.mcp.json` and the vendor's own SDK. There is no account and no login.
-- Read what the agent did: `npx @pome-sh/cli@latest twin tape --diff`. One line per request, REST or MCP, with the state each one changed. A write that did not land reads `no change`.
+- Watch it live: `twin start` also prints a `Dashboard:` link. Every call the agent makes lands there as it happens, with what it changed, and a write that did not land turns red.
+- Read what the agent did from a terminal or CI: `npx @pome-sh/cli@latest twin tape --diff`. One line per request, REST or MCP, with the state each one changed. A write that did not land reads `no change`.
 - Several twins at once: `npx @pome-sh/cli@latest twin start github slack linear`. Each takes its own port, and one connect block covers all of them.
 - Your own starting state: `npx @pome-sh/cli@latest twin new-seed github --out seed.json`, edit it, then `twin start github --seed seed.json`. The twin is named on the command line, not in the file, and the seed REPLACES the twin's default state rather than merging into it.
 - Requires Node.js 24 or newer. The twins run on Node's built-in SQLite.
