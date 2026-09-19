@@ -397,9 +397,9 @@ jobs:
           npm run probe:twins
           node scripts/probe-twin-endpoints.test.mjs
 
-      - name: Unit tests (wire, sdk, stripe, gmail, linear, checks, sandbox-domains)
+      - name: Unit tests (wire, sdk, stripe, gmail, linear, checks, sandbox-domains, dashboard)
         if: steps.scope.outputs.heavy == 'true'
-        run: npx vitest run --project wire --project sdk --project twin-stripe --project twin-gmail --project twin-linear --project checks --project sandbox-domains
+        run: npx vitest run --project wire --project sdk --project twin-stripe --project twin-gmail --project twin-linear --project checks --project sandbox-domains --project dashboard
 
       # The tarball half of the @pome-sh/checks audit: the engine is not inlined,
       # zod stayed external (one schema identity), the DSL exists exactly once

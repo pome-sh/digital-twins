@@ -42,6 +42,23 @@ const pkg = JSON.parse(readFileSync(resolve(CLI_ROOT, "package.json"), "utf8")) 
 };
 
 /**
+ * `@pome-sh/*` devDependencies the CLI names for TYPES ONLY, which the map
+ * below must not claim to have inlined.
+ *
+ * `@pome-sh/dashboard` is the render contract `cli/src/dashboard/` satisfies
+ * (`packages/dashboard/src/api.ts`). Every reference to it is an `import type`,
+ * so esbuild erases it and not one byte rides along — while the map's whole
+ * purpose is to record "which vocabulary rode along" for `pome checks <twin>`
+ * and the F-1791 digest-skew refusals. Listing a version for a package that is
+ * not in the bundle is a false entry in a map those refusals trust.
+ *
+ * The dashboard's BUILD ordering does not come from this dependency either: it
+ * falls out of `scripts/build.mjs`'s topological sort (dashboard depends only
+ * on wire and lands in layer 1; the CLI lands in layer 3).
+ */
+const TYPE_ONLY_DEPS = new Set(["@pome-sh/dashboard"]);
+
+/**
  * Versions of the `@pome-sh/*` packages this bundle inlines. They are
  * devDependencies resolved as workspace `"*"` links, so nothing in the
  * published tarball records which twin vocabulary rode along — except this
@@ -51,8 +68,8 @@ const pkg = JSON.parse(readFileSync(resolve(CLI_ROOT, "package.json"), "utf8")) 
  */
 function inlinedPackageVersions(): Record<string, string> {
   const require = createRequire(resolve(CLI_ROOT, "package.json"));
-  const inlined = Object.keys(pkg.devDependencies ?? {}).filter((dep) =>
-    dep.startsWith("@pome-sh/"),
+  const inlined = Object.keys(pkg.devDependencies ?? {}).filter(
+    (dep) => dep.startsWith("@pome-sh/") && !TYPE_ONLY_DEPS.has(dep),
   );
   return Object.fromEntries(
     inlined.map((dep) => {

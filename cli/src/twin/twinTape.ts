@@ -66,18 +66,152 @@ const WRITE_VERBS = new Set([
   "kick", "join", "leave", "pin", "unpin", "react", "upload", "trash", "untrash", "modify",
   "insert", "import", "batch", "submit", "request", "dismiss", "approve", "reject", "resolve",
   "transfer", "attach", "detach", "refund", "capture", "confirm", "void", "finalize", "pay",
+  // Slack's `conversations.open` (opens a DM) and `chat.scheduleMessage`. Checked
+  // against all 115 MCP tool names across the five twins: neither word turns a
+  // read into a write, and `schedule` fixes `slack_schedule_message`, a write
+  // this list used to read as a read.
+  "open", "schedule",
+  // GitHub's consolidated `issue_write` and Linear's `save_issue`,
+  // `save_project`, `save_document` — found by a real Claude Code session, whose
+  // failed `issue_write` would otherwise never have been marked. Every tool that
+  // declares `readOnlyHint` is now checked against this list
+  // (`requestKind.test.ts`).
+  "write", "save",
 ]);
+
+/**
+ * Nouns whose words would otherwise read as verbs. `pull_request_read` is a
+ * read; split naively, its `request` is on the list above and it came out as a
+ * write that "did not land" on every call.
+ */
+const COMPOUND_NOUNS: ReadonlyArray<[RegExp, string]> = [[/pull_request/gi, "pullrequest"]];
+
+/**
+ * The words of a tool or method name: `create_issue` → create, issue;
+ * `chat.postMessage` → chat, post, message. camelCase splits too, because Slack
+ * names its methods that way and the verb is the second word, not the first.
+ */
+function nameWords(name: string): string[] {
+  let joined = name;
+  for (const [compound, noun] of COMPOUND_NOUNS) joined = joined.replace(compound, noun);
+  return joined
+    .split(/[_\-.]|(?=[A-Z])/)
+    .map((word) => word.toLowerCase())
+    .filter((word) => word.length > 0);
+}
+
+function namesAWrite(name: string): boolean {
+  return nameWords(name).some((word) => WRITE_VERBS.has(word));
+}
 
 /** `/mcp` (streamable HTTP) and the legacy `/mcp/call`, `/mcp/tools/:name` doors. */
 function isMcpTransport(path: string): boolean {
   return path === "/mcp" || path.startsWith("/mcp/");
 }
 
-/** Read or write, from the HTTP method for a route and from the verb for an MCP tool. */
-export function requestKind(method: string, path: string, tool: string | null): "read" | "write" {
-  if (tool && isMcpTransport(path)) {
-    return tool.toLowerCase().split(/[_\-.]/).some((part) => WRITE_VERBS.has(part)) ? "write" : "read";
+/**
+ * A Slack-style Web API method: one path segment, dotted, `noun.verbPhrase` —
+ * `/conversations.list`, `/chat.postMessage`, `/users.profile.get`.
+ *
+ * ONE segment is the discriminator. GitHub's `/repos/acme/api/contents/src/index.ts`
+ * also ends in a dotted name, and reading its `PUT` by the "verb" in `index.ts`
+ * would call a file write a read.
+ */
+function isRpcMethod(path: string): boolean {
+  return /^\/[a-z][a-zA-Z]*(\.[a-zA-Z]+)+$/.test(path);
+}
+
+/**
+ * What a GraphQL request body asks for: `mutation` is a write; `query`,
+ * `subscription` and the `{ … }` shorthand are reads.
+ *
+ * Reads the operation the request names (`operationName`), else the first one,
+ * skipping `fragment` definitions and ignoring comments and string literals —
+ * a query whose argument happens to contain the word "mutation" is still a
+ * query. A batch (an array of bodies) is a write if any member is. Anything it
+ * cannot read comes back undefined, and the caller treats that as a read: the
+ * safe direction, because a write read as a read loses a mark while a read
+ * read as a write prints a false "did not land".
+ */
+export function graphqlOperationKind(body: unknown): "read" | "write" | undefined {
+  if (Array.isArray(body)) {
+    const kinds = body.map(graphqlOperationKind);
+    if (kinds.includes("write")) return "write";
+    return kinds.some((kind) => kind === "read") ? "read" : undefined;
   }
+  if (body === null || typeof body !== "object") return undefined;
+  const { query, operationName } = body as { query?: unknown; operationName?: unknown };
+  if (typeof query !== "string") return undefined;
+
+  const source = query
+    .replace(/"""[\s\S]*?"""/g, '""')
+    .replace(/"(?:\\.|[^"\\])*"/g, '""')
+    .replace(/#[^\n]*/g, "");
+
+  // Top-level definitions only. Braces set the depth; parentheses are skipped
+  // whole, because a variable default (`$f: Filter = {a: 1}`) puts a brace at
+  // depth zero that is not a selection set. A top-level `{` opens the selection
+  // set of whatever keyword came before it — an operation, a fragment — or, with
+  // nothing before it, is the `{ … }` query shorthand.
+  type Operation = { type: "query" | "mutation" | "subscription"; name?: string };
+  const operations: Operation[] = [];
+  let depth = 0;
+  let parens = 0;
+  let pending: "operation" | "fragment" | null = null;
+  const tokens = /[{}()]|\b(query|mutation|subscription|fragment)\b\s*([A-Za-z_]\w*)?/g;
+  for (const [token, keyword, name] of source.matchAll(tokens)) {
+    if (token === "(") parens += 1;
+    else if (token === ")") parens = Math.max(0, parens - 1);
+    else if (parens > 0) continue;
+    else if (token === "{") {
+      if (depth === 0) {
+        if (pending === null) operations.push({ type: "query" });
+        pending = null;
+      }
+      depth += 1;
+    } else if (token === "}") {
+      depth = Math.max(0, depth - 1);
+    } else if (depth === 0 && keyword !== undefined) {
+      if (keyword === "fragment") {
+        pending = "fragment";
+      } else {
+        operations.push({ type: keyword as Operation["type"], ...(name ? { name } : {}) });
+        pending = "operation";
+      }
+    }
+  }
+  const chosen =
+    typeof operationName === "string"
+      ? operations.find((operation) => operation.name === operationName)
+      : operations[0];
+  if (chosen === undefined) return undefined;
+  return chosen.type === "mutation" ? "write" : "read";
+}
+
+/**
+ * Read or write.
+ *
+ * The HTTP method answers it for a REST route, and says nothing at all for the
+ * three transports that send every call as a POST: MCP (the tool name decides),
+ * GraphQL (the operation type decides — Linear), and Slack's Web API (the
+ * method name decides — `@slack/web-api` POSTs `conversations.list`). Reading
+ * those three by method made every Linear query and every Slack SDK read print
+ * "write did not land", which is the one sentence the dashboard exists to say
+ * truthfully.
+ */
+export function requestKind(
+  method: string,
+  path: string,
+  tool: string | null,
+  body?: unknown,
+): "read" | "write" {
+  if (tool && isMcpTransport(path)) return namesAWrite(tool) ? "write" : "read";
+  if (path === "/graphql" || path.endsWith("/graphql")) {
+    // GraphQL over GET cannot carry a mutation, per the spec.
+    if (READ_METHODS.has(method)) return "read";
+    return graphqlOperationKind(body) ?? "read";
+  }
+  if (isRpcMethod(path)) return namesAWrite(path.slice(1)) ? "write" : "read";
   return READ_METHODS.has(method) ? "read" : "write";
 }
 
@@ -96,7 +230,7 @@ export function tapeRows(events: unknown, sessionPath: string): TapeRow[] {
     const event = parsed.data;
     const method = event.method.toUpperCase();
     const path = event.path.startsWith(sessionPath) ? event.path.slice(sessionPath.length) || "/" : event.path;
-    const kind = requestKind(method, path, event.tool ?? null);
+    const kind = requestKind(method, path, event.tool ?? null, event.request_body);
     let note: string | null = null;
     if (event.fidelity === "unsupported" || event.status === 501) {
       note = "not modelled by this twin";
@@ -127,7 +261,11 @@ export function tapeSummary(rows: readonly TapeRow[]): TapeSummary {
     changed_state: rows.filter((row) => row.state_mutation).length,
     writes_not_landed: rows.filter((row) => row.note?.startsWith("write ")).length,
     unsupported: rows.filter((row) => row.note?.startsWith("not modelled")).length,
-    reads: rows.filter((row) => row.kind === "read" && !row.note).length,
+    // A row that changed state is counted there and nowhere else, whatever its
+    // name suggests: before, a `changed` row whose tool the verb list misread
+    // was counted twice, and "4 requests: 2 changed · 1 did not land · 2 reads"
+    // summed to five.
+    reads: rows.filter((row) => row.kind === "read" && !row.note && !row.state_mutation).length,
   };
 }
 

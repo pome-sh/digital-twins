@@ -14,6 +14,7 @@ import { TWIN_REGISTRY } from "../../src/twin/registry.js";
 import {
   chooseStandalonePorts,
   mergeStandaloneStatus,
+  parseListenPort,
   resolveStandaloneAuthSecretFor,
   resolveStandaloneSeeds,
   resolveStandaloneTwins,
@@ -126,6 +127,20 @@ describe("chooseStandalonePorts", () => {
     await expect(
       chooseStandalonePorts(["github", "slack"], undefined, {}, async () => false),
     ).rejects.toThrow("no free port for the github twin");
+  });
+});
+
+// `--dashboard-port` is held to the same rule, refused under its own name.
+describe("parseListenPort", () => {
+  it("takes a port a listener can bind", () => {
+    expect(parseListenPort("4555", "--dashboard-port")).toBe(4555);
+    expect(parseListenPort("65535", "--dashboard-port")).toBe(65535);
+  });
+
+  it.each(["0", "65536", "-1", "3.5", "http", ""])("refuses %j, naming the flag", (raw) => {
+    expect(() => parseListenPort(raw, "--dashboard-port")).toThrow(
+      `pome twin start: invalid --dashboard-port "${raw}"`,
+    );
   });
 });
 

@@ -142,7 +142,14 @@ describe("pome checks", () => {
   // The published tarball has no workspace to fall back to, so the build must
   // bake the versions in. Assert the map the tsup config defines, not the
   // bundling itself: every inlined @pome-sh package, each with a real version.
-  it("bakes a version for every inlined @pome-sh package into the bundle", async () => {
+  //
+  // "Inlined" is not the same as "declared". `@pome-sh/dashboard` is a CLI
+  // devDependency the bundle never carries a byte of — `cli/src/dashboard/`
+  // names it only for `import type`, which esbuild erases — and its build output
+  // rides in `assets/`, not in the JS. A version for it here would be a false
+  // entry in a map `pome checks <twin>` prints and the F-1791 digest-skew
+  // refusals trust, so the exclusion is asserted in BOTH directions below.
+  it("bakes a version for every inlined @pome-sh package, and only those", async () => {
     const config = (await import("../../tsup.config.js")).default as {
       define?: Record<string, string>;
     };
@@ -153,12 +160,24 @@ describe("pome checks", () => {
     const manifest = JSON.parse(
       readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
     ) as { devDependencies: Record<string, string> };
-    const inlined = Object.keys(manifest.devDependencies).filter((dep) =>
+    const typeOnly = new Set(["@pome-sh/dashboard"]);
+    const declared = Object.keys(manifest.devDependencies).filter((dep) =>
       dep.startsWith("@pome-sh/"),
     );
+    const inlined = declared.filter((dep) => !typeOnly.has(dep));
+
     expect(inlined.length).toBeGreaterThan(0);
     for (const dep of inlined) {
       expect(baked[dep], `${dep} has no baked version`).toMatch(/^\d+\.\d+\.\d+/);
+    }
+    // The other direction: a type-only dep that quietly starts being inlined
+    // (someone drops the `type` keyword) shows up here as a missing version
+    // rather than as a silent runtime import of a package with no dist.
+    for (const dep of typeOnly) {
+      expect(declared, `${dep} is no longer a CLI devDependency — drop it from typeOnly`).toContain(
+        dep,
+      );
+      expect(baked[dep], `${dep} is type-only and must not claim a baked version`).toBeUndefined();
     }
   });
 
