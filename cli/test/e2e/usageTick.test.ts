@@ -12,10 +12,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { resolveTsxBin } from "../../scripts/lib/resolve-tsx.js";
+import { tsxNodeArgs } from "../fixtures/tsxNode.js";
 
 const CLI_ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const TSX_BIN = resolveTsxBin(import.meta.url);
+const NODE_TSX = tsxNodeArgs(import.meta.url);
 const MAIN_TS = join(CLI_ROOT, "src", "cli", "main.ts");
 
 let server: Server;
@@ -45,7 +45,7 @@ async function run(home: string, env: NodeJS.ProcessEnv, args: string[]): Promis
   return await new Promise((resolve, reject) => {
     // A clean environment: no CI, no opt-out inherited from the developer's shell.
     const { CI: _ci, DO_NOT_TRACK: _dnt, POME_TELEMETRY: _pt, ...inherited } = process.env;
-    const proc = spawn(TSX_BIN, [MAIN_TS, ...args], {
+    const proc = spawn(process.execPath, [...NODE_TSX, MAIN_TS, ...args], {
       cwd: home,
       env: { ...inherited, HOME: home, USERPROFILE: home, POME_TELEMETRY_KEY: "phc_e2e", POME_TELEMETRY_HOST: host, POME_CLI_DISABLE_KEYCHAIN: "1", ...env },
       stdio: ["ignore", "pipe", "pipe"],

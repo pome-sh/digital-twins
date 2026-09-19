@@ -24,11 +24,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { resolveTsxBin } from "../../scripts/lib/resolve-tsx.js";
+import { tsxNodeArgs } from "../fixtures/tsxNode.js";
 import { TWIN_NAME_LIST, type TwinName } from "../../src/twin/registry.js";
 
 const CLI_ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const TSX_BIN = resolveTsxBin(import.meta.url);
+const NODE_TSX = tsxNodeArgs(import.meta.url);
 const MAIN_TS = join(CLI_ROOT, "src", "cli", "main.ts");
 
 /** Distinctive strings the generated seed DECLARES, which the twin's own
@@ -62,7 +62,7 @@ async function freePort(): Promise<number> {
 }
 
 function runCli(args: string[], cwd: string): Promise<{ code: number | null; output: string }> {
-  const proc = spawn(TSX_BIN, [MAIN_TS, ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+  const proc = spawn(process.execPath, [...NODE_TSX, MAIN_TS, ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
   let output = "";
   proc.stdout?.on("data", (chunk) => { output += chunk; });
   proc.stderr?.on("data", (chunk) => { output += chunk; });
@@ -96,8 +96,8 @@ describe("pome twin new-seed → pome twin start --seed (e2e)", () => {
 
       const port = await freePort();
       child = spawn(
-        TSX_BIN,
-        [MAIN_TS, "twin", "start", twin, "--port", String(port), "--seed", seedPath],
+        process.execPath,
+        [...NODE_TSX, MAIN_TS, "twin", "start", twin, "--port", String(port), "--seed", seedPath],
         { cwd, env: { ...process.env }, stdio: ["ignore", "pipe", "pipe"] },
       );
       let output = "";
