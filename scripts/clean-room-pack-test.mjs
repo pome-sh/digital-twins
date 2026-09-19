@@ -130,11 +130,21 @@ async function waitForHealth(port, child, twin) {
  * that stops at "the file is there". This asks the server for the page and for
  * each thing the page names, which is the cheapest check that a dashboard a
  * user installs actually loads.
+ *
+ * The URL is waited for, not read once. `/healthz` answers the moment the twin
+ * binds, and the command still writes its status file, prints its banner and
+ * binds the dashboard before it prints the line — so reading the log at the
+ * first 200 raced the twin's own startup, and lost on slack in a release run
+ * with nothing printed yet at all.
  */
-async function checkDashboard(twin, log) {
-  const printed = /Dashboard: (http:\/\/127\.0\.0\.1:\d+\/\?k=[a-f0-9]+)/.exec(log);
-  if (!printed) {
-    fail(`twin ${twin}: the banner printed no Dashboard URL\n--- twin output ---\n${log}`);
+async function checkDashboard(twin, readLog, child) {
+  const deadline = Date.now() + 15_000;
+  let printed = null;
+  while (!(printed = /Dashboard: (http:\/\/127\.0\.0\.1:\d+\/\?k=[a-f0-9]+)/.exec(readLog()))) {
+    if (child.exitCode !== null || Date.now() > deadline) {
+      fail(`twin ${twin}: the banner printed no Dashboard URL within 15s\n--- twin output ---\n${readLog()}`);
+    }
+    await new Promise((r) => setTimeout(r, 50));
   }
   const url = new URL(printed[1]);
   const page = await fetch(url.origin + "/");
@@ -180,7 +190,7 @@ async function bootTwinFromTarball(room, cliBin, twin, port) {
     const problem = await waitForHealth(port, child, twin);
     if (problem) fail(`twin ${twin} from the tarball: ${problem}\n--- twin output ---\n${log}`);
     console.log(`  ✓ ${twin}: booted from the tarball, /healthz 200`);
-    await checkDashboard(twin, log);
+    await checkDashboard(twin, () => log, child);
   } finally {
     child.kill("SIGTERM");
     await new Promise((r) => {
