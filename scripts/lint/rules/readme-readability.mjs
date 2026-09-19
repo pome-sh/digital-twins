@@ -201,6 +201,12 @@ function renderedText(source) {
  * through the same loop so neither can be reassembled by removing the other.
  * Each pass strictly shortens the string or changes nothing, so this
  * terminates.
+ *
+ * Whatever `<` survives the loop is literal text, and github.com paints it:
+ * an unterminated `<!--` inside a paragraph renders as `&lt;!--`, verified
+ * against GitHub's own /markdown endpoint. So it is not stripped — that would
+ * hide characters the reader sees — but swapped for a same-width stand-in,
+ * which keeps the count honest and leaves nothing that looks like markup.
  */
 function stripTags(text) {
   let out = text;
@@ -209,7 +215,7 @@ function stripTags(text) {
     previous = out;
     out = out.replace(/<!--[\s\S]*?-->/g, "").replace(/<\/?[a-zA-Z][^>]*>/g, "");
   } while (out !== previous);
-  return out;
+  return out.replace(/</g, "\u2039");
 }
 
 function assertGitRoot(root) {

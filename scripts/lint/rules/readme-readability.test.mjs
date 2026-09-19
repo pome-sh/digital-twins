@@ -170,6 +170,17 @@ const cases = [
     expect: "green",
   },
   {
+    name: "an unterminated <!-- mid-paragraph is literal text GitHub paints, and is counted",
+    files: { "README.md": page(`${words(PROSE_CHAR_LIMIT - 20)} <!-- and the words after it`) },
+    expect: "red",
+    contains: "rendered characters",
+  },
+  {
+    name: "a literal < in prose counts as the one character it renders as",
+    files: { "README.md": page(`${words(PROSE_CHAR_LIMIT - 4)} a<b`) },
+    expect: "green",
+  },
+  {
     name: "a table row is a record, not prose",
     files: {
       "README.md": page(`| Twin | Notes |\n| --- | --- |\n| GitHub | ${words(PROSE_CHAR_LIMIT + 50)} |`),
