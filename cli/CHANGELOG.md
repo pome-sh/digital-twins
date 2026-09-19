@@ -15,7 +15,7 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
-## Unreleased (minor)
+## 0.46.0 — 2026-09-19
 
 **`pome twin start` serves a live dashboard of the tape** (F-1850). The banner
 prints a `Dashboard: http://127.0.0.1:…/?k=…` line; open it to watch every
@@ -50,8 +50,6 @@ twin inherited `GITHUB_CLONE_DB` on those paths, so a graded run re-seeded —
 and so wiped — a database an operator had saved. Their twins are in memory
 whatever the environment says; the path is now an argument, and only
 `pome twin start` fills it.
-
-## Unreleased (patch)
 
 **`pome twin start stripe` takes Stripe's `[]`-append form bodies** (F-1778).
 `-d "payment_method_types[]=crypto"` answered 400 `expected array, received
