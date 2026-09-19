@@ -96,7 +96,8 @@ export default {
  *
  * A prose block is a run of consecutive lines that renders as one paragraph or
  * one list item. Table rows are records rather than prose and are skipped, as
- * they are in `markdown-size`. Raw HTML lines carry attributes, not sentences.
+ * they are in `markdown-size`. Raw HTML counts for what it paints: a tag that
+ * renders nothing separates blocks, and a tag wrapped around text is prose.
  */
 function parse(text) {
   const lines = text.split("\n");
@@ -116,7 +117,15 @@ function parse(text) {
     const fenceMatch = /^\s*(`{3,}|~{3,})/.exec(line);
 
     if (fence) {
-      if (fenceMatch && fenceMatch[1][0] === fence[0] && fenceMatch[1].length >= fence.length) {
+      // A closing fence may be followed only by whitespace (CommonMark §4.5).
+      // "```js" inside a fenced block is content, and closing on it would
+      // hand every later code line to the prose check instead of this one.
+      if (
+        fenceMatch &&
+        fenceMatch[1][0] === fence[0] &&
+        fenceMatch[1].length >= fence.length &&
+        line.slice(fenceMatch[0].length).trim() === ""
+      ) {
         fence = null;
       } else {
         codeLines.push({ line, number });
@@ -128,11 +137,22 @@ function parse(text) {
       fence = fenceMatch[1];
       continue;
     }
-    if (line.trim() === "" || isHeading(line) || isTableRow(line) || isHtml(line)) {
+    if (line.trim() === "" || isHeading(line) || isTableRow(line)) {
       flush();
       continue;
     }
-    if (isListItem(line) || current === null) {
+    // Raw HTML is judged by what it paints. A line that renders nothing —
+    // `<div align="center">`, an `<img>`, a closing `</p>` — separates blocks.
+    // A line that renders text is prose and pays the budget like any other:
+    // skipping it wholesale let a `<p>` paragraph of any length through.
+    if (isHtml(line) && renderedText(line) === "") {
+      flush();
+      continue;
+    }
+    // A block-level tag starts a new paragraph; an inline one (`<code>`, `<a>`)
+    // on a continuation line is part of the paragraph it sits in, exactly as
+    // CommonMark decides which HTML may interrupt a paragraph.
+    if (isListItem(line) || isBlockHtml(line) || current === null) {
       flush();
       current = { number, text: line };
       continue;
@@ -145,7 +165,11 @@ function parse(text) {
 
 const isHeading = (line) => /^\s{0,3}#{1,6}\s/.test(line);
 const isListItem = (line) => /^\s*(?:[-*+]|\d+[.)])\s/.test(line);
-const isHtml = (line) => /^\s*<\/?[a-zA-Z]/.test(line);
+const isHtml = (line) => /^\s*<(?:\/?[a-zA-Z]|!--)/.test(line);
+const isBlockHtml = (line) =>
+  /^\s*<\/?(?:p|div|h[1-6]|details|summary|blockquote|center|section|article|header|footer|figure|figcaption|table|thead|tbody|tr|td|th|ul|ol|li|dl|dt|dd|hr)\b/i.test(
+    line,
+  );
 
 function isTableRow(line) {
   const trimmed = line.trim();
@@ -156,6 +180,7 @@ function isTableRow(line) {
 function renderedText(source) {
   return stripTags(
     source
+      .replace(/<!--[\s\S]*?-->/g, "")
       .replace(/^\s*(?:[-*+]|\d+[.)])\s+/, "")
       .replace(/^\s*>\s?/, "")
       .replace(/!\[[^\]]*\]\([^)]*\)/g, "")

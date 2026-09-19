@@ -128,6 +128,43 @@ const cases = [
     expect: "green",
   },
   {
+    name: "a fence line with trailing text does not close the block — later code is still code",
+    files: {
+      "README.md": page("Prose.\n\n```markdown\n```js\n" + "x".repeat(CODE_COLUMN_LIMIT + 10) + "\n```"),
+    },
+    expect: "red",
+    contains: `${CODE_COLUMN_LIMIT + 10} columns in a code block`,
+  },
+  {
+    name: "a paragraph wrapped in <p> pays the budget — HTML is measured by what it paints",
+    files: { "README.md": page(`<p align="center">${words(PROSE_CHAR_LIMIT + 1)}</p>`) },
+    expect: "red",
+    contains: `${PROSE_CHAR_LIMIT + 1} rendered characters`,
+  },
+  {
+    name: "HTML that paints no text still separates blocks — an <img> alt is not prose",
+    files: {
+      "README.md": page(`<p align="center">\n  <img src="x.svg" alt="${words(PROSE_CHAR_LIMIT + 50)}">\n</p>`),
+    },
+    expect: "green",
+  },
+  {
+    name: "an inline tag on a continuation line stays in its paragraph",
+    files: { "README.md": page(`${words(PROSE_CHAR_LIMIT - 20)}\n<code>tail</code> and a few more words here`) },
+    expect: "red",
+    contains: "rendered characters",
+  },
+  {
+    name: "a block-level tag starts a new paragraph instead of joining the last one",
+    files: { "README.md": page(`${words(200)}\n<p>${words(200)}</p>`) },
+    expect: "green",
+  },
+  {
+    name: "an HTML comment paints nothing and is not charged",
+    files: { "README.md": page(`<!-- ${words(PROSE_CHAR_LIMIT + 100)} -->`) },
+    expect: "green",
+  },
+  {
     name: "a table row is a record, not prose",
     files: {
       "README.md": page(`| Twin | Notes |\n| --- | --- |\n| GitHub | ${words(PROSE_CHAR_LIMIT + 50)} |`),

@@ -154,7 +154,7 @@ The same command works in a GitHub Actions job. The job below starts the twin, w
     node-version: 24
 - name: Start the GitHub twin
   run: |
-    npx @pome-sh/cli@0.45.1 twin start github > twin.log 2>&1 &
+    npx @pome-sh/cli@0.46.0 twin start github > twin.log 2>&1 &
     for _ in $(seq 60); do
       curl -fsS http://127.0.0.1:3333/healthz >/dev/null && break
       sleep 1
@@ -166,7 +166,7 @@ The same command works in a GitHub Actions job. The job below starts the twin, w
 - run: npm test
 - name: What the tests did
   if: always()
-  run: npx @pome-sh/cli@0.45.1 twin tape --diff
+  run: npx @pome-sh/cli@0.46.0 twin tape --diff
 ```
 
 The twin from the first step keeps running for the rest of the job, and `twin tape` finds it through `.pome/twin-status.json`. This repository's own CI starts its twins the same way.
