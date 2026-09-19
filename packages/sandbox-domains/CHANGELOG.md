@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.4.2 — 2026-09-19
 
 **No consumer-visible change.** Comment-only headers on the bundled `@pome-sh/sdk/checks` grammar (F-1589). No export or behaviour change.
 

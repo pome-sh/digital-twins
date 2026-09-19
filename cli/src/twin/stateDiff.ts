@@ -31,6 +31,21 @@ export type CollectionDiff = {
   removed: string[];
 };
 
+/**
+ * A `CollectionDiff` plus how many rows the collection held at each end, and
+ * which of the two kinds of array it is.
+ *
+ * `membership` is an array of scalars — slack's `channel.members`, linear's
+ * `issue.labelIds`, gmail's `message.to`. They are join tables: real state, but
+ * never the thing a reader is looking at, and a panel that gives them the same
+ * weight as `issues` buries it. `collection` is an array of rows.
+ */
+export type CollectionCensus = CollectionDiff & {
+  boot: number;
+  now: number;
+  kind: "collection" | "membership";
+};
+
 type Row = Record<string, unknown>;
 type Primitive = string | number | boolean | null;
 
@@ -122,36 +137,74 @@ function sameScalars(a: Row, b: Row): boolean {
  * that changed; a collection nothing touched is absent.
  */
 export function diffState(before: unknown, after: unknown): CollectionDiff[] {
-  const out: CollectionDiff[] = [];
-  walk(before, after, "", out);
-  return out;
+  return censusState(before, after, { changedOnly: true }).map(({ path, added, changed, removed }) => ({
+    path,
+    added,
+    changed,
+    removed,
+  }));
 }
 
-function walk(before: unknown, after: unknown, path: string, out: CollectionDiff[]): void {
+/**
+ * Every collection in the tree with how many rows it held then and holds now —
+ * the diff above, plus the collections nothing touched, plus the two counts.
+ *
+ * Why this and not "count the collections in `after`": a count taken in its own
+ * traversal can disagree with the diff about a path. Bracket segments are built
+ * from a row's identity (`repositories[acme/api]`), and `identityKeyOf` decides
+ * that key from BOTH sides at once — so a separate single-tree pass can pick a
+ * different key, emit `repositories[1].issues`, and produce a count that joins
+ * to no diff entry. One traversal, one identity decision, paths agree by
+ * construction.
+ *
+ * Why counts at all: `pome twin tape --diff` only ever needed what moved. A
+ * reader watching a twin needs the collections that did NOT move as well — they
+ * are the context that makes a change legible — and needs a count that can
+ * return to zero when the last row is deleted (F-1850 · D3).
+ */
+export function censusState(
+  before: unknown,
+  after: unknown,
+  options: { changedOnly?: boolean } = {},
+): CollectionCensus[] {
+  const sink: Sink = { out: [], changedOnly: options.changedOnly === true };
+  walk(before, after, "", sink);
+  return sink.out;
+}
+
+type Sink = { out: CollectionCensus[]; changedOnly: boolean };
+
+/** Record an entry, or drop it when the caller only asked for what moved. */
+function emit(sink: Sink, entry: CollectionCensus): void {
+  const moved = entry.added.length > 0 || entry.changed.length > 0 || entry.removed.length > 0;
+  if (moved || !sink.changedOnly) sink.out.push(entry);
+}
+
+function walk(before: unknown, after: unknown, path: string, sink: Sink): void {
   if (Array.isArray(before) || Array.isArray(after)) {
     const b = Array.isArray(before) ? before : [];
     const a = Array.isArray(after) ? after : [];
     if (isMembership(b) || isMembership(a)) {
       if ((b.length === 0 || isMembership(b)) && (a.length === 0 || isMembership(a))) {
-        diffMembership(b as Primitive[], a as Primitive[], path, out);
+        diffMembership(b as Primitive[], a as Primitive[], path, sink);
       }
       return;
     }
     if ((b.length === 0 || isCollection(b)) && (a.length === 0 || isCollection(a))) {
-      diffCollection(b as Row[], a as Row[], path, out);
+      diffCollection(b as Row[], a as Row[], path, sink);
     }
     return;
   }
   if (isRow(before) && isRow(after)) {
     const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
     for (const key of [...keys].sort()) {
-      walk(before[key], after[key], path === "" ? key : `${path}.${key}`, out);
+      walk(before[key], after[key], path === "" ? key : `${path}.${key}`, sink);
     }
   }
 }
 
 /** Scalars in, scalars out: added and removed by value, counted as a multiset. */
-function diffMembership(before: Primitive[], after: Primitive[], path: string, out: CollectionDiff[]): void {
+function diffMembership(before: Primitive[], after: Primitive[], path: string, sink: Sink): void {
   const count = (values: Primitive[]) => {
     const map = new Map<string, number>();
     for (const value of values) map.set(String(value), (map.get(String(value)) ?? 0) + 1);
@@ -159,15 +212,31 @@ function diffMembership(before: Primitive[], after: Primitive[], path: string, o
   };
   const b = count(before);
   const a = count(after);
-  const entry: CollectionDiff = { path: path || "(root)", added: [], changed: [], removed: [] };
+  const entry: CollectionCensus = {
+    path: path || "(root)",
+    boot: before.length,
+    now: after.length,
+    kind: "membership",
+    added: [],
+    changed: [],
+    removed: [],
+  };
   for (const [value, n] of a) for (let i = b.get(value) ?? 0; i < n; i += 1) entry.added.push(value);
   for (const [value, n] of b) for (let i = a.get(value) ?? 0; i < n; i += 1) entry.removed.push(value);
-  if (entry.added.length || entry.removed.length) out.push(entry);
+  emit(sink, entry);
 }
 
-function diffCollection(before: Row[], after: Row[], path: string, out: CollectionDiff[]): void {
+function diffCollection(before: Row[], after: Row[], path: string, sink: Sink): void {
   const key = identityKeyOf(before, after);
-  const entry: CollectionDiff = { path: path || "(root)", added: [], changed: [], removed: [] };
+  const entry: CollectionCensus = {
+    path: path || "(root)",
+    boot: before.length,
+    now: after.length,
+    kind: "collection",
+    added: [],
+    changed: [],
+    removed: [],
+  };
   // Rows with no identity field are matched by their scalar content (a
   // repeated identical row gets a counter, so a multiset still matches), and
   // labelled by it; a row whose content changed is a remove plus an add.
@@ -202,14 +271,14 @@ function diffCollection(before: Row[], after: Row[], path: string, out: Collecti
   for (const [id, { row, index }] of beforeById) {
     if (!afterById.has(id)) entry.removed.push(name(row, index));
   }
-  if (entry.added.length || entry.changed.length || entry.removed.length) out.push(entry);
+  emit(sink, entry);
   for (const pair of nested) {
     const keys = new Set([...Object.keys(pair.before), ...Object.keys(pair.after)]);
     for (const field of [...keys].sort()) {
       const b = pair.before[field];
       const a = pair.after[field];
       if (Array.isArray(b) || Array.isArray(a) || (isRow(b) && isRow(a))) {
-        walk(b, a, `${path}[${pair.label}].${field}`, out);
+        walk(b, a, `${path}[${pair.label}].${field}`, sink);
       }
     }
   }

@@ -89,6 +89,26 @@
         "test/**/*.ts"
       ]
     },
+    "packages/dashboard": {
+      "entry": [
+        "index.html",
+        "src/main.tsx",
+        "vite.config.ts",
+        "test/**/*.test.ts"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "test/**/*.ts",
+        "vite.config.ts"
+      ],
+      "ignoreDependencies": [
+        "tailwindcss",
+        "tw-animate-css",
+        "@fontsource-variable/geist",
+        "@fontsource-variable/geist-mono",
+        "@fontsource-variable/source-serif-4"
+      ]
+    },
     "packages/sandbox-domains": {
       "entry": [
         "src/index.ts",

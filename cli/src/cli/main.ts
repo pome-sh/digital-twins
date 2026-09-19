@@ -206,6 +206,18 @@ export function createProgram() {
       "--seed <path>",
       "Boot from a JSON or YAML seed file instead of the default. A seed REPLACES the default; it does not merge. Takes the per-twin envelope { <twin>: { … } } or one twin's flat seed (several twins need the envelope, one entry per named twin). Overrides POME_SEED_JSON.",
     )
+    .option(
+      "--no-dashboard",
+      "Do not serve the local dashboard. It is a read-only view of the tape on its own loopback port; this turns the port off.",
+    )
+    .option(
+      "--open",
+      "Open the dashboard in a browser once the twins are listening. Off by default: the URL is printed either way, and this command runs in CI.",
+    )
+    .option(
+      "--dashboard-port <port>",
+      "Bind the dashboard to this port instead of a free one. The twins' own ports are unaffected.",
+    )
     .description(
       // The db variables are the registry's, not this text's: naming them here
       // is how the reader learns state is in memory by default BEFORE the boot
@@ -214,10 +226,21 @@ export function createProgram() {
         (twin) => TWIN_REGISTRY[twin].dbEnvName,
       ).join(", ")}); with one set, the twin's matching *_NO_SEED=1 serves what the file holds instead of re-seeding over it.`,
     )
-    .action(async (names: string[], options: { port?: string; seed?: string }) => {
-      const { runTwinStartCommand } = await import("../twin/twinStart.js");
-      await runTwinStartCommand(names, options);
-    });
+    .action(
+      async (
+        names: string[],
+        options: {
+          port?: string;
+          seed?: string;
+          dashboard?: boolean;
+          open?: boolean;
+          dashboardPort?: string;
+        },
+      ) => {
+        const { runTwinStartCommand } = await import("../twin/twinStart.js");
+        await runTwinStartCommand(names, options);
+      },
+    );
 
   twin
     .command("new-seed")

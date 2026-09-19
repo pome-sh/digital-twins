@@ -15,7 +15,25 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
-## Unreleased (minor)
+## 0.46.0 — 2026-09-19
+
+**`pome twin start` serves a live dashboard of the tape** (F-1850). The banner
+prints a `Dashboard: http://127.0.0.1:…/?k=…` line; open it to watch every
+request the agent makes land as it happens, which write did not land, and what
+the twin's state now holds against boot. It is read-only and loopback-only, and
+the URL carries a per-boot key. `--open` opens a browser, `--no-dashboard` turns
+it off, `--dashboard-port <port>` pins its port.
+
+**`pome twin tape` stops calling reads failed writes** (F-1850). A Linear
+GraphQL query, a Slack Web API read sent as a POST (as `@slack/web-api` sends
+every call), and the MCP tools whose names misled the verb list — `issue_write`,
+`pull_request_read`, Linear's `save_*` — are now read the way the twin declares
+them. A row that changed state is no longer also counted as a read.
+
+**`pome twin tape --diff` stops reporting untouched secrets as changed**
+(F-1850). The boot snapshot is redacted by the same function the twin's state
+endpoint uses, so a freshly started Linear twin no longer shows its tokens and
+webhooks as changed.
 
 **`pome twin start` keeps state where the twin's own `*_DB` says** (F-1758).
 `SLACK_CLONE_DB`, `STRIPE_CLONE_DB`, `GMAIL_TWIN_DB` and `LINEAR_TWIN_DB` were
@@ -32,8 +50,6 @@ twin inherited `GITHUB_CLONE_DB` on those paths, so a graded run re-seeded —
 and so wiped — a database an operator had saved. Their twins are in memory
 whatever the environment says; the path is now an argument, and only
 `pome twin start` fills it.
-
-## Unreleased (patch)
 
 **`pome twin start stripe` takes Stripe's `[]`-append form bodies** (F-1778).
 `-d "payment_method_types[]=crypto"` answered 400 `expected array, received
