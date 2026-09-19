@@ -165,6 +165,11 @@ const cases = [
     expect: "green",
   },
   {
+    name: "a nested comment is stripped whole — one pass would leave a comment behind",
+    files: { "README.md": page(`<!-<!-- x -->- ${words(PROSE_CHAR_LIMIT + 50)} -->`) },
+    expect: "green",
+  },
+  {
     name: "a table row is a record, not prose",
     files: {
       "README.md": page(`| Twin | Notes |\n| --- | --- |\n| GitHub | ${words(PROSE_CHAR_LIMIT + 50)} |`),
