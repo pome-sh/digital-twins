@@ -18,10 +18,10 @@ import { fileURLToPath } from "node:url";
 import { sign } from "hono/jwt";
 import { afterEach, describe, expect, it } from "vitest";
 import { TWIN_NAME_LIST } from "../../src/twin/registry.js";
-import { resolveTsxBin } from "../../scripts/lib/resolve-tsx.js";
+import { tsxNodeArgs } from "../fixtures/tsxNode.js";
 
 const CLI_ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const TSX_BIN = resolveTsxBin(import.meta.url);
+const NODE_TSX = tsxNodeArgs(import.meta.url);
 const MAIN_TS = join(CLI_ROOT, "src", "cli", "main.ts");
 const PERSISTED_SECRET = "e2e-persisted-secret-0123456789abcdef";
 
@@ -41,7 +41,7 @@ async function runCli(
 ): Promise<{ code: number | null; output: string }> {
   const cwd = await mkdtemp(join(tmpdir(), "pome-twin-start-cli-e2e-"));
   return await new Promise((resolve, reject) => {
-    const proc = spawn(TSX_BIN, [MAIN_TS, ...args], {
+    const proc = spawn(process.execPath, [...NODE_TSX, MAIN_TS, ...args], {
       cwd,
       env: { ...process.env, ...extraEnv },
       stdio: ["ignore", "pipe", "pipe"],
@@ -72,7 +72,7 @@ async function startTwin(
   stop: () => Promise<number | null>;
 }> {
   const port = await freePort();
-  const proc = spawn(TSX_BIN, [MAIN_TS, ...args, "--port", String(port)], {
+  const proc = spawn(process.execPath, [...NODE_TSX, MAIN_TS, ...args, "--port", String(port)], {
     cwd,
     env,
     stdio: ["ignore", "pipe", "pipe"],
@@ -132,7 +132,7 @@ describe("pome twin start (e2e)", () => {
       const port = await freePort();
       const env: NodeJS.ProcessEnv = { ...process.env, POME_TWIN_DATA_DIR: dataDir };
       delete env.TWIN_AUTH_SECRET; // the persisted-file branch under test
-      child = spawn(TSX_BIN, [MAIN_TS, "twin", "start", "github", "--port", String(port)], {
+      child = spawn(process.execPath, [...NODE_TSX, MAIN_TS, "twin", "start", "github", "--port", String(port)], {
         cwd,
         env,
         stdio: ["ignore", "pipe", "pipe"],
@@ -225,8 +225,8 @@ describe("pome twin start (e2e)", () => {
 
       const port = await freePort();
       child = spawn(
-        TSX_BIN,
-        [MAIN_TS, "twin", "start", "github", "--port", String(port), "--seed", seedPath],
+        process.execPath,
+        [...NODE_TSX, MAIN_TS, "twin", "start", "github", "--port", String(port), "--seed", seedPath],
         { cwd, env: { ...process.env }, stdio: ["ignore", "pipe", "pipe"] },
       );
       let output = "";
@@ -342,8 +342,8 @@ describe("pome twin start (e2e)", () => {
 
       const port = await freePort();
       child = spawn(
-        TSX_BIN,
-        [MAIN_TS, "twin", "start", "github", "--port", String(port), "--seed", seedPath],
+        process.execPath,
+        [...NODE_TSX, MAIN_TS, "twin", "start", "github", "--port", String(port), "--seed", seedPath],
         { cwd, env: { ...process.env }, stdio: ["ignore", "pipe", "pipe"] },
       );
       let output = "";
@@ -373,7 +373,7 @@ describe("pome twin start — port already in use (e2e)", () => {
     await once(holder, "listening");
     const port = (holder.address() as { port: number }).port;
     try {
-      child = spawn(TSX_BIN, [MAIN_TS, "twin", "start", "github", "--port", String(port)], {
+      child = spawn(process.execPath, [...NODE_TSX, MAIN_TS, "twin", "start", "github", "--port", String(port)], {
         cwd,
         env: { ...process.env },
         stdio: ["ignore", "pipe", "pipe"],
@@ -418,7 +418,7 @@ describe("pome twin start — unknown-twin error (e2e)", () => {
 describe("pome twin start — several twins (e2e)", () => {
   type Spawned = { child: ChildProcess; output: () => string; exited: Promise<number | null> };
   function start(cwd: string, args: string[]): Spawned {
-    const proc = spawn(TSX_BIN, [MAIN_TS, "twin", "start", ...args], {
+    const proc = spawn(process.execPath, [...NODE_TSX, MAIN_TS, "twin", "start", ...args], {
       cwd,
       env: { ...process.env },
       stdio: ["ignore", "pipe", "pipe"],

@@ -12,10 +12,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { resolveTsxBin } from "../../scripts/lib/resolve-tsx.js";
+import { tsxNodeArgs } from "../fixtures/tsxNode.js";
 
 const CLI_ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const TSX_BIN = resolveTsxBin(import.meta.url);
+const NODE_TSX = tsxNodeArgs(import.meta.url);
 const MAIN_TS = join(CLI_ROOT, "src", "cli", "main.ts");
 
 async function freePort(): Promise<number> {
@@ -29,7 +29,7 @@ async function freePort(): Promise<number> {
 
 async function runCli(cwd: string, args: string[]): Promise<{ code: number | null; output: string }> {
   return await new Promise((resolve, reject) => {
-    const proc = spawn(TSX_BIN, [MAIN_TS, ...args], {
+    const proc = spawn(process.execPath, [...NODE_TSX, MAIN_TS, ...args], {
       cwd,
       env: { ...process.env },
       stdio: ["ignore", "pipe", "pipe"],
@@ -55,7 +55,7 @@ describe("pome twin tape (e2e)", () => {
     async () => {
       const cwd = await mkdtemp(join(tmpdir(), "pome-twin-tape-e2e-"));
       const port = await freePort();
-      child = spawn(TSX_BIN, [MAIN_TS, "twin", "start", "github", "--port", String(port)], {
+      child = spawn(process.execPath, [...NODE_TSX, MAIN_TS, "twin", "start", "github", "--port", String(port)], {
         cwd,
         env: { ...process.env },
         stdio: ["ignore", "pipe", "pipe"],
