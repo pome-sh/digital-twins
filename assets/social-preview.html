@@ -1,0 +1,61 @@
+<!doctype html>
+<!--
+  SPDX-License-Identifier: Apache-2.0
+
+  Source of assets/social-preview.png, the card GitHub shows when the repo is
+  shared. Rendered, not drawn: open this file in Chrome from a checkout with
+  node_modules installed, at a 1280x640 viewport, and screenshot the page.
+
+  It is HTML rather than SVG because the card has to use the design system's
+  fonts. An SVG served as an image cannot load a web font, so the old card fell
+  back to whatever sans-serif each machine had. Colours and type are the
+  dashboard's tokens (packages/dashboard/src/app.css).
+
+  Upload is manual: repo Settings -> General -> Social preview. There is no API.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pome social preview</title>
+<style>
+  @font-face { font-family: "Geist"; src: url("../node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2") format("woff2-variations"); font-weight: 100 900; }
+  @font-face { font-family: "Geist Mono"; src: url("../node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2") format("woff2-variations"); font-weight: 100 900; }
+  @font-face { font-family: "Source Serif 4"; src: url("../node_modules/@fontsource-variable/source-serif-4/files/source-serif-4-latin-wght-normal.woff2") format("woff2-variations"); font-weight: 200 900; }
+
+  :root {
+    --canvas: #faf9f5; --ink: #141413; --body: #3d3d3a; --muted: #6c6a64;
+    --dark: #181715; --hairline-on-dark: #2a2825; --on-dark: #faf9f5; --on-dark-soft: #a09d96;
+    --moss-lift: #7f9b63; --red-lift: #f08a8a;
+  }
+  * { margin: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 640px; background: var(--canvas); }
+  body { padding: 64px 80px; font-family: "Geist", sans-serif; color: var(--ink); display: flex; flex-direction: column; }
+
+  .brand { display: flex; align-items: center; gap: 16px; }
+  .brand img { width: 52px; height: 52px; }
+  .brand span { font-family: "Source Serif 4", serif; font-size: 34px; font-weight: 500; letter-spacing: -0.01em; }
+
+  h1 { margin-top: 44px; font-family: "Source Serif 4", serif; font-weight: 500; font-size: 58px; line-height: 1.08; letter-spacing: -0.02em; }
+  .sub { margin-top: 20px; font-size: 23px; color: var(--body); }
+
+  .tape { margin-top: auto; background: var(--dark); border-radius: 14px; overflow: hidden; font-family: "Geist Mono", monospace; font-size: 19px; }
+  .row { display: grid; grid-template-columns: 290px 72px 1fr; align-items: center; padding: 16px 28px; color: var(--on-dark); }
+  .row + .row { border-top: 1px solid var(--hairline-on-dark); }
+  .row .code { color: var(--on-dark-soft); }
+  .row .out { display: flex; align-items: center; gap: 10px; font-family: "Geist", sans-serif; font-size: 18px; }
+  .row .out::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .changed .out { color: var(--moss-lift); }
+  .missed { background: rgba(198, 69, 69, 0.20); box-shadow: inset 3px 0 0 #c64545; }
+  .missed .code, .missed .out { color: var(--red-lift); }
+</style>
+</head>
+<body>
+  <div class="brand"><img src="./pome-logo.svg" alt=""><span>Pome</span></div>
+  <h1>Test mode for your integrations,<br>built for the way agents build.</h1>
+  <p class="sub">Local, stateful twins of GitHub, Slack, Stripe, Gmail and Linear, over REST and MCP.</p>
+  <div class="tape">
+    <div class="row changed"><span>create_issue</span><span class="code">200</span><span class="out">changed state</span></div>
+    <div class="row missed"><span>add_issue_comment</span><span class="code">404</span><span class="out">write did not land</span></div>
+  </div>
+</body>
+</html>

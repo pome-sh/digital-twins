@@ -2,9 +2,15 @@
 
 <img src="./assets/pome-logo.svg" alt="Pome" width="76" height="76" />
 
-# Pome
+<h1>
+  Pome<br />
+  Test mode for your integrations, built for the way agents build.
+</h1>
 
-**Test mode for your integrations, built for the way agents build.**
+<p>
+  Local, stateful twins of GitHub, Slack, Stripe, Gmail and Linear, over REST and MCP.<br />
+  No test account, no OAuth app, no API key.
+</p>
 
 [![CI](https://github.com/pome-sh/digital-twins/actions/workflows/ci.yml/badge.svg)](https://github.com/pome-sh/digital-twins/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/%40pome-sh%2Fcli?label=%40pome-sh%2Fcli)](https://www.npmjs.com/package/@pome-sh/cli)
@@ -13,17 +19,27 @@
 
 [Documentation](https://docs.pome.sh) · [Pome](https://pome.sh) · [CLI reference](./cli/README.md)
 
+<br />
+
+<img src="./assets/readme/dashboard.gif" width="100%" alt="The Pome dashboard while an agent works against a GitHub twin: a read, then a new issue that changes the twin's state, then a comment on issue 17, which does not exist, marked in red as a write that did not land.">
+
 </div>
 
-Pome gives you local, stateful twins of GitHub, Slack, Stripe, Gmail and Linear. Your agent, or your own code, calls a twin the way it calls the real API, over REST or MCP. There is no test account, no OAuth app and no API key.
+## What is Pome
 
-Every request lands on a tape: the twin's own record of every call and what it changed. A step the agent only claimed appears on the tape as a step that did not happen. Stripe has a test mode. GitHub and Slack do not, and none of them hands you the tape.
+Pome runs a stateful copy of GitHub, Slack, Stripe, Gmail or Linear on your machine. Your agent, or your own code, calls it the way it calls the real API, and every call lands on a tape.
 
-<p align="center">
-  <img src="./assets/readme/how-it-works.svg" width="100%" alt="How Pome works: start a twin, connect your agent, let it act, read the tape, then swap to the real API.">
-</p>
+The dashboard shows that tape as it happens: what the agent did, what it changed, and which step never happened. Stripe has a test mode. GitHub and Slack do not, and none of them hands you the tape.
 
-## One command
+## What is a digital twin
+
+A digital twin answers the same calls as the real API, in the same shapes, from its own small database instead of the real service. Open an issue on the GitHub twin and the issue exists, in the twin. List the issues and it is there. Stop the twin and it is gone.
+
+- **Not a mock.** A mock returns what you told it to return, and forgets. A twin remembers, because it has state: the issue your agent opened is still there when it lists them.
+- **Not a recording.** A recording replays responses you captured once, and breaks the moment your agent does something new. A twin answers calls nobody anticipated.
+- **Not the real API.** No twin delivers webhooks, and each one publishes its coverage route by route, so you know exactly where it stops.
+
+## Quick start
 
 You need Node.js 24 or newer. The twins run on Node's built-in SQLite.
 
@@ -31,7 +47,42 @@ You need Node.js 24 or newer. The twins run on Node's built-in SQLite.
 npx @pome-sh/cli@latest twin start github
 ```
 
-It prints:
+1. Open the `Dashboard:` link the command prints. Every call lands there as it happens.
+2. Connect your agent. Paste the `claude mcp add` line it printed, or copy the `.mcp.json` or Codex stanza from the dashboard.
+3. Ask the agent for something small: "Open an issue in acme/api for the login page returning 500 after the deploy."
+
+The twin starts with one repository, `acme/api`, and one open issue, so your agent has something to act on before you write a seed.
+
+## Features
+
+**One command, five APIs. No account, no OAuth app, no API key.**
+
+- `twin start github slack linear` boots three twins, each on its own port, sharing one token the command minted itself. There is nothing to sign up for and nothing to revoke.
+
+**Watch it happen.**
+
+- The dashboard puts every call on screen as it lands, with what it changed. A write that did not land turns red and opens itself, so a step your agent only claimed shows up as a step that did not happen.
+
+**State that behaves.**
+
+- Open an issue and it exists. Comment on one that does not and the twin answers `404`, as GitHub would. `--seed` sets the world your agent wakes up in, and replaces the default rather than merging into it.
+
+**REST and MCP on the same twin.**
+
+- Your agent reaches it over MCP. Your code reaches it through Octokit, Slack's `WebClient`, Stripe's client, googleapis or Linear's SDK. One tape records both.
+
+**Fidelity you can check.**
+
+- Every route is marked `semantic`, `shape` or `unsupported`. Every day Pome replays the same requests against the real vendor API and publishes the result per route at [status.pome.sh](https://status.pome.sh).
+
+## Use cases
+
+- **You are building an agent that writes to GitHub, Slack or Stripe.** Let it act on a twin, watch the dashboard, and see which of its writes actually landed before it touches a real account.
+- **Your CI has no test account.** Start a twin in the job and point your integration tests at it. The token is minted on the runner and dies with it, so no secret goes in the repository.
+- **You need to show what an agent did.** The tape is the record: every call, what it changed, and what it did not. Attach it to a bug report with `pome twin tape --json`.
+- **You need failures that production will not hand you on demand.** A seed decides the world the agent wakes up in: an issue that does not exist, a merge blocked by failing checks, a Gmail send that gets throttled.
+
+## What `twin start` prints
 
 ```text
 Pome github twin listening at http://127.0.0.1:3333/s/standalone
@@ -43,6 +94,8 @@ Claude Code:
   claude mcp add --transport http pome-github \
     http://127.0.0.1:3333/s/standalone/mcp \
     --header "Authorization: Bearer eyJ…"
+
+Dashboard: http://127.0.0.1:52341/?k=7f3a…
 ```
 
 <details>
@@ -89,11 +142,11 @@ new Octokit({
 
 </details>
 
-The twin mints the token when it starts. It is not an account credential. The twin starts with one repository, `acme/api`, and one open issue, so your agent has something to act on before you write a seed.
+The twin mints the token when it starts. It is not an account credential. State lives in the twin's process and is gone when you stop it. `--seed` decides where it starts.
 
-State lives in the twin's process and is gone when you stop it. `--seed` decides where it starts.
+The dashboard is served on a random local port and keyed to this run, so its link works only while the twin is up. `--open` opens it for you, and `--no-dashboard` leaves it off.
 
-Several twins at once is one command: `twin start github slack linear`. Each twin takes its own port, and one connect block covers all of them.
+Several twins at once is one command: `twin start github slack linear`. Each takes its own port, and one connect block and one dashboard cover all of them.
 
 <details>
 <summary>Ports, paths, and the file the twin writes</summary>
@@ -113,9 +166,9 @@ Your own code takes the SDK line. GitHub's Octokit, Slack's `WebClient`, Stripe'
 
 If your client already has a real GitHub MCP server, the twin registers under its own name, `pome-github`. Disable the real one while you test. Otherwise the agent picks whichever it likes.
 
-Then ask the agent for something small: "Open an issue in acme/api for the login page returning 500 after the deploy."
+## Read the tape
 
-## See what it actually did
+The dashboard is one view of the tape. The terminal is another, and it is the one CI uses:
 
 ```bash
 npx @pome-sh/cli@latest twin tape --diff
@@ -154,7 +207,7 @@ The same command works in a GitHub Actions job. The job below starts the twin, w
     node-version: 24
 - name: Start the GitHub twin
   run: |
-    npx @pome-sh/cli@0.46.0 twin start github > twin.log 2>&1 &
+    npx @pome-sh/cli@0.46.0 twin start github --no-dashboard > twin.log 2>&1 &
     for _ in $(seq 60); do
       curl -fsS http://127.0.0.1:3333/healthz >/dev/null && break
       sleep 1
@@ -169,7 +222,7 @@ The same command works in a GitHub Actions job. The job below starts the twin, w
   run: npx @pome-sh/cli@0.46.0 twin tape --diff
 ```
 
-The twin from the first step keeps running for the rest of the job, and `twin tape` finds it through `.pome/twin-status.json`. This repository's own CI starts its twins the same way.
+The twin from the first step keeps running for the rest of the job, and `twin tape` finds it through `.pome/twin-status.json`. `--no-dashboard` because nobody watches a runner.
 
 There is no account and no secret in the repository: the twin mints the token on the runner, and the token dies with the twin. Your tests read `POME_GITHUB_REST_URL` and `POME_AUTH_TOKEN` the way they would read a real base URL and token.
 
@@ -250,6 +303,8 @@ A new twin is a package that satisfies the runtime contract in [`CONTRACT.md`](.
 The CLI sends one anonymous usage event per day, at most. The event carries a random id, the CLI version, the OS, the Node major, and the command's name (`twin start`, `init`). The CLI mints the id once and keeps it in `~/.pome/telemetry.json`.
 
 The event never carries an argument, a path, a repo name, a seed, a token or anything from a tape. The first send prints a one-line notice.
+
+The dashboard page sends nothing anywhere.
 
 Turn it off with `POME_TELEMETRY=0`. The CLI also honours `DO_NOT_TRACK=1`. It sends nothing when `CI` is set, and nothing from a build made without an ingest key. The code is [`cli/src/cli/usageTick.ts`](./cli/src/cli/usageTick.ts).
 
