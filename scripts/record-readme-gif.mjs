@@ -205,11 +205,15 @@ function connect(url) {
   socket.addEventListener("message", (event) => {
     const message = JSON.parse(event.data);
     if (message.id !== undefined) {
-      const { resolve: settle, reject } = pending.get(message.id);
+      const waiter = pending.get(message.id);
+      if (!waiter) return; // a reply to nothing this client sent: ignore it, do not throw
       pending.delete(message.id);
-      message.error ? reject(new Error(`${message.error.message}`)) : settle(message.result);
+      message.error ? waiter.reject(new Error(`${message.error.message}`)) : waiter.resolve(message.result);
     } else {
-      listeners.get(message.method)?.(message.params, message.sessionId);
+      // Only a listener this script registered can run. Anything else Chrome
+      // sends is ignored, never dispatched by the name it arrived with.
+      const listener = listeners.get(message.method);
+      if (typeof listener === "function") listener(message.params, message.sessionId);
     }
   });
   return new Promise((resolveSocket) =>
