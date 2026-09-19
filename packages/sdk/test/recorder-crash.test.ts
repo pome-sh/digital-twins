@@ -2,17 +2,20 @@
 // Crash-loss gate for the durable recorder (production path).
 
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { twinHttpEventSchema } from "@pome-sh/wire";
 
 const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const REPO_ROOT = resolve(PKG_ROOT, "../..");
-const TSX_BIN = resolve(REPO_ROOT, "node_modules/.bin/tsx");
+// The recorder runs in `node` itself with tsx as an import hook, not under the
+// `tsx` executable. That CLI is a second process: the SIGKILL landed on it, and
+// the recorder beneath exited on its own once the CLI's pipe closed — cleanly,
+// so the crash this test is named for never happened.
+const TSX_LOADER = pathToFileURL(createRequire(import.meta.url).resolve("tsx")).href;
 const tmpDirs: string[] = [];
 
 afterEach(async () => {
@@ -24,13 +27,12 @@ afterEach(async () => {
 
 describe("durable recorder crash loss", () => {
   it("kill -9 mid-run leaves a parseable partial tape losing at most one event", async () => {
-    expect(existsSync(TSX_BIN), `tsx not found at ${TSX_BIN}`).toBe(true);
-
     const dir = await mkdtemp(join(tmpdir(), "pome-crash-"));
     tmpDirs.push(dir);
     const eventsPath = join(dir, "events.jsonl");
     const readyPath = join(dir, "ready");
     const armedPath = join(dir, "armed");
+    const pidPath = join(dir, "pid");
     const childScript = join(dir, "crash-child.ts");
 
     const TOTAL = 20;
@@ -74,6 +76,7 @@ function event(i: number) {
 }
 
 async function main() {
+  writeFileSync(process.env.PID_PATH!, String(process.pid));
   for (let i = 0; i < flushed; i++) {
     store.record(event(i));
     await store.flush!();
@@ -93,13 +96,14 @@ void main().catch((err) => {
       "utf8"
     );
 
-    const child = spawn(TSX_BIN, [childScript], {
+    const child = spawn(process.execPath, ["--import", TSX_LOADER, childScript], {
       cwd: PKG_ROOT,
       env: {
         ...process.env,
         EVENTS_PATH: eventsPath,
         READY_PATH: readyPath,
         ARMED_PATH: armedPath,
+        PID_PATH: pidPath,
         TOTAL: String(TOTAL),
         FLUSHED: String(FLUSHED),
       },
@@ -148,6 +152,10 @@ void main().catch((err) => {
           `crash child never reached armed barrier (armed=${armedCount}): stderr=${stderr} stdout=${stdout}`
         );
       }
+
+      // The process about to be killed must be the one holding the recorder.
+      // Under a wrapper this is the wrapper's pid, and the kill proves nothing.
+      expect(Number(await readFile(pidPath, "utf8"))).toBe(child.pid);
 
       const exited = new Promise<void>((resolvePromise) =>
         child.once("exit", () => resolvePromise())

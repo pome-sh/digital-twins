@@ -15,10 +15,10 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { resolveTsxBin } from "../../scripts/lib/resolve-tsx.js";
+import { tsxNodeArgs } from "../fixtures/tsxNode.js";
 
 const CLI_ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const TSX_BIN = resolveTsxBin(import.meta.url);
+const NODE_TSX = tsxNodeArgs(import.meta.url);
 const MAIN_TS = join(CLI_ROOT, "src", "cli", "main.ts");
 
 async function freePort(): Promise<number> {
@@ -33,7 +33,7 @@ async function freePort(): Promise<number> {
 type Run = { child: ChildProcess; output: () => string; exited: Promise<number | null> };
 
 function start(cwd: string, args: string[], env: NodeJS.ProcessEnv = process.env): Run {
-  const proc = spawn(TSX_BIN, [MAIN_TS, "twin", "start", ...args], {
+  const proc = spawn(process.execPath, [...NODE_TSX, MAIN_TS, "twin", "start", ...args], {
     cwd,
     env,
     stdio: ["ignore", "pipe", "pipe"],
