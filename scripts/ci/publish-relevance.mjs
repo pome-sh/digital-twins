@@ -48,7 +48,17 @@ export const PUBLISHED_PACKAGES = [
     manifest: "cli/package.json",
     changelog: "cli/CHANGELOG.md",
     registry: "npm",
-    pathPrefixes: ["cli/", "packages/twin-", "packages/wire/", "packages/sdk/"],
+    // `packages/dashboard/` is here because its build output SHIPS inside this
+    // tarball (`cli/assets/dashboard/`, written by its own vite build). Without
+    // the prefix a renderer-only change needs no release note and allocates no
+    // version, and the published CLI silently carries a page nobody released.
+    pathPrefixes: [
+      "cli/",
+      "packages/twin-",
+      "packages/wire/",
+      "packages/sdk/",
+      "packages/dashboard/",
+    ],
   },
   {
     name: "@pome-sh/checks",

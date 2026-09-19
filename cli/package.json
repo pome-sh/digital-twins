@@ -75,6 +75,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@pome-sh/dashboard": "*",
     "@pome-sh/sdk": "*",
     "@pome-sh/wire": "*",
     "@pome-sh/twin-github": "*",

@@ -17,6 +17,24 @@ one it corrects.
 
 ## Unreleased (minor)
 
+**`pome twin start` serves a live dashboard of the tape** (F-1850). The banner
+prints a `Dashboard: http://127.0.0.1:…/?k=…` line; open it to watch every
+request the agent makes land as it happens, which write did not land, and what
+the twin's state now holds against boot. It is read-only and loopback-only, and
+the URL carries a per-boot key. `--open` opens a browser, `--no-dashboard` turns
+it off, `--dashboard-port <port>` pins its port.
+
+**`pome twin tape` stops calling reads failed writes** (F-1850). A Linear
+GraphQL query, a Slack Web API read sent as a POST (as `@slack/web-api` sends
+every call), and the MCP tools whose names misled the verb list — `issue_write`,
+`pull_request_read`, Linear's `save_*` — are now read the way the twin declares
+them. A row that changed state is no longer also counted as a read.
+
+**`pome twin tape --diff` stops reporting untouched secrets as changed**
+(F-1850). The boot snapshot is redacted by the same function the twin's state
+endpoint uses, so a freshly started Linear twin no longer shows its tokens and
+webhooks as changed.
+
 **`pome twin start` keeps state where the twin's own `*_DB` says** (F-1758).
 `SLACK_CLONE_DB`, `STRIPE_CLONE_DB`, `GMAIL_TWIN_DB` and `LINEAR_TWIN_DB` were
 dead on this path: the registry booted those four twins in `":memory:"`, so a

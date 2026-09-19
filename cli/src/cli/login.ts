@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { persistCredentialsAfterLogin } from "./credentials.js";
+import { openBrowser } from "./open-browser.js";
 
 export interface LoginOptions {
   apiUrl: string;
@@ -229,29 +229,6 @@ function closeServer(server: Server | null): Promise<void> {
   });
 }
 
-async function openBrowser(url: string): Promise<void> {
-  const command =
-    process.platform === "darwin"
-      ? "open"
-      : process.platform === "win32"
-        ? "powershell.exe"
-        : "xdg-open";
-  const args =
-    process.platform === "win32"
-      ? ["-NoProfile", "-Command", "Start-Process", url]
-      : [url];
-
-  await new Promise<void>((resolve) => {
-    execFile(command, args, (error) => {
-      if (error) {
-        console.error(
-          "Could not open a browser automatically — copy the URL above into a browser.",
-        );
-      }
-      resolve();
-    });
-  });
-}
 
 function normalizeBaseUrl(raw: string): string {
   return new URL(raw).toString().replace(/\/$/, "");

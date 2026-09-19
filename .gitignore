@@ -4,6 +4,10 @@ node_modules/
 # Build output
 dist/
 *.tsbuildinfo
+# The local dashboard's built page. `packages/dashboard` emits it straight into
+# the directory `cli/package.json` ships via `files: ["assets"]` — generated at
+# build time like `cli/dist`, and shipped the same way `cli/dist` is.
+cli/assets/dashboard/
 
 # Test coverage
 coverage/

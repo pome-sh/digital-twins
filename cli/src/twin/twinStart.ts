@@ -28,6 +28,9 @@ import {
   soleTwinOf,
   twinsNamedBy,
 } from "./seedFile.js";
+import { openBrowser } from "../cli/open-browser.js";
+import { redactSecrets } from "../recorder/redaction.js";
+import { startDashboard, type DashboardHandle } from "../dashboard/server.js";
 import { bootTwin, type TwinHarness } from "./twinHarness.js";
 import { resolveStandaloneSeeds } from "./twinStartSeed.js";
 import { renderStateLines, resolveStandaloneDbs } from "./twinDb.js";
@@ -57,6 +60,21 @@ export {
   resolveStandaloneSeeds,
   type StandaloneSeed,
 } from "./twinStartSeed.js";
+
+/**
+ * A twin's state at boot, as the diff baseline.
+ *
+ * Through `redactSecrets`, the same function `GET /_pome/state` applies on the
+ * way out. The later side of every diff comes from that endpoint, so a raw
+ * export here meant two redactions of one secret — linear's token read
+ * `lin_…[redacted]` at boot and `[REDACTED]` ever after — and every
+ * credential-bearing row reported "changed" on a twin nothing had touched. It
+ * also keeps the snapshot written under `.pome/` no less redacted than what the
+ * twin itself will serve. `bootBaseline.test.ts` holds this for all five twins.
+ */
+export async function bootBaseline(harness: Pick<TwinHarness, "exportState">): Promise<unknown> {
+  return redactSecrets(await harness.exportState());
+}
 
 /** The fixed session id a standalone twin serves under (`/s/standalone`). */
 const STANDALONE_SID = "standalone";
@@ -204,7 +222,15 @@ export function resolveStandaloneAuthSecretFor(
 
 export async function runTwinStartCommand(
   namesArg: readonly string[] | string | undefined,
-  options: { port?: string; seed?: string },
+  options: {
+    port?: string;
+    seed?: string;
+    /** Commander's `--no-dashboard` sets this false. Default on. */
+    dashboard?: boolean;
+    /** Open the printed URL in a browser. Off by default — see below. */
+    open?: boolean;
+    dashboardPort?: string;
+  },
 ): Promise<void> {
   const names =
     namesArg === undefined ? [] : typeof namesArg === "string" ? [namesArg] : [...namesArg];
@@ -236,7 +262,15 @@ export async function runTwinStartCommand(
   // running twins agree.
   process.env.TWIN_AUTH_SECRET = resolved.secret;
 
-  type Booted = { twin: TwinName; port: number; baseUrl: string; harness: TwinHarness };
+  type Booted = {
+    twin: TwinName;
+    port: number;
+    baseUrl: string;
+    harness: TwinHarness;
+    /** The boot state, kept in hand: the dashboard's world panel measures
+     *  against exactly what `twin tape --diff` measures against. */
+    initialState: unknown;
+  };
   const booted: Booted[] = [];
   try {
     for (const [index, twin] of twins.entries()) {
@@ -250,9 +284,11 @@ export async function runTwinStartCommand(
         dbPath: dbs.get(twin)!.dbPath,
         noSeed: dbs.get(twin)!.noSeed,
       });
-      booted.push({ twin, port, baseUrl, harness });
-      // The boot snapshot `twin tape --diff` diffs against (F-1837); nothing listens yet.
-      await snapshotStandaloneInitialState(twin, () => harness.exportState());
+      // The boot snapshot `twin tape --diff` and the dashboard diff against
+      // (F-1837); nothing listens yet, so it is the world before the agent.
+      const initialState = await bootBaseline(harness);
+      booted.push({ twin, port, baseUrl, harness, initialState });
+      await snapshotStandaloneInitialState(twin, () => initialState);
     }
   } catch (err) {
     for (const entry of booted) await entry.harness.close();
@@ -277,7 +313,11 @@ export async function runTwinStartCommand(
   );
 
   const servers: ServerType[] = [];
+  // Assigned after the twins are listening; closed first on the way out so the
+  // page stops polling before the twins it polls go away.
+  let dashboard: DashboardHandle | undefined;
   const closeAll = async () => {
+    await dashboard?.close();
     for (const server of servers) {
       (server as { closeAllConnections?: () => void }).closeAllConnections?.();
       await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -364,6 +404,41 @@ export async function runTwinStartCommand(
   // share one block: one export line, one .mcp.json, one paste.
   console.log("");
   console.log(renderConnectSnippets(connect));
+
+  // The dashboard serves by default and opens nothing by default.
+  //
+  // Serving is free — one more loopback socket in a process that already holds
+  // several — and the Done-When for F-1850 is that someone who has read no docs
+  // can open it, which a URL in this banner buys and a second command does not.
+  //
+  // Opening a browser is NOT free: `contract/cli-start.test.mjs` spawns this
+  // command for all five twins on every CI run, and a browser launching there
+  // is at best noise. `--open` is the opt-in.
+  if (options.dashboard !== false) {
+    try {
+      dashboard = await startDashboard({
+        twins: booted.map((entry) => ({
+          name: entry.twin,
+          restUrl: `${entry.baseUrl}/s/${STANDALONE_SID}`,
+          mcpUrl: `${entry.baseUrl}/s/${STANDALONE_SID}/mcp`,
+          token,
+          envName: entry.harness.envName,
+          ...(entry.harness.tokenEnvName ? { tokenEnvName: entry.harness.tokenEnvName } : {}),
+          initialState: entry.initialState,
+        })),
+        ...(options.dashboardPort === undefined ? {} : { port: Number(options.dashboardPort) }),
+      });
+      console.log("");
+      console.log(`Dashboard: ${dashboard.url}`);
+      console.log("  Open it in a browser to watch the tape while the agent works.");
+      if (options.open === true) await openBrowser(dashboard.url);
+    } catch (err) {
+      // A dashboard that cannot bind must not stop the twin: the twin is the
+      // product and the page is a view of it. Say what went wrong and serve on.
+      console.error(`Dashboard not started: ${(err as Error).message}`);
+    }
+  }
+
   console.log("");
   console.log("Ctrl-C to stop.");
 
