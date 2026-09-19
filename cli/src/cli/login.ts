@@ -229,7 +229,6 @@ function closeServer(server: Server | null): Promise<void> {
   });
 }
 
-
 function normalizeBaseUrl(raw: string): string {
   return new URL(raw).toString().replace(/\/$/, "");
 }

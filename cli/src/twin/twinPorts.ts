@@ -7,6 +7,20 @@
 import { createServer } from "node:net";
 import { defaultPortFor, type TwinName } from "./registry.js";
 
+/**
+ * A port named on the command line, as a number a listener can bind. Port 0
+ * (ephemeral) is rejected: every printed URL and the status-file token would
+ * name a port nobody can discover from outside the process — and a flag that
+ * pins a port has pinned nothing if 0 gets through.
+ */
+export function parseListenPort(raw: string, flag: string): number {
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`pome twin start: invalid ${flag} "${raw}"`);
+  }
+  return port;
+}
+
 /** Can 127.0.0.1:port be bound right now? A probe bind, released at once. */
 export async function isLoopbackPortFree(port: number): Promise<boolean> {
   return await new Promise<boolean>((resolve) => {
@@ -33,15 +47,7 @@ export async function chooseStandalonePorts(
   env: NodeJS.ProcessEnv = process.env,
   isFree: (port: number) => Promise<boolean> = isLoopbackPortFree,
 ): Promise<number[]> {
-  const parse = (raw: string): number => {
-    const port = Number(raw);
-    // Port 0 (ephemeral) is rejected: every printed URL and the status-file
-    // token would name a port nobody can discover from outside the process.
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      throw new Error(`pome twin start: invalid --port "${raw}"`);
-    }
-    return port;
-  };
+  const parse = (raw: string): number => parseListenPort(raw, "--port");
   if (twins.length === 1) return [parse(portOption ?? defaultPortFor(twins[0]!, env))];
 
   const chosen: number[] = [];

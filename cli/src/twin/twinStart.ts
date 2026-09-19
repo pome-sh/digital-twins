@@ -35,7 +35,7 @@ import { bootTwin, type TwinHarness } from "./twinHarness.js";
 import { resolveStandaloneSeeds } from "./twinStartSeed.js";
 import { renderStateLines, resolveStandaloneDbs } from "./twinDb.js";
 import { renderConnectSnippets, type ConnectSnippetInput } from "./connectSnippets.js";
-import { chooseStandalonePorts } from "./twinPorts.js";
+import { chooseStandalonePorts, parseListenPort } from "./twinPorts.js";
 import {
   snapshotStandaloneInitialState,
   updateStandaloneStatusFile,
@@ -54,7 +54,7 @@ export {
   type StandaloneStatus,
   type StandaloneStatusFile,
 } from "./twinStatusFile.js";
-export { chooseStandalonePorts, isLoopbackPortFree } from "./twinPorts.js";
+export { chooseStandalonePorts, isLoopbackPortFree, parseListenPort } from "./twinPorts.js";
 export {
   resolveStandaloneSeed,
   resolveStandaloneSeeds,
@@ -244,6 +244,12 @@ export async function runTwinStartCommand(
   // Each twin's db first: a `--seed` contradicting its `*_NO_SEED` is refused
   // before a port is probed, let alone a db file created.
   const dbs = resolveStandaloneDbs(twins, options.seed, process.env);
+  // Held to `--port`'s rule and refused as early: a typo found only once the
+  // twins are listening leaves them serving with no dashboard and a bind error.
+  const dashboardPort =
+    options.dashboardPort === undefined
+      ? undefined
+      : parseListenPort(options.dashboardPort, "--dashboard-port");
   const ports = await chooseStandalonePorts(twins, options.port, process.env);
 
   // Resolve every seed BEFORE the auth secret and any listener: a refused seed
@@ -426,12 +432,15 @@ export async function runTwinStartCommand(
           ...(entry.harness.tokenEnvName ? { tokenEnvName: entry.harness.tokenEnvName } : {}),
           initialState: entry.initialState,
         })),
-        ...(options.dashboardPort === undefined ? {} : { port: Number(options.dashboardPort) }),
+        ...(dashboardPort === undefined ? {} : { port: dashboardPort }),
       });
       console.log("");
       console.log(`Dashboard: ${dashboard.url}`);
       console.log("  Open it in a browser to watch the tape while the agent works.");
-      if (options.open === true) await openBrowser(dashboard.url);
+      // Not awaited: `xdg-open` can stay in the foreground until the browser it
+      // started exits, and until the handlers below are installed, Ctrl-C kills
+      // the process without closing the twins or flushing their recorders.
+      if (options.open === true) void openBrowser(dashboard.url);
     } catch (err) {
       // A dashboard that cannot bind must not stop the twin: the twin is the
       // product and the page is a view of it. Say what went wrong and serve on.
