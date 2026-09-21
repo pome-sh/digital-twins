@@ -87,7 +87,7 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     recorder.handle({ mutation: true }, async (c) => {
       const parsed = await POST_DELETE_MESSAGE.parse(c.req);
       domain.deleteMessage(botActor(c), parsed.body);
-      return { status: 200, body: { ok: true } };
+      return { status: 200, body: telegramOk(true) };
     }),
   );
   mountDeclaredRoute(
@@ -96,7 +96,7 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     recorder.handle({ mutation: true }, async (c) => {
       const parsed = await POST_DELETE_MESSAGES.parse(c.req);
       domain.deleteMessages(botActor(c), parsed.body);
-      return { status: 200, body: { ok: true } };
+      return { status: 200, body: telegramOk(true) };
     }),
   );
   mountDeclaredRoute(

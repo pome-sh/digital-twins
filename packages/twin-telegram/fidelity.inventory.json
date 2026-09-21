@@ -19,7 +19,7 @@
     { "name": "delete_message", "heat": "hot", "fidelity": "semantic", "justification": "Revoke vs hide." },
     { "name": "forward_message", "heat": "hot", "fidelity": "semantic", "justification": "Forward attribution." },
     { "name": "get_message_context", "heat": "hot", "fidelity": "semantic", "justification": "Context window." },
-    { "name": "message_from_link", "heat": "hot", "fidelity": "semantic", "justification": "Seeded links only." },
+    { "name": "message_from_link", "heat": "hot", "fidelity": "semantic", "justification": "Only emitted tg:// links." },
     { "name": "get_message_link", "heat": "hot", "fidelity": "semantic", "justification": "tg:// builder." },
     { "name": "mark_as_read", "heat": "hot", "fidelity": "semantic", "justification": "Read cursor." },
     { "name": "get_message_viewers", "heat": "hot", "fidelity": "semantic", "justification": "Cursor disclosure." }

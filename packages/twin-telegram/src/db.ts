@@ -87,6 +87,14 @@ export function migrate(db: TelegramTwinDatabase): void {
       // already present
     }
   }
+  db.exec(`
+    UPDATE chats SET next_message_id = (
+      SELECT COALESCE(MAX(message_id), 0) + 1 FROM messages WHERE chat_id = chats.id
+    )
+    WHERE next_message_id <= (
+      SELECT COALESCE(MAX(message_id), 0) FROM messages WHERE chat_id = chats.id
+    )
+  `);
 }
 
 export function resetDatabase(db: TelegramTwinDatabase): void {

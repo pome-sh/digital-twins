@@ -127,6 +127,14 @@ describe("edit / delete / forward / copy", () => {
     expect(domain.getHistory("alice", 2001)[0]?.text).toBe("aged");
   });
 
+  it("HTTP delete returns result true", async () => {
+    const { app } = fresh();
+    await bot(app, "sendMessage", { chat_id: 2001, text: "gone" });
+    const del = await bot(app, "deleteMessage", { chat_id: 2001, message_id: 1 });
+    expect(del.status).toBe(200);
+    expect(del.body).toEqual({ ok: true, result: true });
+  });
+
   it("forward keeps attribution; copy does not", async () => {
     const { app } = fresh();
     await mcp(app, "alice", "send_message", { chat_id: 2001, text: "src" });
@@ -182,6 +190,8 @@ describe("search / context / links / viewers", () => {
     expect(JSON.stringify(ok.body)).toContain("linked");
     const bad = await mcp(app, "alice", "message_from_link", { link: "https://example.com/x" });
     expect(JSON.stringify(bad.body)).toContain("unsupported link");
+    const tme = await mcp(app, "alice", "message_from_link", { link: "https://t.me/c/1234567890/1" });
+    expect(JSON.stringify(tme.body)).toContain("unsupported link");
   });
 
   it("viewers in a private chat are only the caller", async () => {

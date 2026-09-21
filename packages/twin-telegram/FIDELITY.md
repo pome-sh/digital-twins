@@ -36,7 +36,7 @@ Staged conversation + history slice. Not a Bot API or Tolboy-equivalence claim.
 | delete_message | hot | semantic | Revoke vs local hide |
 | forward_message | hot | semantic | Attribution kept |
 | get_message_context | hot | semantic | Same window as get_messages |
-| message_from_link | hot | semantic | Seeded tg:// or t.me/c links only |
+| message_from_link | hot | semantic | Only `tg://message?chat_id=&message_id=` that this twin emits |
 | get_message_link | hot | semantic | tg://message?chat_id=&message_id= |
 | mark_as_read | hot | semantic | Per-account cursor |
 | get_message_viewers | hot | semantic | Private: self. Group: cursors past the message |
@@ -47,5 +47,5 @@ Staged conversation + history slice. Not a Bot API or Tolboy-equivalence claim.
 2. Path tokens never persist onto the tape (shared wire redaction).
 3. Bot delete window is a fixed 48 hours from `date`.
 4. User `revoke` of someone else's message is refused.
-5. Links never fetch the network.
+5. Links never fetch the network. Only the `tg://message` form this twin emits is accepted.
 6. Polling, webhooks, media, and remaining Bot API methods are unsupported.

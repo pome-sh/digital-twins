@@ -31,7 +31,7 @@ export class TelegramDomain {
 
   seed(input: TelegramSeed | unknown): void {
     const state = parseSeed(input);
-    const now = Math.floor(Date.now() / 1000);
+    const now = this.now();
     this.db.transaction(() => {
       resetDatabase(this.db);
       for (const bot of state.bots) {
@@ -211,7 +211,7 @@ export class TelegramDomain {
     const row = this.requireVisibleMessage(actor, args.chat_id, args.message_id);
     const person = this.personFor(actor);
     if (actor.kind === "bot") {
-      if (this.now() - row.date > BOT_DELETE_WINDOW_SEC) {
+      if (this.now() - row.date >= BOT_DELETE_WINDOW_SEC) {
         telegramFail(400, 400, "Bad Request: message can't be deleted");
       }
       this.hardDelete(args.chat_id, args.message_id);
@@ -230,9 +230,11 @@ export class TelegramDomain {
 
   deleteMessages(actor: Actor, args: { chat_id: number; message_ids: number[] }): { ok: true } {
     if (args.message_ids.length === 0) telegramFail(400, 400, "Bad Request: message_ids is empty");
-    for (const message_id of args.message_ids) {
-      this.deleteMessage(actor, { chat_id: args.chat_id, message_id });
-    }
+    this.db.transaction(() => {
+      for (const message_id of args.message_ids) {
+        this.deleteMessage(actor, { chat_id: args.chat_id, message_id });
+      }
+    })();
     return { ok: true };
   }
 
@@ -299,7 +301,7 @@ export class TelegramDomain {
   }
 
   messageFromLink(account: string, link: string): Record<string, unknown> {
-    const match = link.match(/^(?:tg:\/\/message\?|https:\/\/t\.me\/c\/)(?:chat_id=)?(-?\d+)(?:&message_id=|\/)(\d+)$/);
+    const match = link.match(/^tg:\/\/message\?chat_id=(-?\d+)&message_id=(\d+)$/);
     if (!match) telegramFail(400, 400, "Bad Request: unsupported link");
     return this.present(this.requireVisibleMessage({ kind: "user", account }, Number(match[1]), Number(match[2])));
   }

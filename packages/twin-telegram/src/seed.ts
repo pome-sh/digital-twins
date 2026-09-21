@@ -62,9 +62,13 @@ export const seedSchema = z
         if (!ids.has(member)) ctx.addIssue({ code: "custom", message: `unknown member ${member}` });
       }
     }
+    const messageKeys = new Set<string>();
     for (const message of state.messages) {
       if (!chatIds.has(message.chat_id)) ctx.addIssue({ code: "custom", message: `unknown chat ${message.chat_id}` });
       if (!ids.has(message.from_id)) ctx.addIssue({ code: "custom", message: `unknown from_id ${message.from_id}` });
+      const key = `${message.chat_id}:${message.message_id}`;
+      if (messageKeys.has(key)) ctx.addIssue({ code: "custom", message: `duplicate message ${key}` });
+      messageKeys.add(key);
     }
   });
 
