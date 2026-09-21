@@ -126,7 +126,7 @@ const SCRUB_STEPS: ReadonlyArray<RegExp | ((value: string) => string)> = [
   // Telegram Bot API token: digits:alnum (e.g. 123456789:AAH…). Replaces the
   // token run only, so /bot<TOKEN>/sendMessage and /file/bot<TOKEN>/... keep
   // their /bot and /file/bot prefixes and method/path suffix.
-  /\d{6,}:[A-Za-z0-9]{20,}/g,
+  /\d{6,}:[A-Za-z0-9_-]{20,}/g,
   scrubJwts,
   scrubPemBlocks,
   /-----BEGIN [A-Z ]+-----/g,

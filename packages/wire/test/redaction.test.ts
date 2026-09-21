@@ -44,6 +44,11 @@ describe("redactSecrets — Telegram bot tokens", () => {
     expect(out).toContain("invalid token [REDACTED]");
   });
 
+  it("redacts a token whose secret run contains hyphens and underscores", () => {
+    const token = "123456789:AAH-dqTcvCH1vGWJxfSeofSAs0K5PALD_saw";
+    expect(redactSecrets(`/bot${token}/getMe`)).toBe("/bot[REDACTED]/getMe");
+  });
+
   it("does not redact a non-token path like /botanic/garden", () => {
     expect(redactSecrets("/botanic/garden")).toBe("/botanic/garden");
   });
