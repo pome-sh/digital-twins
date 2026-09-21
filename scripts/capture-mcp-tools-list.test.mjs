@@ -90,12 +90,20 @@ function sandboxWithDeferredTwin() {
   const sources = loadSources({ repoRoot: ROOT });
   const ids = Object.keys(sources.twins);
   assert(ids.length >= 5, `source table declares every first-party twin (got ${ids.join(", ")})`);
-  for (const id of ["gmail", "github", "stripe", "slack", "linear"]) {
+  for (const id of ["gmail", "github", "stripe", "slack", "linear", "telegram"]) {
     assert(ids.includes(id), `source table declares ${id}`);
+  }
+  assert(sources.twins.telegram.capture === false, "telegram stays deferred until a two-account listing exists");
+  for (const [id, source] of Object.entries(sources.twins)) {
+    if (source.capture) continue;
+    const paths = goldenPaths({ repoRoot: ROOT, sources, twin: id });
+    for (const kind of ["raw", "meta", "canonical"]) {
+      assert(!existsSync(paths[kind]), `${id}: capture:false must not carry a ${kind} golden`);
+    }
   }
 
   const producerText = readFileSync(join(ROOT, "scripts/capture-mcp-tools-list.mjs"), "utf8");
-  for (const id of ["gmail", "github", "stripe", "slack", "linear"]) {
+  for (const id of ["gmail", "github", "stripe", "slack", "linear", "telegram"]) {
     assert(
       !new RegExp(`["'\`]${id}["'\`]`).test(producerText),
       `the producer does not name the twin "${id}" — adding a twin must be a data edit`
