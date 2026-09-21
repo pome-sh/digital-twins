@@ -181,20 +181,6 @@ const MIDDLEWARE_EXEMPTIONS = [
       "the decoder for `/admin/seed` and the legacy `/mcp/call`.",
   },
   {
-    file: "packages/twin-telegram/src/path-token.ts",
-    expression: `pathname = new URL(c.req.url).pathname;`,
-    reason:
-      "auth, not a route input: extracts the Bot API path token before any handler runs. " +
-      "The token is identity, never a declared operation parameter.",
-  },
-  {
-    file: "packages/twin-telegram/src/twin.ts",
-    expression: `const pathSid = c.req.param("sid");`,
-    reason:
-      "auth, not a route input: binds a path-token session to the /s/:sid mount. " +
-      "Sid matching is the engine's session check, not a vendor argument.",
-  },
-  {
     file: "packages/twin-linear/src/twin.ts",
     expression: `const peek = new HonoRequest(c.req.raw.clone())`,
     reason:
