@@ -29,7 +29,7 @@ rather than stamped, so a re-derivation can never make an old reading look like 
 
 ## Per twin
 
-All five are captured.
+Five first-party twins are captured. `telegram` is declared and deferred — no golden.
 
 | twin | substrate | completeness | what was read |
 | --- | --- | --- | --- |
@@ -38,6 +38,7 @@ All five are captured.
 | stripe | `live-wire-oauth` | `credential-scoped` | `mcp.stripe.com` under an OAuth grant on the Pome account in test mode, all permissions = Write (11 tools) |
 | slack | `live-wire-oauth` | `exact` | `mcp.slack.com/mcp` under a user token carrying all 30 advertised scopes (19 tools, the count Slack documents) |
 | linear | `live-wire-oauth` | `exact` | `mcp.linear.app/mcp` under a `read write` grant (58 tools) — see below |
+| telegram | `live-wire-unauth` | — | **not captured.** Pinned Tolboy with TDLib disabled registers one `default` account. Two named accounts start TDLib. See `telegram.status.json`. |
 
 Every file is `<twin>.{raw,meta,canonical}.json`.
 
