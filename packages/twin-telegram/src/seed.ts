@@ -32,12 +32,40 @@ const messageSchema = z.strictObject({
   reply_to_message_id: z.number().int().positive().optional(),
 });
 
-export const seedSchema = z.strictObject({
-  bots: z.array(botSchema).min(1),
-  users: z.array(userSchema).min(1),
-  chats: z.array(chatSchema).min(1),
-  messages: z.array(messageSchema).default([]),
-});
+export const seedSchema = z
+  .strictObject({
+    bots: z.array(botSchema).min(1),
+    users: z.array(userSchema).min(1),
+    chats: z.array(chatSchema).min(1),
+    messages: z.array(messageSchema).default([]),
+  })
+  .superRefine((state, ctx) => {
+    const ids = new Set<number>();
+    for (const bot of state.bots) {
+      if (ids.has(bot.id)) ctx.addIssue({ code: "custom", message: `duplicate id ${bot.id}` });
+      ids.add(bot.id);
+    }
+    const accounts = new Set(state.users.map((user) => user.account));
+    for (const user of state.users) {
+      if (ids.has(user.id)) ctx.addIssue({ code: "custom", message: `duplicate id ${user.id}` });
+      ids.add(user.id);
+    }
+    for (const bot of state.bots) {
+      if (accounts.has(bot.username)) {
+        ctx.addIssue({ code: "custom", message: `bot username ${bot.username} collides with a user account` });
+      }
+    }
+    const chatIds = new Set(state.chats.map((chat) => chat.id));
+    for (const chat of state.chats) {
+      for (const member of chat.members) {
+        if (!ids.has(member)) ctx.addIssue({ code: "custom", message: `unknown member ${member}` });
+      }
+    }
+    for (const message of state.messages) {
+      if (!chatIds.has(message.chat_id)) ctx.addIssue({ code: "custom", message: `unknown chat ${message.chat_id}` });
+      if (!ids.has(message.from_id)) ctx.addIssue({ code: "custom", message: `unknown from_id ${message.from_id}` });
+    }
+  });
 
 export type TelegramSeed = z.infer<typeof seedSchema>;
 

@@ -116,6 +116,33 @@ describe("HTTP path token", () => {
     const res = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/getChat?chat_id=999`);
     expect(res.status).toBe(400);
   });
+
+  it("rejects empty text and a missing reply", async () => {
+    const { app } = fresh();
+    const empty = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: 2001, text: "" }),
+    });
+    expect(empty.status).toBe(400);
+    const missing = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: 2001, text: "hi", reply_to_message_id: 99 }),
+    });
+    expect(missing.status).toBe(400);
+  });
+
+  it("round-trips unicode on the seeded group", async () => {
+    const { app } = fresh();
+    const sent = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: -1001234567890, text: "café 你好" }),
+    });
+    expect(sent.status).toBe(200);
+    expect(JSON.stringify(await sent.json())).toContain("café 你好");
+  });
 });
 
 describe("loopback A → X → history", () => {
@@ -161,14 +188,40 @@ describe("loopback A → X → history", () => {
       method: "tools/call",
       params: { name: "list_chats", arguments: { account: "mallory" } },
     });
-    expect(JSON.stringify(asMallory.body)).toMatch(/unauthorized account|isError/i);
+    expect(JSON.stringify(asMallory.body)).toContain("unauthorized account");
     const asBob = await mcp(app, token, {
       jsonrpc: "2.0",
       id: 2,
       method: "tools/call",
-      params: { name: "send_message", arguments: { account: "bob", chat_id: 2001, text: "impersonate" } },
+      params: {
+        name: "send_message",
+        arguments: { account: "bob", chat_id: -1001234567890, text: "impersonate" },
+      },
     });
-    expect(JSON.stringify(asBob.body)).toMatch(/unauthorized account|isError/i);
+    expect(JSON.stringify(asBob.body)).toContain("unauthorized account");
+    const bob = await userToken("bob");
+    const bobSend = await mcp(app, bob, {
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: { name: "send_message", arguments: { account: "bob", chat_id: -1001234567890, text: "from bob" } },
+    });
+    expect(JSON.stringify(bobSend.body)).toContain("from bob");
+    expect(JSON.stringify(bobSend.body)).not.toContain("impersonate");
+  });
+
+  it("does not treat /s/botanic/mcp as a bot path token", async () => {
+    const { app } = fresh();
+    const token = await sign(
+      { sid: "botanic", team_id: "tg", login: "alice", exp: Math.floor(Date.now() / 1000) + 3600 },
+      secret,
+    );
+    const res = await app.request("/s/botanic/mcp", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+    expect(res.status).toBe(200);
   });
 
 });

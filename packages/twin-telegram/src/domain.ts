@@ -80,12 +80,12 @@ export class TelegramDomain {
     this.seed(factory());
   }
 
-  lookupBotToken(token: string): { sid: string; bot_id: number; login: string } | undefined {
+  lookupBotToken(token: string): { sid: string; bot_id: number; bot_username: string } | undefined {
     const row = this.db.prepare("SELECT id, username FROM bots WHERE token = ?").get(token) as
       | { id: number; username: string }
       | undefined;
     if (!row) return undefined;
-    return { sid: "local", bot_id: row.id, login: row.username };
+    return { sid: "local", bot_id: row.id, bot_username: row.username };
   }
 
   getMe(actor: Actor): Record<string, unknown> {
@@ -112,18 +112,20 @@ export class TelegramDomain {
       if (!reply) telegramFail(400, 400, "Bad Request: reply message not found");
     }
     const from = this.personFor(actor);
-    const next =
-      (
+    const date = Math.floor(Date.now() / 1000);
+    const next = this.db.transaction(() => {
+      const allocated = (
         this.db.prepare("SELECT COALESCE(MAX(message_id), 0) + 1 AS next FROM messages WHERE chat_id = ?").get(
           args.chat_id,
         ) as { next: number }
       ).next;
-    const date = Math.floor(Date.now() / 1000);
-    this.db
-      .prepare(
-        "INSERT INTO messages (chat_id, message_id, from_id, text, date, reply_to_message_id) VALUES (?, ?, ?, ?, ?, ?)",
-      )
-      .run(args.chat_id, next, from.id, args.text, date, args.reply_to_message_id ?? null);
+      this.db
+        .prepare(
+          "INSERT INTO messages (chat_id, message_id, from_id, text, date, reply_to_message_id) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .run(args.chat_id, allocated, from.id, args.text, date, args.reply_to_message_id ?? null);
+      return allocated;
+    })();
     const row: MessageRow = {
       chat_id: args.chat_id,
       message_id: next,

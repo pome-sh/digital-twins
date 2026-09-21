@@ -14,7 +14,7 @@ import { TelegramDomain } from "./domain.js";
 import { TwinError } from "./errors.js";
 import { extractTelegramPathToken } from "./path-token.js";
 import { registerTelegramRoutes } from "./routes.js";
-import { defaultSeedState, seedSchema, type TelegramSeed } from "./seed.js";
+import { defaultSeedState, parseSeed, type TelegramSeed } from "./seed.js";
 import { telegramError } from "./serializers.js";
 import { executeTool, isMutatingTool, telegramToolFixture, toolSchemas } from "./tools.js";
 import { unsupportedEnvelope } from "./unsupported-envelope.js";
@@ -65,7 +65,16 @@ export function telegramTwinDefinition(
     implementation: "telegram_twin",
     packageName: "@pome-sh/twin-telegram",
     fidelity: { default: "semantic" },
-    seed: seedSchema as unknown as z.ZodType<TelegramSeed>,
+    seed: {
+      parse: (input: unknown) => parseSeed(input),
+      safeParse: (input: unknown) => {
+        try {
+          return { success: true as const, data: parseSeed(input) };
+        } catch (error) {
+          return { success: false as const, error };
+        }
+      },
+    } as unknown as z.ZodType<TelegramSeed>,
     domain: ({ seed }) => {
       const domain = new TelegramDomain(db);
       if (seed !== undefined) domain.seed(seed);
