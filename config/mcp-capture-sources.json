@@ -201,6 +201,10 @@
         "repo": "https://github.com/tolboy/telegram-mcp-tdlib",
         "commit": "da3ee1f194c104d922449bf11a3595840e163357"
       },
+      "configuration": {
+        "minNamedAccounts": 2,
+        "accountSelectorProperty": "account"
+      },
       "evidence": {
         "inspected": "tolboy/telegram-mcp-tdlib@da3ee1f194c104d922449bf11a3595840e163357 src/main/kotlin/dev/telegrammcp/server/client/TdLibConfig.kt (telegramAccountRegistry, configuredAccounts, startAccount)",
         "tdlibDisabledAccount": "default",

@@ -94,6 +94,10 @@ function sandboxWithDeferredTwin() {
     assert(ids.includes(id), `source table declares ${id}`);
   }
   assert(sources.twins.telegram.capture === false, "telegram stays deferred until a two-account listing exists");
+  assert(
+    sources.twins.telegram.configuration?.minNamedAccounts === 2,
+    "telegram source (when present) must declare configuration.minNamedAccounts === 2"
+  );
   for (const [id, source] of Object.entries(sources.twins)) {
     if (source.capture) continue;
     const paths = goldenPaths({ repoRoot: ROOT, sources, twin: id });
@@ -429,6 +433,81 @@ function sandboxWithDeferredTwin() {
   const recheck = await runCapture({ repoRoot: dir, check: true, offline: true, ...SILENT });
   assert(recheck === 0, "what write mode produced is what --check accepts");
   rmSync(dir, { recursive: true, force: true });
+}
+
+{
+  const listing = (accountEnum) =>
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      result: {
+        tools: [
+          {
+            name: "probe_tool",
+            inputSchema: {
+              type: "object",
+              properties: {
+                account: { type: "string", enum: accountEnum },
+              },
+            },
+          },
+        ],
+      },
+    });
+
+  async function writeWithFloor({ accountEnum, minNamedAccounts }) {
+    const dir = sandbox();
+    const cfgPath = join(dir, "config/mcp-capture-sources.json");
+    const table = JSON.parse(readFileSync(cfgPath, "utf8"));
+    const twin = Object.keys(table.twins).find((id) => table.twins[id].capture);
+    if (minNamedAccounts !== undefined) {
+      table.twins[twin].configuration.minNamedAccounts = minNamedAccounts;
+      table.twins[twin].configuration.accountSelectorProperty = "account";
+    }
+    writeFileSync(cfgPath, `${JSON.stringify(table, null, 2)}\n`);
+    const sources = loadSources({ sourcesPath: cfgPath });
+    const paths = goldenPaths({ repoRoot: dir, sources, twin });
+    const before = readFileSync(paths.raw, "utf8");
+    const rawText = listing(accountEnum);
+    const code = await runCapture({
+      repoRoot: dir,
+      sourcesPath: cfgPath,
+      twins: [twin],
+      today: "2026-01-02",
+      readSubstrate: async () => ({ rawText }),
+      ...SILENT,
+    });
+    return { dir, paths, before, rawText, code };
+  }
+
+  {
+    const { dir, paths, before, code } = await writeWithFloor({
+      accountEnum: ["default"],
+      minNamedAccounts: 2,
+    });
+    assert(code !== 0, "injected listing with account enum [default] and minNamedAccounts:2 fails runCapture write");
+    assert(readFileSync(paths.raw, "utf8") === before, "a listing below the named-account floor is not frozen");
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  {
+    const { dir, paths, rawText, code } = await writeWithFloor({
+      accountEnum: ["alpha", "beta"],
+      minNamedAccounts: 2,
+    });
+    assert(code === 0, "injected listing with account enum [alpha,beta] and minNamedAccounts:2 succeeds");
+    assert(readFileSync(paths.raw, "utf8") === rawText, "a listing that meets the named-account floor is written");
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  {
+    const { dir, paths, rawText, code } = await writeWithFloor({
+      accountEnum: ["default"],
+    });
+    assert(code === 0, "existing twins without minNamedAccounts still write a one-name listing");
+    assert(readFileSync(paths.raw, "utf8") === rawText, "no named-account floor means a one-name listing is frozen");
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 {

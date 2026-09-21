@@ -286,6 +286,29 @@ function pretty(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
+function namedAccountUnion(tools, selector) {
+  const names = new Set();
+  for (const tool of tools) {
+    const values = tool?.inputSchema?.properties?.[selector]?.enum;
+    if (!Array.isArray(values)) continue;
+    for (const value of values) names.add(value);
+  }
+  return names;
+}
+
+function assertNamedAccountFloor({ source, tools }) {
+  const min = source.configuration?.minNamedAccounts;
+  if (typeof min !== "number" || min <= 0) return;
+  const selector = source.configuration.accountSelectorProperty || "account";
+  const names = namedAccountUnion(tools, selector);
+  if (names.size >= min) return;
+  const listed = names.size > 0 ? ` (${[...names].join(", ")})` : "";
+  throw new Error(
+    `${source.twin}: the listing's \`${selector}\` enum names ${names.size} account(s)${listed}; ` +
+      `configuration.minNamedAccounts is ${min}. This listing cannot be frozen.`
+  );
+}
+
 export function deriveGolden({ source, rawText, captureDate }) {
   if (!captureDate) throw new Error(`${source.twin}: a capture must be dated`);
   let envelope;
@@ -301,6 +324,7 @@ export function deriveGolden({ source, rawText, captureDate }) {
   if (!Array.isArray(tools) || tools.length === 0) {
     throw new Error(`${source.twin}: the substrate answered no \`result.tools\` array`);
   }
+  assertNamedAccountFloor({ source, tools });
   const names = tools.map((tool) => tool.name);
   const rawFileSha256 = sha256(rawText);
 
