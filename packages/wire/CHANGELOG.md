@@ -4,6 +4,10 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
+## Unreleased
+
+Telegram bot tokens, bot/file paths, `secret_token`, and `X-Telegram-Bot-Api-Secret-Token` are scrubbed before persist.
+
 ## 0.4.3 — 2026-09-16
 
 **Dev-only: vitest 5.** Test runner only; no exported API change.

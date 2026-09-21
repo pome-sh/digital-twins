@@ -15,6 +15,9 @@ const HARD_REDACT_KEYS = new Set([
   "password",
   "secret",
   "token",
+  // Exact key match after toLowerCase: "secret" / "token" do not cover these.
+  "secret_token",
+  "x-telegram-bot-api-secret-token",
   "access_token",
   "refresh_token",
   "session_token",
@@ -120,6 +123,10 @@ const SCRUB_STEPS: ReadonlyArray<RegExp | ((value: string) => string)> = [
   /(?:pme|pk|rk)_[A-Za-z0-9_-]{20,}/g,
   /AIza[0-9A-Za-z_-]{20,}/g,
   /AKIA[0-9A-Z]{16}/g,
+  // Telegram Bot API token: digits:alnum (e.g. 123456789:AAH…). Replaces the
+  // token run only, so /bot<TOKEN>/sendMessage and /file/bot<TOKEN>/... keep
+  // their /bot and /file/bot prefixes and method/path suffix.
+  /\d{6,}:[A-Za-z0-9]{20,}/g,
   scrubJwts,
   scrubPemBlocks,
   /-----BEGIN [A-Z ]+-----/g,
