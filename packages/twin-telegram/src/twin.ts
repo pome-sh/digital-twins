@@ -14,7 +14,7 @@ import { TelegramDomain } from "./domain.js";
 import { TwinError } from "./errors.js";
 import { extractTelegramPathToken } from "./path-token.js";
 import { registerTelegramRoutes } from "./routes.js";
-import { defaultSeedState, type TelegramSeed } from "./seed.js";
+import { defaultSeedState, seedSchema, type TelegramSeed } from "./seed.js";
 import { telegramError } from "./serializers.js";
 import { executeTool, isMutatingTool, telegramToolFixture, toolSchemas } from "./tools.js";
 import { unsupportedEnvelope } from "./unsupported-envelope.js";
@@ -56,14 +56,6 @@ const implementations = Object.fromEntries(
   ]),
 ) as Record<string, McpToolImplementation<TelegramDomain>>;
 
-function lookupBot(db: TelegramTwinDatabase, token: string) {
-  const row = db.prepare("SELECT id, username FROM bots WHERE token = ?").get(token) as
-    | { id: number; username: string }
-    | undefined;
-  if (!row) return undefined;
-  return { sid: "local", bot_id: row.id, login: row.username };
-}
-
 export function telegramTwinDefinition(
   db: TelegramTwinDatabase,
 ): TwinDefinition<TelegramTwinDatabase, TelegramSeed, TelegramDomain> {
@@ -73,7 +65,7 @@ export function telegramTwinDefinition(
     implementation: "telegram_twin",
     packageName: "@pome-sh/twin-telegram",
     fidelity: { default: "semantic" },
-    seed: z.unknown() as unknown as z.ZodType<TelegramSeed>,
+    seed: seedSchema as unknown as z.ZodType<TelegramSeed>,
     domain: ({ seed }) => {
       const domain = new TelegramDomain(db);
       domain.seed(seed !== undefined ? seed : defaultSeedState());
@@ -102,7 +94,7 @@ export function telegramTwinDefinition(
       requirePathSid: false,
       extractPathToken: extractTelegramPathToken,
       tokenResolvers: [extractTelegramPathToken],
-      resolveCredential: (token) => lookupBot(db, token),
+      resolveCredential: (token) => new TelegramDomain(db).lookupBotToken(token),
       unauthorized: () => ({ status: 401, body: telegramError(401, "Unauthorized") }),
       sidMismatch: () => ({ status: 403, body: telegramError(403, "Forbidden") }),
       sessionExtras: (claims) =>

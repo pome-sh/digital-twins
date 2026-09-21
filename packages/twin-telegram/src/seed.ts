@@ -12,7 +12,7 @@ const userSchema = z.strictObject({
 
 const botSchema = z.strictObject({
   id: z.number().int(),
-  token: z.string().min(1),
+  token: z.string().regex(/^\d{6,}:[A-Za-z0-9_-]{20,}$/),
   first_name: z.string().min(1),
   username: z.string().min(1),
 });
