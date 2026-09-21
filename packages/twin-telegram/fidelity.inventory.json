@@ -1,0 +1,21 @@
+{
+  "twin": "telegram",
+  "package": "@pome-sh/twin-telegram",
+  "updated": "2026-09-21",
+  "notes": "T04 spine. MCP table is twin-authored-from-vendor-docs until a two-account capture exists.",
+  "tools": [
+    { "name": "get_me", "heat": "hot", "fidelity": "semantic", "justification": "Spine identity." },
+    { "name": "list_accounts", "heat": "hot", "fidelity": "semantic", "justification": "Named-account selector." },
+    { "name": "_manifest", "heat": "hot", "fidelity": "shape", "justification": "Staged listing." },
+    { "name": "list_chats", "heat": "hot", "fidelity": "semantic", "justification": "Account-visible chats." },
+    { "name": "get_chat", "heat": "hot", "fidelity": "semantic", "justification": "Member check." },
+    { "name": "get_history", "heat": "hot", "fidelity": "semantic", "justification": "Per-chat history." },
+    { "name": "send_message", "heat": "hot", "fidelity": "semantic", "justification": "User send." },
+    { "name": "reply_to_message", "heat": "hot", "fidelity": "semantic", "justification": "Reply link." }
+  ],
+  "http": [
+    { "name": "getMe", "heat": "hot", "fidelity": "semantic", "justification": "Bot identity." },
+    { "name": "getChat", "heat": "hot", "fidelity": "semantic", "justification": "Chat lookup." },
+    { "name": "sendMessage", "heat": "hot", "fidelity": "semantic", "justification": "Bot send." }
+  ]
+}

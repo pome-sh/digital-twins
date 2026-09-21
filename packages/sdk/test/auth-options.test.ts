@@ -227,3 +227,27 @@ describe("session extras (row 7)", () => {
     expect(session.login).toBe("user-of-tm_test");
   });
 });
+
+describe("extractPathToken", () => {
+  it("rejects a JWT when the path token does not resolve", async () => {
+    const token = await signTestToken();
+    const res = await sessionApp({
+      extractPathToken: () => "bad-bot-token",
+      resolveCredential: () => undefined,
+    }).request(path, withAuth(token));
+    expect(res.status).toBe(401);
+  });
+
+  it("merges a resolved path credential onto a valid JWT session", async () => {
+    const token = await signTestToken();
+    const res = await sessionApp({
+      extractPathToken: () => "1100001:AAHAAAAAAAAAAAAAAAAAAAAA",
+      resolveCredential: (presented) =>
+        presented.startsWith("1100001:") ? { sid: "bot-sid", bot_id: 100 } : undefined,
+    }).request(path, withAuth(token));
+    expect(res.status).toBe(200);
+    const session = (await res.json()) as Record<string, unknown>;
+    expect(session.sid).toBe(TEST_SID);
+    expect(session.bot_id).toBe(100);
+  });
+});

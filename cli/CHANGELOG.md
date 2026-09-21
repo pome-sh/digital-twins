@@ -19,6 +19,8 @@ one it corrects.
 
 **Telegram bot tokens and webhook `secret_token` are scrubbed before persist.** Paths `/bot<token>/` and `/file/bot<token>/`, URL-encoded colons, and `X-Telegram-Bot-Api-Secret-Token` no longer survive onto the tape.
 
+**Standalone Telegram twin boots HTTP getMe/getChat/sendMessage and eight user MCP tools.** Path tokens always resolve to a seeded bot, including under a Pome bearer. Not registered with the CLI.
+
 ## 0.46.0 — 2026-09-19
 
 **`pome twin start` serves a live dashboard of the tape** (F-1850). The banner

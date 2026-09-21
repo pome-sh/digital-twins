@@ -427,7 +427,7 @@ const toolFidelityMeta = z.object({
 });
 
 const toolMeta = z.object({
-  name: z.string().min(1).regex(slugLike, "tool name must be a lowercase slug"),
+  name: z.string().min(1).regex(/^[a-z_][a-z0-9_-]*$/, "tool name must be a lowercase slug"),
   description: z.string().min(1),
   schema: z.custom<z.ZodType>(isZodType, "tool.schema must be a Zod schema"),
   handler: z.custom<Function>(isFunction, "tool.handler must be a function"),

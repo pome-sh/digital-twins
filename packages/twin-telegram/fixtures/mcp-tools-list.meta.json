@@ -1,0 +1,34 @@
+{
+  "twin": "telegram",
+  "substrate": "twin-authored-from-vendor-docs",
+  "endpoint": "in-process://twin-telegram/s/:sid/mcp",
+  "method": "tools/list",
+  "protocol": "JSON-RPC 2.0 over Streamable HTTP",
+  "protocolVersion": "2025-06-18",
+  "captureDate": "2026-09-21",
+  "rawFileSha256": "40d4cbfed24370a72049d15d4708214c3c84b4443d03fd243961fea4700b952c",
+  "canonicalFileSha256": "cd23fd13eea6a66e0ca2823e27ddf54a328f4221c08f90cc237036923fe7a292",
+  "liveToolCount": 8,
+  "liveToolOrder": [
+    "get_me",
+    "list_accounts",
+    "_manifest",
+    "list_chats",
+    "get_chat",
+    "get_history",
+    "send_message",
+    "reply_to_message"
+  ],
+  "transcription": {
+    "readFrom": "T04 spine tool names from the Telegram operation-ownership matrix and Tolboy's published names",
+    "contentOrigin": "packages/twin-telegram/src/tools.ts — twin-authored schemas, not a vendor capture",
+    "comparedToUpstream": "never compared. Capture is deferred until a two-account listing exists."
+  },
+  "notes": [
+    "Not a vendor golden. Do not treat these schemas as Tolboy wire."
+  ],
+  "files": {
+    "raw": "mcp-tools-list.raw.json",
+    "canonical": "mcp-tools-list.canonical.json"
+  }
+}

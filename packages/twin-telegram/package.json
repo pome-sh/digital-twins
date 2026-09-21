@@ -1,0 +1,53 @@
+{
+  "name": "@pome-sh/twin-telegram",
+  "version": "0.0.0",
+  "description": "Standalone Telegram Bot API + user MCP twin. Not a first-party CLI twin until registration lands.",
+  "private": true,
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./server": {
+      "types": "./dist/src/server.d.ts",
+      "default": "./dist/src/server.js"
+    },
+    "./seed": {
+      "types": "./dist/src/seed.d.ts",
+      "default": "./dist/src/seed.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "FIDELITY.md",
+    "fidelity.inventory.json"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/server.ts",
+    "start": "node dist/src/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@pome-sh/sdk": "*",
+    "@pome-sh/wire": "*",
+    "hono": "^4.13.8",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24"
+  }
+}
