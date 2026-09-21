@@ -239,6 +239,7 @@ jobs:
       # human-reviewed lane (`npm run capture:mcp-tools-list`).
       - run: npm run gate:mcp-tools-list
       - run: node scripts/capture-mcp-tools-list.test.mjs
+      - run: node scripts/telegram-operation-ownership.test.mjs
 
       # ---------------------------------------------------------------------
       # Heavy suite. Every step below is gated on `steps.scope.outputs.heavy`,
