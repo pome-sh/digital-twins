@@ -6,8 +6,8 @@
   "protocol": "JSON-RPC 2.0 over Streamable HTTP",
   "protocolVersion": "2025-06-18",
   "captureDate": "2026-09-21",
-  "rawFileSha256": "def94a25fda346dfaa9cb2fbec0cac305c9682b031f74842e69960264204a83b",
-  "canonicalFileSha256": "38a21fbea1b28ca12f04b053811cdc0352aeb19aeb66e77434df750450046062",
+  "rawFileSha256": "309ba4b8f75c0ccdf2da6c1bf67ab917eddc0041f9fc69275b2509a5cb450f53",
+  "canonicalFileSha256": "1ba58d360503fcb04c3aa2a1851f8af3bb9c99414d25731d2430fe40df152f6d",
   "liveToolCount": 19,
   "liveToolOrder": [
     "get_me",

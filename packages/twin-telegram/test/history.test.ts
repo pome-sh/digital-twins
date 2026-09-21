@@ -50,6 +50,18 @@ async function bot(app: ReturnType<typeof createTelegramTwinApp>, method: string
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 }
 
+describe("seeded ids", () => {
+  it("allocates past a seeded message_id", () => {
+    const db = openTelegramTwinDatabase(":memory:");
+    const domain = new TelegramDomain(db);
+    const seed = defaultSeedState();
+    seed.messages = [{ chat_id: 2001, message_id: 5, from_id: 2001, text: "seeded" }];
+    domain.seed(seed);
+    const sent = domain.sendMessage({ kind: "user", account: "alice" }, { chat_id: 2001, text: "next" });
+    expect(sent.message_id).toBe(6);
+  });
+});
+
 describe("migrate", () => {
   it("backfills next_message_id past existing rows", () => {
     const db = openTelegramTwinDatabase(":memory:");

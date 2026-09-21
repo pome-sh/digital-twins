@@ -7,7 +7,7 @@
     "protocol": "JSON-RPC 2.0 over Streamable HTTP",
     "protocolVersion": "2025-06-18",
     "captureDate": "2026-09-21",
-    "rawFileSha256": "def94a25fda346dfaa9cb2fbec0cac305c9682b031f74842e69960264204a83b",
+    "rawFileSha256": "309ba4b8f75c0ccdf2da6c1bf67ab917eddc0041f9fc69275b2509a5cb450f53",
     "liveToolCount": 19,
     "liveToolOrder": [
       "get_me",
@@ -338,7 +338,7 @@
       },
       {
         "name": "message_from_link",
-        "description": "Resolve a seeded tg:// or t.me link.",
+        "description": "Resolve a tg://message?chat_id=&message_id= link this twin emitted.",
         "inputSchema": {
           "type": "object",
           "properties": {
