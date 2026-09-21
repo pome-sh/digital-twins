@@ -75,9 +75,27 @@ describe("HTTP path token", () => {
     const { app } = fresh();
     const res = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/getMe`);
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { ok: boolean; result: { username: string } };
+    const body = (await res.json()) as { ok: boolean; result: { username: string; is_bot: boolean } };
     expect(body.ok).toBe(true);
     expect(body.result.username).toBe("x_bot");
+    expect(body.result.is_bot).toBe(true);
+  });
+
+  it("getMe on a session-prefixed path with no bearer", async () => {
+    const { app } = fresh();
+    const res = await app.request(`/s/${sid}/bot${SYNTHETIC_BOT_TOKEN}/getMe`);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { result: { is_bot: boolean } }).result.is_bot).toBe(true);
+  });
+
+  it("getMe with a JWT and a valid path token is still the bot", async () => {
+    const { app } = fresh();
+    const token = await userToken("alice");
+    const res = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/getMe`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { result: { is_bot: boolean; username: string } }).result.username).toBe("x_bot");
   });
 
   it("rejects an unknown token", async () => {

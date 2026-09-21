@@ -103,7 +103,12 @@ export function telegramTwinDefinition(
       requirePathSid: false,
       extractPathToken: extractTelegramPathToken,
       tokenResolvers: [extractTelegramPathToken],
-      resolveCredential: (token) => new TelegramDomain(db).lookupBotToken(token),
+      resolveCredential: (token, c) => {
+        const found = new TelegramDomain(db).lookupBotToken(token);
+        if (!found) return undefined;
+        const pathSid = c.req.param("sid");
+        return pathSid ? { ...found, sid: pathSid } : found;
+      },
       unauthorized: () => ({ status: 401, body: telegramError(401, "Unauthorized") }),
       sidMismatch: () => ({ status: 403, body: telegramError(403, "Forbidden") }),
       sessionExtras: (claims) =>
