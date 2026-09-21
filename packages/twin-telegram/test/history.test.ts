@@ -2,7 +2,7 @@
 import { sign } from "hono/jwt";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BOT_DELETE_WINDOW_SEC, TelegramDomain } from "../src/domain.js";
-import { openTelegramTwinDatabase } from "../src/db.js";
+import { migrate, openTelegramTwinDatabase } from "../src/db.js";
 import { createTelegramTwinApp } from "../src/twin.js";
 import { defaultSeedState, SYNTHETIC_BOT_TOKEN } from "../src/seed.js";
 
@@ -49,6 +49,20 @@ async function bot(app: ReturnType<typeof createTelegramTwinApp>, method: string
   });
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 }
+
+describe("migrate", () => {
+  it("backfills next_message_id past existing rows", () => {
+    const db = openTelegramTwinDatabase(":memory:");
+    db.exec("UPDATE chats SET next_message_id = 1");
+    const domain = new TelegramDomain(db);
+    domain.seed(defaultSeedState());
+    domain.sendMessage({ kind: "bot", botId: 1100001 }, { chat_id: 2001, text: "first" });
+    db.exec("UPDATE chats SET next_message_id = 1 WHERE id = 2001");
+    migrate(db);
+    const again = domain.sendMessage({ kind: "bot", botId: 1100001 }, { chat_id: 2001, text: "second" });
+    expect(again.message_id).toBe(2);
+  });
+});
 
 describe("edit / delete / forward / copy", () => {
   it("same message_id can exist in two chats", () => {
@@ -179,6 +193,9 @@ describe("search / context / links / viewers", () => {
     expect(JSON.stringify(res.body)).toContain("two");
     expect(JSON.stringify(res.body)).not.toContain("one");
     expect(JSON.stringify(res.body)).not.toContain("three");
+    await mcp(app, "alice", "delete_message", { chat_id: 2001, message_id: 2 });
+    const hiddenCenter = await mcp(app, "alice", "get_messages", { chat_id: 2001, message_id: 2, limit: 0 });
+    expect(JSON.stringify(hiddenCenter.body)).toContain("message not found");
   });
 
   it("links only resolve seeded chats", async () => {

@@ -271,7 +271,7 @@ export class TelegramDomain {
     account: string,
     args: { chat_id: number; message_id: number; limit?: number },
   ): Record<string, unknown>[] {
-    this.requireMember({ kind: "user", account }, args.chat_id);
+    this.requireVisibleMessage({ kind: "user", account }, args.chat_id, args.message_id);
     const limit = args.limit ?? 10;
     const rows = this.visibleMessages(account, args.chat_id).filter(
       (row) => Math.abs(row.message_id - args.message_id) <= limit,
