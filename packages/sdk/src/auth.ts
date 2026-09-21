@@ -274,6 +274,12 @@ export interface BearerAuthOptions {
     c: Context
   ) => SessionValue | undefined | Promise<SessionValue | undefined>;
   /**
+   * Vendor path credential that must resolve even when a Bearer is present.
+   * tokenResolvers only run when Authorization is absent; this companion
+   * is how `/bot<token>/…` stays bound to a seeded bot under a Pome JWT.
+   */
+  extractPathToken?: (c: Context) => string | undefined;
+  /**
    * Rows 2 + 6: the twin's 401 envelope, keyed by failure classification.
    * `info.token` carries the presented credential so a twin can render
    * shape-dependent messages (stripe: api-key-shaped tokens answer
@@ -363,6 +369,7 @@ export function bearerAuth(options: BearerAuthOptions = {}): MiddlewareHandler {
   const allowRawBearer = options.allowRawBearer === true;
 
   return async (c, next) => {
+    const pathToken = options.extractPathToken?.(c);
     let token = bearerHeaderToken(c, allowRawBearer);
     if (!token && options.tokenResolvers) {
       for (const resolveToken of options.tokenResolvers) {
@@ -370,6 +377,7 @@ export function bearerAuth(options: BearerAuthOptions = {}): MiddlewareHandler {
         if (token) break;
       }
     }
+    if (!token && pathToken) token = pathToken;
     if (!token) return respond(unauthorized("no_token"));
 
     const pathSid = c.req.param("sid") ?? extractSidFromUrl(c.req.url);
@@ -378,20 +386,20 @@ export function bearerAuth(options: BearerAuthOptions = {}): MiddlewareHandler {
       return requirePathSid ? respond(sidMismatch()) : undefined;
     };
 
+    let session: SessionValue | undefined;
+
     // Row 8: DB-backed credential lookup (stripe api_keys).
     if (options.resolveCredential) {
       const resolved = await options.resolveCredential(token, c);
       if (resolved) {
         const mismatch = checkSid(resolved.sid);
         if (mismatch) return mismatch;
-        c.set("session", resolved);
-        await next();
-        return;
+        session = resolved;
       }
     }
 
     // Row 1: provider-shaped tokens.
-    if (options.providerToken) {
+    if (!session && options.providerToken) {
       let providerSid: string | undefined;
       try {
         providerSid = verifyProviderToken(options.providerToken, token);
@@ -405,36 +413,44 @@ export function bearerAuth(options: BearerAuthOptions = {}): MiddlewareHandler {
       if (providerSid) {
         const mismatch = checkSid(providerSid);
         if (mismatch) return mismatch;
-        c.set("session", {
+        session = {
           sid: providerSid,
           team_id: PROVIDER_SHAPED_TEAM_ID,
           ...(options.providerSession?.(providerSid) ?? {}),
-        });
-        await next();
-        return;
+        };
       }
     }
 
     // Session JWT, with engine-side expired-vs-invalid classification
     // (row 6). The envelope hook decides how each kind renders on the wire.
-    let claims: SessionClaims;
-    try {
-      claims = (await verify(token, resolveAuthSecret(), "HS256")) as unknown as SessionClaims;
-    } catch (err) {
-      return respond(unauthorized(classifyJwtError(err), { token }));
+    if (!session) {
+      let claims: SessionClaims;
+      try {
+        claims = (await verify(token, resolveAuthSecret(), "HS256")) as unknown as SessionClaims;
+      } catch (err) {
+        return respond(unauthorized(classifyJwtError(err), { token }));
+      }
+      if (typeof claims.exp === "number" && claims.exp < Math.floor(Date.now() / 1000)) {
+        return respond(unauthorized("expired", { token }));
+      }
+      if (!claims.sid) return respond(unauthorized("invalid", { token }));
+      const mismatch = checkSid(claims.sid);
+      if (mismatch) return mismatch;
+      session = {
+        sid: claims.sid,
+        team_id: claims.team_id,
+        ...(options.sessionExtras?.(claims) ?? {}),
+      };
     }
-    if (typeof claims.exp === "number" && claims.exp < Math.floor(Date.now() / 1000)) {
-      return respond(unauthorized("expired", { token }));
-    }
-    if (!claims.sid) return respond(unauthorized("invalid", { token }));
-    const mismatch = checkSid(claims.sid);
-    if (mismatch) return mismatch;
 
-    c.set("session", {
-      sid: claims.sid,
-      team_id: claims.team_id,
-      ...(options.sessionExtras?.(claims) ?? {}),
-    });
+    if (pathToken !== undefined) {
+      if (!options.resolveCredential) return respond(unauthorized("invalid", { token: pathToken }));
+      const pathSession = await options.resolveCredential(pathToken, c);
+      if (!pathSession) return respond(unauthorized("invalid", { token: pathToken }));
+      session = { ...session, ...pathSession, sid: session.sid };
+    }
+
+    c.set("session", session);
     await next();
   };
 }
