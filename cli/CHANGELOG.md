@@ -15,6 +15,10 @@ consumer must do differently. The reasoning belongs in the code it explains.
 Released entries are insertions only: a correction is the next entry, naming the
 one it corrects.
 
+## Unreleased (patch)
+
+**Telegram bot tokens and webhook `secret_token` are scrubbed before persist.** Paths `/bot<token>/` and `/file/bot<token>/`, URL-encoded colons, and `X-Telegram-Bot-Api-Secret-Token` no longer survive onto the tape.
+
 ## 0.46.0 — 2026-09-19
 
 **`pome twin start` serves a live dashboard of the tape** (F-1850). The banner
