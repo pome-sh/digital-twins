@@ -127,7 +127,10 @@ const SCRUB_STEPS: ReadonlyArray<RegExp | ((value: string) => string)> = [
   // token run only, so /bot<TOKEN>/sendMessage and /file/bot<TOKEN>/... keep
   // their /bot and /file/bot prefixes and method/path suffix.
   /\d{6,}(?::|%3[aA])[A-Za-z0-9_-]{20,}/g,
-  (value: string) => value.replace(/([?&])secret_token=[A-Za-z0-9_-]+/gi, "$1secret_token=[REDACTED]"),
+  (value: string) =>
+    value
+      .replace(/secret_token=[A-Za-z0-9_-]+/gi, "secret_token=[REDACTED]")
+      .replace(/"secret_token"\s*:\s*"[^"]*"/gi, '"secret_token":"[REDACTED]"'),
   scrubJwts,
   scrubPemBlocks,
   /-----BEGIN [A-Z ]+-----/g,
