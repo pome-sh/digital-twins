@@ -49,8 +49,35 @@ describe("redactSecrets — Telegram bot tokens", () => {
     expect(redactSecrets(`/bot${token}/getMe`)).toBe("/bot[REDACTED]/getMe");
   });
 
+  it("redacts a query-encoded colon (%3A / %3a)", () => {
+    const secret = "AAH-dqTcvCH1vGWJxfSeofSAs0K5PALD_saw";
+    expect(redactSecrets(`https://example.com/hook?token=123456789%3A${secret}`)).toBe(
+      "https://example.com/hook?token=[REDACTED]",
+    );
+    expect(redactSecrets(`https://example.com/hook?token=123456789%3a${secret}`)).toBe(
+      "https://example.com/hook?token=[REDACTED]",
+    );
+    expect(redactSecrets(`https://example.com/hook?token=123456789:${secret}`)).toBe(
+      "https://example.com/hook?token=[REDACTED]",
+    );
+  });
+
+  it("redacts a token that is immediately followed by a query string", () => {
+    expect(redactSecrets(`/bot${TELEGRAM_BOT_TOKEN}?offset=1`)).toBe("/bot[REDACTED]?offset=1");
+  });
+
+  it("redacts secret_token in a query string", () => {
+    const out = redactSecrets("/setWebhook?url=https://example.com&secret_token=webhook-secret") as string;
+    expect(out).toContain("secret_token=[REDACTED]");
+    expect(out).not.toContain("webhook-secret");
+  });
+
   it("does not redact a non-token path like /botanic/garden", () => {
     expect(redactSecrets("/botanic/garden")).toBe("/botanic/garden");
+  });
+
+  it("does not redact clock times or ports", () => {
+    expect(redactSecrets("meet at 12:30 on :8080")).toBe("meet at 12:30 on :8080");
   });
 });
 
