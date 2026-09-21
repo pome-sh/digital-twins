@@ -82,7 +82,13 @@ describe("redactSecrets — Telegram bot tokens", () => {
     expect(redactSecrets('{"secret_token":"webhook-secret"}')).toBe(
       '{"secret_token":"[REDACTED]"}',
     );
+    expect(redactSecrets('{ "secret_token": "webhook-secret" }')).toBe(
+      '{ "secret_token":"[REDACTED]" }',
+    );
     expect(redactSecrets("secret_token=webhook-secret")).toBe("secret_token=[REDACTED]");
+    const nested = JSON.stringify({ body: '{"secret_token":"webhook-secret"}' });
+    expect(redactSecrets(nested)).not.toContain("webhook-secret");
+    expect(redactSecrets(nested)).toContain("[REDACTED]");
   });
 
   it("does not redact a non-token path like /botanic/garden", () => {

@@ -130,7 +130,8 @@ const SCRUB_STEPS: ReadonlyArray<RegExp | ((value: string) => string)> = [
   (value: string) =>
     value
       .replace(/secret_token=[A-Za-z0-9_-]+/gi, "secret_token=[REDACTED]")
-      .replace(/"secret_token"\s*:\s*"[^"]*"/gi, '"secret_token":"[REDACTED]"'),
+      .replace(/"secret_token"\s*:\s*"[^"]*"/gi, '"secret_token":"[REDACTED]"')
+      .replace(/\\"secret_token\\"\s*:\s*\\"[^"\\]*\\"/g, '\\"secret_token\\":\\"[REDACTED]\\"'),
   scrubJwts,
   scrubPemBlocks,
   /-----BEGIN [A-Z ]+-----/g,
