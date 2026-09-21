@@ -8,7 +8,24 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const table = JSON.parse(readFileSync(join(ROOT, "config/telegram-operation-ownership.json"), "utf8"));
+const raw = readFileSync(join(ROOT, "config/telegram-operation-ownership.json"), "utf8");
+const table = JSON.parse(raw);
+
+/** Top-level keys of `"property": { ... }` as written, including duplicates JSON.parse would drop. */
+function keysOf(text, property) {
+  const match = text.match(new RegExp(`"${property}": \\{\\n([\\s\\S]*?)\\n  \\}`));
+  if (!match) throw new Error(`missing object ${property}`);
+  return [...match[1].matchAll(/^    "([^"]+)":/gm)].map((item) => item[1]);
+}
+
+function unique(keys, label) {
+  const seen = new Set();
+  for (const key of keys) {
+    if (seen.has(key)) return `${label}: duplicate key ${key}`;
+    seen.add(key);
+  }
+  return null;
+}
 
 const METHODS = [
   "answerCallbackQuery",
@@ -202,6 +219,18 @@ const slices = new Set(table.slices);
 const methods = new Map(Object.entries(table.methods));
 const tools = new Map(Object.entries(table.tools));
 const excluded = new Map(Object.entries(table.excluded));
+
+assert(
+  unique(
+    keysOf('{ "methods": {\n    "getMe": "conversation",\n    "getMe": "history"\n  } }', "methods"),
+    "methods",
+  ) === "methods: duplicate key getMe",
+  "duplicate JSON keys fail before JSON.parse collapses them",
+);
+for (const property of ["methods", "tools", "excluded"]) {
+  const clash = unique(keysOf(raw, property), property);
+  assert(clash === null, clash ?? property);
+}
 
 assert(METHODS.length === 54, "frozen method list is 54 names");
 assert(TOOLS.length === 105, "frozen tool list is 105 names");
