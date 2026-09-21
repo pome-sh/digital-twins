@@ -26,7 +26,7 @@ describe("telegram MCP fixture", () => {
     expect(read("mcp-tools-list.canonical.json")).toBe(deriveCanonicalMcpToolListing({ raw, meta }));
   });
 
-  it("serves the eight spine tools", () => {
+  it("serves the staged conversation and history tools", () => {
     expect([...telegramToolFixture.toolNames]).toEqual([
       "get_me",
       "list_accounts",
@@ -36,6 +36,17 @@ describe("telegram MCP fixture", () => {
       "get_history",
       "send_message",
       "reply_to_message",
+      "get_messages",
+      "search_messages",
+      "search_global",
+      "edit_message",
+      "delete_message",
+      "forward_message",
+      "get_message_context",
+      "message_from_link",
+      "get_message_link",
+      "mark_as_read",
+      "get_message_viewers",
     ]);
   });
 });

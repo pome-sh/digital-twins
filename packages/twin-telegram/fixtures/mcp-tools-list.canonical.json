@@ -7,8 +7,8 @@
     "protocol": "JSON-RPC 2.0 over Streamable HTTP",
     "protocolVersion": "2025-06-18",
     "captureDate": "2026-09-21",
-    "rawFileSha256": "40d4cbfed24370a72049d15d4708214c3c84b4443d03fd243961fea4700b952c",
-    "liveToolCount": 8,
+    "rawFileSha256": "def94a25fda346dfaa9cb2fbec0cac305c9682b031f74842e69960264204a83b",
+    "liveToolCount": 19,
     "liveToolOrder": [
       "get_me",
       "list_accounts",
@@ -17,7 +17,18 @@
       "get_chat",
       "get_history",
       "send_message",
-      "reply_to_message"
+      "reply_to_message",
+      "get_messages",
+      "search_messages",
+      "search_global",
+      "edit_message",
+      "delete_message",
+      "forward_message",
+      "get_message_context",
+      "message_from_link",
+      "get_message_link",
+      "mark_as_read",
+      "get_message_viewers"
     ],
     "transcription": {
       "readFrom": "T04 spine tool names from the Telegram operation-ownership matrix and Tolboy's published names",
@@ -155,6 +166,257 @@
             "chat_id",
             "message_id",
             "text"
+          ]
+        }
+      },
+      {
+        "name": "get_messages",
+        "description": "Context window around a message.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            },
+            "limit": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id"
+          ]
+        }
+      },
+      {
+        "name": "search_messages",
+        "description": "Search one chat.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "query": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "chat_id",
+            "query"
+          ]
+        }
+      },
+      {
+        "name": "search_global",
+        "description": "Search account-visible chats.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      },
+      {
+        "name": "edit_message",
+        "description": "Edit a message the account authored.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id",
+            "text"
+          ]
+        }
+      },
+      {
+        "name": "delete_message",
+        "description": "Revoke own message or hide another locally.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            },
+            "revoke": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id"
+          ]
+        }
+      },
+      {
+        "name": "forward_message",
+        "description": "Forward a message, keeping attribution.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "from_chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "chat_id",
+            "from_chat_id",
+            "message_id"
+          ]
+        }
+      },
+      {
+        "name": "get_message_context",
+        "description": "Context window around a message.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            },
+            "limit": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id"
+          ]
+        }
+      },
+      {
+        "name": "message_from_link",
+        "description": "Resolve a seeded tg:// or t.me link.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "link": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "link"
+          ]
+        }
+      },
+      {
+        "name": "get_message_link",
+        "description": "Build a tg:// link for a seeded message.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id"
+          ]
+        }
+      },
+      {
+        "name": "mark_as_read",
+        "description": "Advance the account read cursor.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id"
+          ]
+        }
+      },
+      {
+        "name": "get_message_viewers",
+        "description": "Accounts whose read cursor passed a message.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id"
           ]
         }
       }

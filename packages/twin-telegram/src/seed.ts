@@ -30,6 +30,7 @@ const messageSchema = z.strictObject({
   from_id: z.number().int(),
   text: z.string(),
   reply_to_message_id: z.number().int().positive().optional(),
+  date: z.number().int().optional(),
 });
 
 export const seedSchema = z
@@ -97,6 +98,7 @@ export function defaultSeedState(): TelegramSeed {
     ],
     chats: [
       { id: 2001, type: "private", members: [2001, 1100001] },
+      { id: 2002, type: "private", members: [2002, 1100001] },
       { id: -1001234567890, type: "supergroup", title: "Lab", members: [2001, 2002, 1100001] },
     ],
     messages: [],

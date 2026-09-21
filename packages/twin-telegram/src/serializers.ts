@@ -32,6 +32,9 @@ export type MessageRow = {
   text: string;
   date: number;
   reply_to_message_id: number | null;
+  edit_date?: number | null;
+  forward_from_id?: number | null;
+  forward_from_chat_id?: number | null;
 };
 
 export function serializeUser(row: UserRow): Record<string, unknown> {
@@ -62,6 +65,10 @@ export function serializeMessage(
     chat: serializeChat(chat),
     date: row.date,
     text: row.text,
+    ...(row.edit_date ? { edit_date: row.edit_date } : {}),
     ...(row.reply_to_message_id ? { reply_to_message: { message_id: row.reply_to_message_id } } : {}),
+    ...(row.forward_from_id
+      ? { forward_from: { id: row.forward_from_id }, forward_from_chat_id: row.forward_from_chat_id }
+      : {}),
   };
 }
