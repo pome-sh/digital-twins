@@ -207,7 +207,11 @@ export class TelegramDomain {
     return this.present(after);
   }
 
-  deleteMessage(actor: Actor, args: { chat_id: number; message_id: number; revoke?: boolean }): { ok: true } {
+  deleteMessage(
+    actor: Actor,
+    args: { chat_id: number; message_id: number; revoke?: boolean },
+    delta: DeltaHook = NOOP,
+  ): { ok: true } {
     const row = this.requireVisibleMessage(actor, args.chat_id, args.message_id);
     const person = this.personFor(actor);
     if (actor.kind === "bot") {
@@ -215,24 +219,34 @@ export class TelegramDomain {
         telegramFail(400, 400, "Bad Request: message can't be deleted");
       }
       this.hardDelete(args.chat_id, args.message_id);
+      delta({ before: { chat_id: args.chat_id, message_id: args.message_id }, after: null });
       return { ok: true };
     }
     if (row.from_id === person.id || args.revoke) {
       if (row.from_id !== person.id) telegramFail(400, 400, "Bad Request: message can't be deleted");
       this.hardDelete(args.chat_id, args.message_id);
+      delta({ before: { chat_id: args.chat_id, message_id: args.message_id }, after: null });
       return { ok: true };
     }
     this.db
       .prepare("INSERT OR IGNORE INTO message_hides (account, chat_id, message_id) VALUES (?, ?, ?)")
       .run(actor.account, args.chat_id, args.message_id);
+    delta({
+      before: { visible: true, chat_id: args.chat_id, message_id: args.message_id },
+      after: { visible: false, account: actor.account },
+    });
     return { ok: true };
   }
 
-  deleteMessages(actor: Actor, args: { chat_id: number; message_ids: number[] }): { ok: true } {
+  deleteMessages(
+    actor: Actor,
+    args: { chat_id: number; message_ids: number[] },
+    delta: DeltaHook = NOOP,
+  ): { ok: true } {
     if (args.message_ids.length === 0) telegramFail(400, 400, "Bad Request: message_ids is empty");
     this.db.transaction(() => {
       for (const message_id of args.message_ids) {
-        this.deleteMessage(actor, { chat_id: args.chat_id, message_id });
+        this.deleteMessage(actor, { chat_id: args.chat_id, message_id }, delta);
       }
     })();
     return { ok: true };
@@ -273,6 +287,7 @@ export class TelegramDomain {
   ): Record<string, unknown>[] {
     this.requireVisibleMessage({ kind: "user", account }, args.chat_id, args.message_id);
     const limit = args.limit ?? 10;
+    if (limit < 0) telegramFail(400, 400, "Bad Request: limit must be non-negative");
     const rows = this.visibleMessages(account, args.chat_id).filter(
       (row) => Math.abs(row.message_id - args.message_id) <= limit,
     );
@@ -306,13 +321,18 @@ export class TelegramDomain {
     return this.present(this.requireVisibleMessage({ kind: "user", account }, Number(match[1]), Number(match[2])));
   }
 
-  markAsRead(account: string, args: { chat_id: number; message_id: number }): { ok: true } {
+  markAsRead(
+    account: string,
+    args: { chat_id: number; message_id: number },
+    delta: DeltaHook = NOOP,
+  ): { ok: true } {
     this.requireVisibleMessage({ kind: "user", account }, args.chat_id, args.message_id);
     this.db
       .prepare(
-        "INSERT INTO read_cursors (account, chat_id, last_read) VALUES (?, ?, ?) ON CONFLICT(account, chat_id) DO UPDATE SET last_read = excluded.last_read",
+        "INSERT INTO read_cursors (account, chat_id, last_read) VALUES (?, ?, ?) ON CONFLICT(account, chat_id) DO UPDATE SET last_read = MAX(read_cursors.last_read, excluded.last_read)",
       )
       .run(account, args.chat_id, args.message_id);
+    delta({ before: null, after: { account, chat_id: args.chat_id, last_read: args.message_id } });
     return { ok: true };
   }
 

@@ -81,11 +81,9 @@ export function migrate(db: TelegramTwinDatabase): void {
     ["messages", "forward_from_chat_id", "INTEGER"],
     ["chats", "next_message_id", "INTEGER NOT NULL DEFAULT 1"],
   ] as const) {
-    try {
-      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${spec}`);
-    } catch {
-      // already present
-    }
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (cols.some((col) => col.name === column)) continue;
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${spec}`);
   }
   db.exec(`
     UPDATE chats SET next_message_id = (

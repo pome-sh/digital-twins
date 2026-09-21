@@ -223,6 +223,15 @@ describe("search / context / links / viewers", () => {
     expect(JSON.stringify(tme.body)).toContain("unsupported link");
   });
 
+  it("read cursor does not move backwards", () => {
+    const { domain } = fresh();
+    domain.sendMessage({ kind: "user", account: "alice" }, { chat_id: 2001, text: "a" });
+    domain.sendMessage({ kind: "user", account: "alice" }, { chat_id: 2001, text: "b" });
+    domain.markAsRead("alice", { chat_id: 2001, message_id: 2 });
+    domain.markAsRead("alice", { chat_id: 2001, message_id: 1 });
+    expect(domain.getMessageViewers("alice", { chat_id: 2001, message_id: 2 })).toEqual([{ account: "alice" }]);
+  });
+
   it("viewers in a private chat are only the caller", async () => {
     const { app } = fresh();
     await mcp(app, "alice", "send_message", { chat_id: 2001, text: "hi" });

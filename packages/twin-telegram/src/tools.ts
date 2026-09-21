@@ -29,7 +29,7 @@ export const toolSchemas = {
     ...account,
     chat_id: z.number().int(),
     message_id: z.number().int(),
-    limit: z.number().int().optional(),
+    limit: z.number().int().min(0).max(100).optional(),
   }),
   search_messages: z.looseObject({ ...account, chat_id: z.number().int(), query: z.string() }),
   search_global: z.looseObject({ ...account, query: z.string() }),
@@ -55,7 +55,7 @@ export const toolSchemas = {
     ...account,
     chat_id: z.number().int(),
     message_id: z.number().int(),
-    limit: z.number().int().optional(),
+    limit: z.number().int().min(0).max(100).optional(),
   }),
   message_from_link: z.looseObject({ ...account, link: z.string() }),
   get_message_link: z.looseObject({ ...account, chat_id: z.number().int(), message_id: z.number().int() }),
@@ -127,11 +127,15 @@ export function executeTool(
         ctx.reportDelta,
       );
     case "delete_message":
-      return domain.deleteMessage(actor(), {
-        chat_id: args.chat_id as number,
-        message_id: args.message_id as number,
-        revoke: args.revoke as boolean | undefined,
-      });
+      return domain.deleteMessage(
+        actor(),
+        {
+          chat_id: args.chat_id as number,
+          message_id: args.message_id as number,
+          revoke: args.revoke as boolean | undefined,
+        },
+        ctx.reportDelta,
+      );
     case "forward_message":
       return domain.forwardMessage(
         actor(),
@@ -150,7 +154,11 @@ export function executeTool(
         message_id: args.message_id as number,
       });
     case "mark_as_read":
-      return domain.markAsRead(accountName(), { chat_id: args.chat_id as number, message_id: args.message_id as number });
+      return domain.markAsRead(
+        accountName(),
+        { chat_id: args.chat_id as number, message_id: args.message_id as number },
+        ctx.reportDelta,
+      );
     case "get_message_viewers":
       return domain.getMessageViewers(accountName(), {
         chat_id: args.chat_id as number,
