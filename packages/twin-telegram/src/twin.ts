@@ -12,7 +12,7 @@ import type { Hono } from "hono";
 import { openTelegramTwinDatabase, type TelegramTwinDatabase } from "./db.js";
 import { TelegramDomain } from "./domain.js";
 import { TwinError } from "./errors.js";
-import { extractTelegramPathToken } from "./path-token.js";
+import { extractTelegramPathToken, telegramPathIdentity } from "./path-token.js";
 import { registerTelegramRoutes } from "./routes.js";
 import { defaultSeedState, parseSeed, type TelegramSeed } from "./seed.js";
 import { telegramError } from "./serializers.js";
@@ -106,7 +106,7 @@ export function telegramTwinDefinition(
       resolveCredential: (token, c) => {
         const found = new TelegramDomain(db).lookupBotToken(token);
         if (!found) return undefined;
-        const pathSid = c.req.param("sid");
+        const pathSid = telegramPathIdentity(c).sid;
         return pathSid ? { ...found, sid: pathSid } : found;
       },
       unauthorized: () => ({ status: 401, body: telegramError(401, "Unauthorized") }),

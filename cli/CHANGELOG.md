@@ -21,6 +21,8 @@ one it corrects.
 
 **Standalone Telegram twin boots HTTP getMe/getChat/sendMessage and eight user MCP tools.** Path tokens always resolve to a seeded bot, including under a Pome bearer. Not registered with the CLI.
 
+**Telegram history tools edit, delete, forward, copy and search the same SQLite conversation from both identities.** User local hide is not a revoke. Bot delete is refused after 48 hours. Links never leave the seeded world.
+
 ## 0.46.0 — 2026-09-19
 
 **`pome twin start` serves a live dashboard of the tape** (F-1850). The banner

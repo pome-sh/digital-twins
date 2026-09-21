@@ -262,6 +262,19 @@ describe("reset", () => {
       params: { name: "get_history", arguments: { account: "alice", chat_id: 2001 } },
     });
     expect(JSON.stringify(history.body)).not.toContain("ephemeral");
+    await mcp(app, token, {
+      jsonrpc: "2.0",
+      id: 2,
+      method: "tools/call",
+      params: { name: "send_message", arguments: { account: "alice", chat_id: 2001, text: "after-reset" } },
+    });
+    const again = await mcp(app, token, {
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: { name: "get_history", arguments: { account: "alice", chat_id: 2001 } },
+    });
+    expect(JSON.stringify(again.body)).toContain("after-reset");
   });
 });
 

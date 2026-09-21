@@ -30,6 +30,7 @@ const messageSchema = z.strictObject({
   from_id: z.number().int(),
   text: z.string(),
   reply_to_message_id: z.number().int().positive().optional(),
+  date: z.number().int().optional(),
 });
 
 export const seedSchema = z
@@ -61,9 +62,13 @@ export const seedSchema = z
         if (!ids.has(member)) ctx.addIssue({ code: "custom", message: `unknown member ${member}` });
       }
     }
+    const messageKeys = new Set<string>();
     for (const message of state.messages) {
       if (!chatIds.has(message.chat_id)) ctx.addIssue({ code: "custom", message: `unknown chat ${message.chat_id}` });
       if (!ids.has(message.from_id)) ctx.addIssue({ code: "custom", message: `unknown from_id ${message.from_id}` });
+      const key = `${message.chat_id}:${message.message_id}`;
+      if (messageKeys.has(key)) ctx.addIssue({ code: "custom", message: `duplicate message ${key}` });
+      messageKeys.add(key);
     }
   });
 
@@ -97,6 +102,7 @@ export function defaultSeedState(): TelegramSeed {
     ],
     chats: [
       { id: 2001, type: "private", members: [2001, 1100001] },
+      { id: 2002, type: "private", members: [2002, 1100001] },
       { id: -1001234567890, type: "supergroup", title: "Lab", members: [2001, 2002, 1100001] },
     ],
     messages: [],

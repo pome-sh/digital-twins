@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
-export const SUPPORTED_SURFACES = ["getMe", "getChat", "sendMessage"];
+export const SUPPORTED_SURFACES = [
+  "getMe",
+  "getChat",
+  "sendMessage",
+  "editMessageText",
+  "deleteMessage",
+  "deleteMessages",
+  "forwardMessage",
+  "copyMessage",
+];
 
 export const unsupportedEnvelope = {
   status: 501,

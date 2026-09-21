@@ -6,9 +6,9 @@
   "protocol": "JSON-RPC 2.0 over Streamable HTTP",
   "protocolVersion": "2025-06-18",
   "captureDate": "2026-09-21",
-  "rawFileSha256": "40d4cbfed24370a72049d15d4708214c3c84b4443d03fd243961fea4700b952c",
-  "canonicalFileSha256": "cd23fd13eea6a66e0ca2823e27ddf54a328f4221c08f90cc237036923fe7a292",
-  "liveToolCount": 8,
+  "rawFileSha256": "309ba4b8f75c0ccdf2da6c1bf67ab917eddc0041f9fc69275b2509a5cb450f53",
+  "canonicalFileSha256": "1ba58d360503fcb04c3aa2a1851f8af3bb9c99414d25731d2430fe40df152f6d",
+  "liveToolCount": 19,
   "liveToolOrder": [
     "get_me",
     "list_accounts",
@@ -17,7 +17,18 @@
     "get_chat",
     "get_history",
     "send_message",
-    "reply_to_message"
+    "reply_to_message",
+    "get_messages",
+    "search_messages",
+    "search_global",
+    "edit_message",
+    "delete_message",
+    "forward_message",
+    "get_message_context",
+    "message_from_link",
+    "get_message_link",
+    "mark_as_read",
+    "get_message_viewers"
   ],
   "transcription": {
     "readFrom": "T04 spine tool names from the Telegram operation-ownership matrix and Tolboy's published names",

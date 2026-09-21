@@ -3,7 +3,18 @@ import type { Context, Hono } from "hono";
 import type { RouteContext } from "@pome-sh/sdk";
 import { mountDeclaredRoute } from "@pome-sh/sdk/route-inputs";
 import type { TelegramDomain } from "./domain.js";
-import { GET_CHAT, GET_ME, POST_GET_CHAT, POST_GET_ME, POST_SEND_MESSAGE } from "./route-inputs.js";
+import {
+  GET_CHAT,
+  GET_ME,
+  POST_COPY_MESSAGE,
+  POST_DELETE_MESSAGE,
+  POST_DELETE_MESSAGES,
+  POST_EDIT_MESSAGE_TEXT,
+  POST_FORWARD_MESSAGE,
+  POST_GET_CHAT,
+  POST_GET_ME,
+  POST_SEND_MESSAGE,
+} from "./route-inputs.js";
 import { telegramOk } from "./serializers.js";
 
 function botActor(c: Context): { kind: "bot"; botId: number } {
@@ -59,6 +70,49 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
           }),
         ),
       };
+    }),
+  );
+
+  mountDeclaredRoute(
+    app,
+    POST_EDIT_MESSAGE_TEXT,
+    recorder.handle({ mutation: true }, async (c) => {
+      const parsed = await POST_EDIT_MESSAGE_TEXT.parse(c.req);
+      return { status: 200, body: telegramOk(domain.editMessageText(botActor(c), parsed.body)) };
+    }),
+  );
+  mountDeclaredRoute(
+    app,
+    POST_DELETE_MESSAGE,
+    recorder.handle({ mutation: true }, async (c) => {
+      const parsed = await POST_DELETE_MESSAGE.parse(c.req);
+      domain.deleteMessage(botActor(c), parsed.body);
+      return { status: 200, body: telegramOk(true) };
+    }),
+  );
+  mountDeclaredRoute(
+    app,
+    POST_DELETE_MESSAGES,
+    recorder.handle({ mutation: true }, async (c) => {
+      const parsed = await POST_DELETE_MESSAGES.parse(c.req);
+      domain.deleteMessages(botActor(c), parsed.body);
+      return { status: 200, body: telegramOk(true) };
+    }),
+  );
+  mountDeclaredRoute(
+    app,
+    POST_FORWARD_MESSAGE,
+    recorder.handle({ mutation: true }, async (c) => {
+      const parsed = await POST_FORWARD_MESSAGE.parse(c.req);
+      return { status: 200, body: telegramOk(domain.forwardMessage(botActor(c), parsed.body)) };
+    }),
+  );
+  mountDeclaredRoute(
+    app,
+    POST_COPY_MESSAGE,
+    recorder.handle({ mutation: true }, async (c) => {
+      const parsed = await POST_COPY_MESSAGE.parse(c.req);
+      return { status: 200, body: telegramOk(domain.copyMessage(botActor(c), parsed.body)) };
     }),
   );
 }
