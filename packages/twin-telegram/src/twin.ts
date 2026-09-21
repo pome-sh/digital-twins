@@ -68,7 +68,7 @@ export function telegramTwinDefinition(
     seed: seedSchema as unknown as z.ZodType<TelegramSeed>,
     domain: ({ seed }) => {
       const domain = new TelegramDomain(db);
-      domain.seed(seed !== undefined ? seed : defaultSeedState());
+      if (seed !== undefined) domain.seed(seed);
       return domain;
     },
     routes: registerTelegramRoutes,

@@ -26,48 +26,50 @@ export class TelegramDomain {
 
   seed(input: TelegramSeed | unknown): void {
     const state = parseSeed(input);
-    resetDatabase(this.db);
     const now = Math.floor(Date.now() / 1000);
-    for (const bot of state.bots) {
-      this.db.prepare("INSERT INTO bots (id, token, first_name, username) VALUES (?, ?, ?, ?)").run(
-        bot.id,
-        bot.token,
-        bot.first_name,
-        bot.username,
-      );
-    }
-    for (const user of state.users) {
-      this.db.prepare("INSERT INTO users (id, account, first_name, username) VALUES (?, ?, ?, ?)").run(
-        user.id,
-        user.account,
-        user.first_name,
-        user.username ?? null,
-      );
-    }
-    for (const chat of state.chats) {
-      this.db.prepare("INSERT INTO chats (id, type, title) VALUES (?, ?, ?)").run(
-        chat.id,
-        chat.type,
-        chat.title ?? null,
-      );
-      for (const member of chat.members) {
-        this.db.prepare("INSERT INTO chat_members (chat_id, user_id) VALUES (?, ?)").run(chat.id, member);
-      }
-    }
-    for (const message of state.messages) {
-      this.db
-        .prepare(
-          "INSERT INTO messages (chat_id, message_id, from_id, text, date, reply_to_message_id) VALUES (?, ?, ?, ?, ?, ?)",
-        )
-        .run(
-          message.chat_id,
-          message.message_id,
-          message.from_id,
-          message.text,
-          now,
-          message.reply_to_message_id ?? null,
+    this.db.transaction(() => {
+      resetDatabase(this.db);
+      for (const bot of state.bots) {
+        this.db.prepare("INSERT INTO bots (id, token, first_name, username) VALUES (?, ?, ?, ?)").run(
+          bot.id,
+          bot.token,
+          bot.first_name,
+          bot.username,
         );
-    }
+      }
+      for (const user of state.users) {
+        this.db.prepare("INSERT INTO users (id, account, first_name, username) VALUES (?, ?, ?, ?)").run(
+          user.id,
+          user.account,
+          user.first_name,
+          user.username ?? null,
+        );
+      }
+      for (const chat of state.chats) {
+        this.db.prepare("INSERT INTO chats (id, type, title) VALUES (?, ?, ?)").run(
+          chat.id,
+          chat.type,
+          chat.title ?? null,
+        );
+        for (const member of chat.members) {
+          this.db.prepare("INSERT INTO chat_members (chat_id, user_id) VALUES (?, ?)").run(chat.id, member);
+        }
+      }
+      for (const message of state.messages) {
+        this.db
+          .prepare(
+            "INSERT INTO messages (chat_id, message_id, from_id, text, date, reply_to_message_id) VALUES (?, ?, ?, ?, ?, ?)",
+          )
+          .run(
+            message.chat_id,
+            message.message_id,
+            message.from_id,
+            message.text,
+            now,
+            message.reply_to_message_id ?? null,
+          );
+      }
+    })();
   }
 
   applySeed(input: unknown): void {

@@ -49,6 +49,25 @@ describe("seed", () => {
   it("accepts the default world", () => {
     expect(parseSeed(defaultSeedState()).users).toHaveLength(2);
   });
+
+  it("leaves existing rows when the domain is opened without a seed", () => {
+    const db = openTelegramTwinDatabase(":memory:");
+    const first = new TelegramDomain(db);
+    first.seed(defaultSeedState());
+    first.sendMessage({ kind: "bot", botId: 1100001 }, { chat_id: 2001, text: "keep" });
+    const second = new TelegramDomain(db);
+    expect(second.getHistory("alice", 2001).some((row) => row.text === "keep")).toBe(true);
+  });
+
+  it("rolls back a failed seed", () => {
+    const db = openTelegramTwinDatabase(":memory:");
+    const domain = new TelegramDomain(db);
+    domain.seed(defaultSeedState());
+    const broken = defaultSeedState();
+    broken.chats[0]!.members = [2001, 2001];
+    expect(() => domain.seed(broken)).toThrow();
+    expect(domain.getMe({ kind: "bot", botId: 1100001 }).username).toBe("x_bot");
+  });
 });
 
 describe("HTTP path token", () => {
@@ -136,13 +155,20 @@ describe("loopback A → X → history", () => {
   it("unauthorized account fails", async () => {
     const { app } = fresh();
     const token = await userToken("alice");
-    const res = await mcp(app, token, {
+    const asMallory = await mcp(app, token, {
       jsonrpc: "2.0",
       id: 1,
       method: "tools/call",
       params: { name: "list_chats", arguments: { account: "mallory" } },
     });
-    expect(JSON.stringify(res.body)).toMatch(/unknown account|isError/i);
+    expect(JSON.stringify(asMallory.body)).toMatch(/unauthorized account|isError/i);
+    const asBob = await mcp(app, token, {
+      jsonrpc: "2.0",
+      id: 2,
+      method: "tools/call",
+      params: { name: "send_message", arguments: { account: "bob", chat_id: 2001, text: "impersonate" } },
+    });
+    expect(JSON.stringify(asBob.body)).toMatch(/unauthorized account|isError/i);
   });
 
 });
