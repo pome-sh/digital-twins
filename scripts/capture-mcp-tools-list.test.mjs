@@ -175,6 +175,27 @@ function sandboxWithDeferredTwin() {
     "reason",
     "a not-captured twin must say WHY"
   );
+  for (const bad of ["2", 0, 1.5]) {
+    assertThrows(
+      () =>
+        loadSources({
+          repoRoot: ROOT,
+          table: {
+            goldenDir: "fixtures/mcp-tools-list",
+            twins: {
+              acme: {
+                substrate: "not-captured",
+                capture: false,
+                reason: "fixture",
+                configuration: { minNamedAccounts: bad },
+              },
+            },
+          },
+        }),
+      "positive integer",
+      `minNamedAccounts ${JSON.stringify(bad)} is rejected rather than silently disabling the floor`,
+    );
+  }
 }
 
 {

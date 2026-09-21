@@ -266,6 +266,14 @@ export function loadSources({ repoRoot = REPO_ROOT, sourcesPath, table } = {}) {
           `An unexplained absence is indistinguishable from an oversight.`
       );
     }
+    if (source.configuration && "minNamedAccounts" in source.configuration) {
+      const min = source.configuration.minNamedAccounts;
+      if (!Number.isInteger(min) || min <= 0) {
+        throw new Error(
+          `${twin}: configuration.minNamedAccounts must be a positive integer (got ${JSON.stringify(min)})`
+        );
+      }
+    }
     twins[twin] = source;
   }
   return { goldenDir: parsed.goldenDir, twins };
@@ -297,8 +305,13 @@ function namedAccountUnion(tools, selector) {
 }
 
 function assertNamedAccountFloor({ source, tools }) {
-  const min = source.configuration?.minNamedAccounts;
-  if (typeof min !== "number" || min <= 0) return;
+  if (!source.configuration || !("minNamedAccounts" in source.configuration)) return;
+  const min = source.configuration.minNamedAccounts;
+  if (!Number.isInteger(min) || min <= 0) {
+    throw new Error(
+      `${source.twin}: configuration.minNamedAccounts must be a positive integer (got ${JSON.stringify(min)})`
+    );
+  }
   const selector = source.configuration.accountSelectorProperty || "account";
   const names = namedAccountUnion(tools, selector);
   if (names.size >= min) return;
