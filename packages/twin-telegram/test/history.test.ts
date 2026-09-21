@@ -70,10 +70,8 @@ describe("edit / delete / forward / copy", () => {
     expect(domain.getHistory("alice", 2001)).toEqual([
       expect.objectContaining({ message_id: 1, text: "new" }),
     ]);
-    const searchOld = await mcp(app, "alice", "search_messages", { chat_id: 2001, query: "old" });
-    expect(JSON.stringify(searchOld.body)).not.toContain("\"text\":\"old\"");
-    const searchNew = await mcp(app, "alice", "search_messages", { chat_id: 2001, query: "new" });
-    expect(JSON.stringify(searchNew.body)).toContain("new");
+    expect(domain.searchMessages("alice", { chat_id: 2001, query: "old" })).toEqual([]);
+    expect(domain.searchMessages("alice", { chat_id: 2001, query: "new" }).map((row) => row.text)).toEqual(["new"]);
   });
 
   it("alice cannot edit bob's lab message", async () => {
@@ -84,7 +82,7 @@ describe("edit / delete / forward / copy", () => {
   });
 
   it("user local delete hides for them only", async () => {
-    const { app } = fresh();
+    const { app, domain } = fresh();
     await mcp(app, "bob", "send_message", { chat_id: GROUP, text: "visible" });
     const del = await mcp(app, "alice", "delete_message", { chat_id: GROUP, message_id: 1 });
     expect(JSON.stringify(del.body)).not.toContain("unauthorized");
@@ -92,6 +90,21 @@ describe("edit / delete / forward / copy", () => {
     const bobHist = await mcp(app, "bob", "get_history", { chat_id: GROUP });
     expect(JSON.stringify(aliceHist.body)).not.toContain("visible");
     expect(JSON.stringify(bobHist.body)).toContain("visible");
+    expect(domain.searchMessages("alice", { chat_id: GROUP, query: "visible" })).toEqual([]);
+    expect(domain.searchMessages("alice", { query: "visible" })).toEqual([]);
+    expect(domain.searchMessages("bob", { query: "visible" }).map((row) => row.text)).toEqual(["visible"]);
+  });
+
+  it("author revoke is gone for everyone and hide does not swallow the next send", async () => {
+    const { app, domain } = fresh();
+    await mcp(app, "bob", "send_message", { chat_id: GROUP, text: "first" });
+    await mcp(app, "alice", "delete_message", { chat_id: GROUP, message_id: 1 });
+    await mcp(app, "bob", "delete_message", { chat_id: GROUP, message_id: 1 });
+    expect(domain.getHistory("alice", GROUP)).toEqual([]);
+    expect(domain.getHistory("bob", GROUP)).toEqual([]);
+    await mcp(app, "bob", "send_message", { chat_id: GROUP, text: "second" });
+    expect(domain.getHistory("alice", GROUP).map((row) => row.text)).toEqual(["second"]);
+    expect(domain.getHistory("alice", GROUP)[0]?.message_id).toBe(2);
   });
 
   it("user revoke of someone else's message fails", async () => {
@@ -131,8 +144,11 @@ describe("edit / delete / forward / copy", () => {
     const { app, domain } = fresh();
     await mcp(app, "alice", "send_message", { chat_id: 2001, text: "secret" });
     const res = await mcp(app, "alice", "forward_message", { chat_id: 2002, from_chat_id: 2001, message_id: 1 });
-    expect(JSON.stringify(res.body)).toMatch(/chat not found|isError/);
+    expect(JSON.stringify(res.body)).toContain("chat not found");
     expect(domain.getHistory("bob", 2002)).toEqual([]);
+    const fromUnseen = await mcp(app, "alice", "forward_message", { chat_id: GROUP, from_chat_id: 2002, message_id: 1 });
+    expect(JSON.stringify(fromUnseen.body)).toContain("chat not found");
+    expect(domain.getHistory("alice", GROUP)).toEqual([]);
   });
 });
 

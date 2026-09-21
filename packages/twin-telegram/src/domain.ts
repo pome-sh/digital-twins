@@ -51,7 +51,7 @@ export class TelegramDomain {
         );
       }
       for (const chat of state.chats) {
-        this.db.prepare("INSERT INTO chats (id, type, title) VALUES (?, ?, ?)").run(
+        this.db.prepare("INSERT INTO chats (id, type, title, next_message_id) VALUES (?, ?, ?, 1)").run(
           chat.id,
           chat.type,
           chat.title ?? null,
@@ -73,6 +73,11 @@ export class TelegramDomain {
             message.date ?? now,
             message.reply_to_message_id ?? null,
           );
+        this.db
+          .prepare(
+            "UPDATE chats SET next_message_id = CASE WHEN next_message_id > ? THEN next_message_id ELSE ? END WHERE id = ?",
+          )
+          .run(message.message_id + 1, message.message_id + 1, message.chat_id);
       }
     })();
   }
@@ -117,19 +122,15 @@ export class TelegramDomain {
     if (!args.text) telegramFail(400, 400, "Bad Request: message text is empty");
     this.requireMember(actor, args.chat_id);
     if (args.reply_to_message_id !== undefined) {
-      const reply = this.db
-        .prepare("SELECT message_id FROM messages WHERE chat_id = ? AND message_id = ?")
-        .get(args.chat_id, args.reply_to_message_id);
-      if (!reply) telegramFail(400, 400, "Bad Request: reply message not found");
+      this.requireVisibleMessage(actor, args.chat_id, args.reply_to_message_id);
     }
     const from = this.personFor(actor);
     const date = this.now();
     const next = this.db.transaction(() => {
-      const allocated = (
-        this.db.prepare("SELECT COALESCE(MAX(message_id), 0) + 1 AS next FROM messages WHERE chat_id = ?").get(
-          args.chat_id,
-        ) as { next: number }
-      ).next;
+      const allocated = (this.db.prepare("SELECT next_message_id AS next FROM chats WHERE id = ?").get(args.chat_id) as {
+        next: number;
+      }).next;
+      this.db.prepare("UPDATE chats SET next_message_id = next_message_id + 1 WHERE id = ?").run(args.chat_id);
       this.db
         .prepare(
           "INSERT INTO messages (chat_id, message_id, from_id, text, date, reply_to_message_id, edit_date, forward_from_id, forward_from_chat_id) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)",
@@ -213,12 +214,12 @@ export class TelegramDomain {
       if (this.now() - row.date > BOT_DELETE_WINDOW_SEC) {
         telegramFail(400, 400, "Bad Request: message can't be deleted");
       }
-      this.db.prepare("DELETE FROM messages WHERE chat_id = ? AND message_id = ?").run(args.chat_id, args.message_id);
+      this.hardDelete(args.chat_id, args.message_id);
       return { ok: true };
     }
     if (row.from_id === person.id || args.revoke) {
       if (row.from_id !== person.id) telegramFail(400, 400, "Bad Request: message can't be deleted");
-      this.db.prepare("DELETE FROM messages WHERE chat_id = ? AND message_id = ?").run(args.chat_id, args.message_id);
+      this.hardDelete(args.chat_id, args.message_id);
       return { ok: true };
     }
     this.db
@@ -277,12 +278,12 @@ export class TelegramDomain {
   }
 
   searchMessages(account: string, args: { chat_id?: number; query: string }): Record<string, unknown>[] {
-    if (!args.query) return [];
-    const needle = args.query.toLowerCase();
     const chats =
       args.chat_id !== undefined
         ? (this.requireMember({ kind: "user", account }, args.chat_id), [args.chat_id])
         : this.memberChatIds(account);
+    if (!args.query) return [];
+    const needle = args.query.toLowerCase();
     const hits: MessageRow[] = [];
     for (const chatId of chats) {
       for (const row of this.visibleMessages(account, chatId)) {
@@ -456,6 +457,11 @@ export class TelegramDomain {
       if (hidden) telegramFail(400, 400, "Bad Request: message not found");
     }
     return row;
+  }
+
+  private hardDelete(chatId: number, messageId: number): void {
+    this.db.prepare("DELETE FROM messages WHERE chat_id = ? AND message_id = ?").run(chatId, messageId);
+    this.db.prepare("DELETE FROM message_hides WHERE chat_id = ? AND message_id = ?").run(chatId, messageId);
   }
 
   private present(row: MessageRow): Record<string, unknown> {
