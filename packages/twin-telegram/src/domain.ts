@@ -30,9 +30,29 @@ export type Actor =
 type PersonRow = { id: number; first_name: string; username: string | null; is_bot: number };
 
 export const BOT_DELETE_WINDOW_SEC = 48 * 3600;
+export const CALLBACK_QUERY_TTL_SEC = 60;
+
+type ReplyMarkup =
+  | { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> }
+  | { reply_keyboard: Array<Array<{ text: string }>> }
+  | { remove_keyboard: true };
+
+type PollRow = {
+  poll_id: string;
+  chat_id: number;
+  message_id: number;
+  question: string;
+  options_json: string;
+  is_anonymous: number;
+  allows_multiple_answers: number;
+  is_closed: number;
+  created_by_bot_id: number;
+  created_at: number;
+};
 
 export class TelegramDomain {
   private readonly runtime: ReturnType<typeof telegramUpdateRuntime>;
+  private readonly callbackWaiters = new Map<string, Set<() => void>>();
 
   constructor(
     readonly db: TelegramTwinDatabase,
@@ -47,6 +67,8 @@ export class TelegramDomain {
   seed(input: TelegramSeed | unknown): void {
     const state = parseSeed(input);
     this.runtime.cancelAll();
+    for (const waiters of this.callbackWaiters.values()) for (const wake of waiters) wake();
+    this.callbackWaiters.clear();
     const now = this.now();
     this.db.transaction(() => {
       resetDatabase(this.db);
@@ -132,6 +154,7 @@ export class TelegramDomain {
       reply_to_message_id?: number;
       forward_from_id?: number;
       forward_from_chat_id?: number;
+      reply_markup?: unknown;
     },
     delta: DeltaHook = NOOP,
   ): Record<string, unknown> {
@@ -141,6 +164,7 @@ export class TelegramDomain {
       this.requireVisibleMessage(actor, args.chat_id, args.reply_to_message_id);
     }
     const from = this.personFor(actor);
+    const replyMarkup = args.reply_markup === undefined ? undefined : this.parseReplyMarkup(args.reply_markup);
     const date = this.now();
     const emittedBotIds: number[] = [];
     const next = this.db.transaction(() => {
@@ -150,7 +174,7 @@ export class TelegramDomain {
       this.db.prepare("UPDATE chats SET next_message_id = next_message_id + 1 WHERE id = ?").run(args.chat_id);
       this.db
         .prepare(
-          "INSERT INTO messages (chat_id, message_id, from_id, text, date, reply_to_message_id, edit_date, forward_from_id, forward_from_chat_id) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)",
+          "INSERT INTO messages (chat_id, message_id, from_id, text, date, reply_to_message_id, edit_date, forward_from_id, forward_from_chat_id, reply_markup_json) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)",
         )
         .run(
           args.chat_id,
@@ -161,6 +185,7 @@ export class TelegramDomain {
           args.reply_to_message_id ?? null,
           args.forward_from_id ?? null,
           args.forward_from_chat_id ?? null,
+          replyMarkup ? JSON.stringify(replyMarkup) : null,
         );
       if (actor.kind === "user") {
         const message = serializeMessage(
@@ -173,6 +198,7 @@ export class TelegramDomain {
             reply_to_message_id: args.reply_to_message_id ?? null,
             forward_from_id: args.forward_from_id ?? null,
             forward_from_chat_id: args.forward_from_chat_id ?? null,
+            reply_markup_json: replyMarkup ? JSON.stringify(replyMarkup) : null,
           },
           this.asUser(from),
           this.chat(args.chat_id),
@@ -191,6 +217,7 @@ export class TelegramDomain {
       reply_to_message_id: args.reply_to_message_id ?? null,
       forward_from_id: args.forward_from_id ?? null,
       forward_from_chat_id: args.forward_from_chat_id ?? null,
+      reply_markup_json: replyMarkup ? JSON.stringify(replyMarkup) : null,
     };
     delta({
       before: null,
@@ -240,6 +267,214 @@ export class TelegramDomain {
     const after = { ...row, text: args.text, edit_date: editDate };
     delta({ before: { text: row.text }, after: { text: args.text, message_id: args.message_id } });
     return this.present(after);
+  }
+
+  editMessageReplyMarkup(
+    actor: Actor,
+    args: { chat_id: number; message_id: number; reply_markup?: unknown },
+    delta: DeltaHook = NOOP,
+  ): Record<string, unknown> {
+    const row = this.requireVisibleMessage(actor, args.chat_id, args.message_id);
+    const person = this.personFor(actor);
+    if (row.from_id !== person.id) telegramFail(400, 400, "Bad Request: message can't be edited");
+    const markup = args.reply_markup === undefined || args.reply_markup === null ? null : this.parseReplyMarkup(args.reply_markup);
+    this.db
+      .prepare("UPDATE messages SET reply_markup_json = ? WHERE chat_id = ? AND message_id = ?")
+      .run(markup ? JSON.stringify(markup) : null, args.chat_id, args.message_id);
+    delta({ before: { reply_markup: row.reply_markup_json ?? null }, after: { reply_markup: markup } });
+    return this.present({ ...row, reply_markup_json: markup ? JSON.stringify(markup) : null });
+  }
+
+  pinChatMessage(actor: Actor, args: { chat_id: number; message_id: number }, delta: DeltaHook = NOOP): { ok: true } {
+    const row = this.requireVisibleMessage(actor, args.chat_id, args.message_id);
+    this.requirePinAuthority(actor, row);
+    this.db
+      .prepare("INSERT OR REPLACE INTO pinned_messages (chat_id, message_id, pinned_by_id, pinned_at) VALUES (?, ?, ?, ?)")
+      .run(args.chat_id, args.message_id, this.personFor(actor).id, this.now());
+    delta({ before: null, after: { chat_id: args.chat_id, message_id: args.message_id, pinned: true } });
+    return { ok: true };
+  }
+
+  unpinChatMessage(actor: Actor, args: { chat_id: number; message_id?: number }, delta: DeltaHook = NOOP): { ok: true } {
+    this.requireMember(actor, args.chat_id);
+    if (args.message_id === undefined) {
+      const latest = this.db.prepare("SELECT message_id FROM pinned_messages WHERE chat_id = ? ORDER BY pinned_at DESC, message_id DESC LIMIT 1").get(args.chat_id) as { message_id: number } | undefined;
+      if (!latest) telegramFail(400, 400, "Bad Request: message is not pinned");
+      args = { ...args, message_id: latest.message_id };
+    }
+    const messageId = args.message_id!;
+    const row = this.requireVisibleMessage(actor, args.chat_id, messageId);
+    this.requirePinAuthority(actor, row);
+    const changed = this.db.prepare("DELETE FROM pinned_messages WHERE chat_id = ? AND message_id = ?").run(args.chat_id, messageId);
+    if (!changed.changes) telegramFail(400, 400, "Bad Request: message is not pinned");
+    delta({ before: { chat_id: args.chat_id, message_id: messageId, pinned: true }, after: null });
+    return { ok: true };
+  }
+
+  unpinAllChatMessages(actor: Actor, args: { chat_id: number }, delta: DeltaHook = NOOP): { ok: true } {
+    this.requireMember(actor, args.chat_id);
+    this.requireChatPinAuthority(actor, args.chat_id);
+    this.db.prepare("DELETE FROM pinned_messages WHERE chat_id = ?").run(args.chat_id);
+    delta({ before: { chat_id: args.chat_id, pins: true }, after: null });
+    return { ok: true };
+  }
+
+  getPinnedMessages(account: string, args: { chat_id: number }): Record<string, unknown>[] {
+    this.requireMember({ kind: "user", account }, args.chat_id);
+    return (this.db.prepare("SELECT m.* FROM pinned_messages p JOIN messages m ON m.chat_id = p.chat_id AND m.message_id = p.message_id WHERE p.chat_id = ? ORDER BY p.pinned_at, p.message_id").all(args.chat_id) as MessageRow[])
+      .map((row) => this.present(row));
+  }
+
+  setMessageReaction(actor: Actor, args: { chat_id: number; message_id: number; reaction?: unknown }, delta: DeltaHook = NOOP): { ok: true } {
+    const row = this.requireVisibleMessage(actor, args.chat_id, args.message_id);
+    const emoji = this.parseReaction(args.reaction);
+    const person = this.personFor(actor);
+    this.db.transaction(() => {
+      this.db.prepare("DELETE FROM message_reactions WHERE chat_id = ? AND message_id = ? AND actor_id = ?").run(args.chat_id, args.message_id, person.id);
+      if (emoji) this.db.prepare("INSERT INTO message_reactions (chat_id, message_id, actor_id, emoji, created_at) VALUES (?, ?, ?, ?, ?)").run(args.chat_id, args.message_id, person.id, emoji, this.now());
+      if (row.from_id !== person.id && this.isBotId(row.from_id)) this.enqueueTargetedUpdate(row.from_id, "message_reaction", {
+        chat: serializeChat(this.chat(args.chat_id)), message_id: args.message_id, user: serializeUser(this.asUser(person)), old_reaction: [], new_reaction: emoji ? [{ type: "emoji", emoji }] : [],
+      }, this.now());
+    })();
+    if (row.from_id !== person.id && this.isBotId(row.from_id)) this.runtime.notify(row.from_id);
+    delta({ before: null, after: { chat_id: args.chat_id, message_id: args.message_id, reaction: emoji } });
+    return { ok: true };
+  }
+
+  getMessageReactions(account: string, args: { chat_id: number; message_id: number }): Record<string, unknown>[] {
+    this.requireVisibleMessage({ kind: "user", account }, args.chat_id, args.message_id);
+    return (this.db.prepare("SELECT actor_id, emoji FROM message_reactions WHERE chat_id = ? AND message_id = ? ORDER BY actor_id, emoji").all(args.chat_id, args.message_id) as Array<{ actor_id: number; emoji: string }>)
+      .map((reaction) => ({ user: serializeUser(this.personById(reaction.actor_id)), reaction: { type: "emoji", emoji: reaction.emoji } }));
+  }
+
+  sendPoll(actor: Actor, args: { chat_id: number; question: string; options: string[]; is_anonymous?: boolean; allows_multiple_answers?: boolean }, delta: DeltaHook = NOOP): Record<string, unknown> {
+    const botId = this.botId(actor);
+    this.requireMember(actor, args.chat_id);
+    if (!args.question || args.options.length < 2 || args.options.length > 10 || args.options.some((option) => !option)) telegramFail(400, 400, "Bad Request: poll question and 2 to 10 non-empty options are required");
+    const now = this.now();
+    const message = this.sendMessage(actor, { chat_id: args.chat_id, text: args.question }, delta);
+    const messageId = message.message_id as number;
+    const pollId = `poll:${args.chat_id}:${messageId}`;
+    this.db.prepare("INSERT INTO polls (poll_id, chat_id, message_id, question, options_json, is_anonymous, allows_multiple_answers, created_by_bot_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(pollId, args.chat_id, messageId, args.question, JSON.stringify(args.options), args.is_anonymous === false ? 0 : 1, args.allows_multiple_answers ? 1 : 0, botId, now);
+    return this.present(this.requireVisibleMessage(actor, args.chat_id, messageId));
+  }
+
+  createPollForUser(account: string, args: { chat_id: number; question: string; options: string[]; is_anonymous?: boolean; allows_multiple_answers?: boolean }, delta: DeltaHook = NOOP): Record<string, unknown> {
+    const actor: Actor = { kind: "user", account };
+    this.requireMember(actor, args.chat_id);
+    if (!args.question || args.options.length < 2 || args.options.length > 10 || args.options.some((option) => !option)) telegramFail(400, 400, "Bad Request: poll question and 2 to 10 non-empty options are required");
+    const message = this.sendMessage(actor, { chat_id: args.chat_id, text: args.question }, delta);
+    const messageId = message.message_id as number;
+    const pollId = `poll:${args.chat_id}:${messageId}`;
+    this.db.prepare("INSERT INTO polls (poll_id, chat_id, message_id, question, options_json, is_anonymous, allows_multiple_answers, created_by_bot_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(pollId, args.chat_id, messageId, args.question, JSON.stringify(args.options), args.is_anonymous === false ? 0 : 1, args.allows_multiple_answers ? 1 : 0, this.personFor(actor).id, this.now());
+    return this.present(this.requireVisibleMessage(actor, args.chat_id, messageId));
+  }
+
+  votePoll(account: string, args: { chat_id: number; message_id: number; option_ids: number[] }, delta: DeltaHook = NOOP): Record<string, unknown> {
+    const voter = this.personFor({ kind: "user", account });
+    const poll = this.pollForMessage({ kind: "user", account }, args.chat_id, args.message_id);
+    const options = JSON.parse(poll.options_json) as string[];
+    if (poll.is_closed) telegramFail(400, 400, "Bad Request: poll is closed");
+    if (args.option_ids.length === 0 || new Set(args.option_ids).size !== args.option_ids.length || args.option_ids.some((id) => !Number.isInteger(id) || id < 0 || id >= options.length) || (!poll.allows_multiple_answers && args.option_ids.length > 1)) telegramFail(400, 400, "Bad Request: invalid poll option ids");
+    this.db.transaction(() => {
+      this.db.prepare("DELETE FROM poll_votes WHERE poll_id = ? AND voter_id = ?").run(poll.poll_id, voter.id);
+      for (const optionId of args.option_ids) this.db.prepare("INSERT INTO poll_votes (poll_id, voter_id, option_id) VALUES (?, ?, ?)").run(poll.poll_id, voter.id, optionId);
+      if (this.isBotId(poll.created_by_bot_id)) this.enqueueTargetedUpdate(poll.created_by_bot_id, "poll_answer", { poll_id: poll.poll_id, user: serializeUser(this.asUser(voter)), option_ids: args.option_ids }, this.now());
+    })();
+    if (this.isBotId(poll.created_by_bot_id)) this.runtime.notify(poll.created_by_bot_id);
+    delta({ before: null, after: { poll_id: poll.poll_id, option_ids: args.option_ids } });
+    return this.presentPoll(poll.poll_id);
+  }
+
+  closePollForUser(account: string, args: { chat_id: number; message_id: number }, delta: DeltaHook = NOOP): Record<string, unknown> {
+    const actor: Actor = { kind: "user", account };
+    const poll = this.pollForMessage(actor, args.chat_id, args.message_id);
+    if (poll.created_by_bot_id !== this.personFor(actor).id) telegramFail(400, 400, "Bad Request: poll can't be stopped");
+    this.db.prepare("UPDATE polls SET is_closed = 1 WHERE poll_id = ?").run(poll.poll_id);
+    delta({ before: { poll_id: poll.poll_id, is_closed: false }, after: { poll_id: poll.poll_id, is_closed: true } });
+    return this.presentPoll(poll.poll_id);
+  }
+
+  stopPoll(actor: Actor, args: { chat_id: number; message_id: number }, delta: DeltaHook = NOOP): Record<string, unknown> {
+    const poll = this.pollForMessage(actor, args.chat_id, args.message_id);
+    if (poll.created_by_bot_id !== this.botId(actor)) telegramFail(400, 400, "Bad Request: poll can't be stopped");
+    this.db.prepare("UPDATE polls SET is_closed = 1 WHERE poll_id = ?").run(poll.poll_id);
+    delta({ before: { poll_id: poll.poll_id, is_closed: false }, after: { poll_id: poll.poll_id, is_closed: true } });
+    return this.presentPoll(poll.poll_id);
+  }
+
+  listInlineButtons(account: string, args: { chat_id: number; message_id: number }): Array<{ text: string; callback_data: string }> {
+    const row = this.requireVisibleMessage({ kind: "user", account }, args.chat_id, args.message_id);
+    if (!row.reply_markup_json) return [];
+    const markup = JSON.parse(row.reply_markup_json) as ReplyMarkup;
+    return "inline_keyboard" in markup ? markup.inline_keyboard.flat() : [];
+  }
+
+  /** Reply keyboard taps are plain user messages; they never create callbacks. */
+  pressReplyKeyboard(account: string, args: { chat_id: number; message_id: number; text: string }, delta: DeltaHook = NOOP): Record<string, unknown> {
+    const row = this.requireVisibleMessage({ kind: "user", account }, args.chat_id, args.message_id);
+    if (!row.reply_markup_json) telegramFail(400, 400, "Bad Request: reply keyboard not found");
+    const markup = JSON.parse(row.reply_markup_json) as ReplyMarkup;
+    if (!("reply_keyboard" in markup) || !markup.reply_keyboard.flat().some((button) => button.text === args.text)) telegramFail(400, 400, "Bad Request: reply keyboard button not found");
+    return this.sendMessage({ kind: "user", account }, { chat_id: args.chat_id, text: args.text }, delta);
+  }
+
+  pressInlineButton(account: string, args: { chat_id: number; message_id: number; callback_data: string }, delta: DeltaHook = NOOP): { callback_query_id: string } {
+    const from = this.personFor({ kind: "user", account });
+    const row = this.requireVisibleMessage({ kind: "user", account }, args.chat_id, args.message_id);
+    if (!row.reply_markup_json || !this.isBotId(row.from_id)) telegramFail(400, 400, "Bad Request: inline button not found");
+    const buttons = this.listInlineButtons(account, args);
+    if (!buttons.some((button) => button.callback_data === args.callback_data)) telegramFail(400, 400, "Bad Request: inline button not found");
+    const callbackId = this.db.transaction(() => {
+      const ordinal = (this.db.prepare("SELECT COUNT(*) AS count FROM callback_queries WHERE chat_id = ? AND message_id = ? AND from_id = ?").get(args.chat_id, args.message_id, from.id) as { count: number }).count + 1;
+      const id = `cb:${args.chat_id}:${args.message_id}:${from.id}:${this.now()}:${ordinal}`;
+      this.db.prepare("INSERT INTO callback_queries (callback_id, bot_id, chat_id, message_id, from_id, data, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(id, row.from_id, args.chat_id, args.message_id, from.id, args.callback_data, this.now(), this.now() + CALLBACK_QUERY_TTL_SEC);
+      this.enqueueTargetedUpdate(row.from_id, "callback_query", { id, from: serializeUser(this.asUser(from)), message: this.present(row), chat_instance: `chat:${args.chat_id}`, data: args.callback_data }, this.now());
+      return id;
+    })();
+    this.runtime.notify(row.from_id);
+    delta({ before: null, after: { callback_query_id: callbackId } });
+    return { callback_query_id: callbackId };
+  }
+
+  async waitForCallbackAnswer(callbackId: string, timeoutSeconds: number, signal?: AbortSignal): Promise<{ callback_query_id: string; answered: boolean }> {
+    const read = () => this.db.prepare("SELECT expires_at, answered_at FROM callback_queries WHERE callback_id = ?").get(callbackId) as { expires_at: number; answered_at: number | null } | undefined;
+    const current = read();
+    if (!current || current.expires_at < this.now()) telegramFail(400, 400, "Bad Request: query is too old or invalid");
+    if (current.answered_at !== null) return { callback_query_id: callbackId, answered: true };
+    const bounded = Math.min(Math.max(timeoutSeconds, 0), CALLBACK_QUERY_TTL_SEC);
+    if (bounded === 0 || signal?.aborted) return { callback_query_id: callbackId, answered: false };
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", finish);
+        this.callbackWaiters.get(callbackId)?.delete(finish);
+        const row = read();
+        resolve({ callback_query_id: callbackId, answered: Boolean(row && row.answered_at !== null) });
+      };
+      const timer = setTimeout(finish, bounded * 1000);
+      const waiters = this.callbackWaiters.get(callbackId) ?? new Set<() => void>();
+      waiters.add(finish);
+      this.callbackWaiters.set(callbackId, waiters);
+      signal?.addEventListener("abort", finish, { once: true });
+    });
+  }
+
+  answerCallbackQuery(actor: Actor, args: { callback_query_id: string; text?: string; show_alert?: boolean; url?: string; cache_time?: number }): { ok: true } {
+    const botId = this.botId(actor);
+    const query = this.db.prepare("SELECT * FROM callback_queries WHERE callback_id = ?").get(args.callback_query_id) as { bot_id: number; expires_at: number; answered_at: number | null } | undefined;
+    if (!query || query.bot_id !== botId) telegramFail(400, 400, "Bad Request: query is too old or invalid");
+    if (query.expires_at < this.now() || query.answered_at !== null) telegramFail(400, 400, "Bad Request: query is too old or invalid");
+    const changed = this.db.prepare("UPDATE callback_queries SET answered_at = ?, answer_json = ? WHERE callback_id = ? AND answered_at IS NULL AND expires_at >= ?").run(this.now(), JSON.stringify(args), args.callback_query_id, this.now());
+    if (changed.changes !== 1) telegramFail(400, 400, "Bad Request: query is too old or invalid");
+    for (const wake of this.callbackWaiters.get(args.callback_query_id) ?? []) wake();
+    return { ok: true };
   }
 
   deleteMessage(
@@ -619,6 +854,17 @@ export class TelegramDomain {
         "get_message_link",
         "mark_as_read",
         "get_message_viewers",
+        "pin_message",
+        "unpin_message",
+        "get_pinned_messages",
+        "send_reaction",
+        "remove_reaction",
+        "get_message_reactions",
+        "create_poll",
+        "vote_poll",
+        "close_poll",
+        "list_inline_buttons",
+        "press_inline_button",
       ],
     };
   }
@@ -665,25 +911,20 @@ export class TelegramDomain {
     const bots = this.db
       .prepare("SELECT b.id FROM bots b JOIN chat_members m ON m.user_id = b.id WHERE m.chat_id = ? ORDER BY b.id")
       .all(chatId) as Array<{ id: number }>;
-    const emitted: number[] = [];
-    for (const bot of bots) {
-      const settings = this.settings(bot.id);
-      const allowed = settings.allowed_updates_json ? (JSON.parse(settings.allowed_updates_json) as string[]) : undefined;
-      if (allowed && !allowed.includes("message")) continue;
-      const updateId = settings.next_update_id;
-      const payload = { update_id: updateId, message };
-      this.db
-        .prepare("INSERT INTO bot_updates (bot_id, update_id, update_type, payload_json, created_at) VALUES (?, ?, 'message', ?, ?)")
-        .run(bot.id, updateId, JSON.stringify(payload), createdAt);
-      this.db.prepare("UPDATE bot_update_settings SET next_update_id = next_update_id + 1 WHERE bot_id = ?").run(bot.id);
-      if (settings.webhook_url) {
-        this.db
-          .prepare("INSERT INTO webhook_outbox (bot_id, update_id, attempts, next_attempt_at) VALUES (?, ?, 0, ?)")
-          .run(bot.id, updateId, createdAt);
-      }
-      emitted.push(bot.id);
-    }
-    return emitted;
+    return bots.filter((bot) => this.enqueueTargetedUpdate(bot.id, "message", message, createdAt)).map((bot) => bot.id);
+  }
+
+  /** Updates are queued only for the bot that owns an interactive message. */
+  private enqueueTargetedUpdate(botId: number, type: string, payload: Record<string, unknown>, createdAt: number): boolean {
+    const settings = this.settings(botId);
+    const allowed = settings.allowed_updates_json ? (JSON.parse(settings.allowed_updates_json) as string[]) : undefined;
+    if (allowed && !allowed.includes(type)) return false;
+    const updateId = settings.next_update_id;
+    this.db.prepare("INSERT INTO bot_updates (bot_id, update_id, update_type, payload_json, created_at) VALUES (?, ?, ?, ?, ?)")
+      .run(botId, updateId, type, JSON.stringify({ update_id: updateId, [type]: payload }), createdAt);
+    this.db.prepare("UPDATE bot_update_settings SET next_update_id = next_update_id + 1 WHERE bot_id = ?").run(botId);
+    if (settings.webhook_url) this.db.prepare("INSERT INTO webhook_outbox (bot_id, update_id, attempts, next_attempt_at) VALUES (?, ?, 0, ?)").run(botId, updateId, createdAt);
+    return true;
   }
 
   private purgeExpiredUpdates(): void {
@@ -788,12 +1029,82 @@ export class TelegramDomain {
     return row;
   }
 
+  private parseReplyMarkup(value: unknown): ReplyMarkup {
+    if (!value || typeof value !== "object" || Array.isArray(value)) telegramFail(400, 400, "Bad Request: reply_markup is invalid");
+    const input = value as Record<string, unknown>;
+    if (input.remove_keyboard === true && Object.keys(input).length === 1) return { remove_keyboard: true };
+    const parseRows = (raw: unknown, inline: boolean): Array<Array<{ text: string; callback_data: string }>> | Array<Array<{ text: string }>> => {
+      if (!Array.isArray(raw) || raw.length === 0 || raw.some((row) => !Array.isArray(row) || row.length === 0)) telegramFail(400, 400, "Bad Request: reply_markup is invalid");
+      return (raw as unknown[][]).map((row) => row.map((item: unknown) => {
+        if (typeof item === "string") {
+          if (inline) telegramFail(400, 400, "Bad Request: inline button is invalid");
+          return { text: item };
+        }
+        if (!item || typeof item !== "object" || Array.isArray(item) || typeof (item as Record<string, unknown>).text !== "string") telegramFail(400, 400, "Bad Request: reply_markup is invalid");
+        const button = item as Record<string, unknown>;
+        if (!inline) return { text: button.text as string };
+        if (typeof button.callback_data !== "string" || Object.keys(button).some((key) => key !== "text" && key !== "callback_data")) telegramFail(400, 400, "Bad Request: unsupported inline button");
+        if (Buffer.byteLength(button.callback_data, "utf8") > 64) telegramFail(400, 400, "Bad Request: callback_data is too long");
+        return { text: button.text as string, callback_data: button.callback_data };
+      }));
+    };
+    if ("inline_keyboard" in input && Object.keys(input).length === 1) return { inline_keyboard: parseRows(input.inline_keyboard, true) as Array<Array<{ text: string; callback_data: string }>> };
+    if ("keyboard" in input && Object.keys(input).every((key) => key === "keyboard" || key === "resize_keyboard" || key === "one_time_keyboard")) return { reply_keyboard: parseRows(input.keyboard, false) as Array<Array<{ text: string }>> };
+    telegramFail(400, 400, "Bad Request: unsupported reply_markup");
+  }
+
+  private parseReaction(value: unknown): string | undefined {
+    if (value === undefined || value === null || (Array.isArray(value) && value.length === 0)) return undefined;
+    if (!Array.isArray(value) || value.length !== 1 || !value[0] || typeof value[0] !== "object") telegramFail(400, 400, "Bad Request: unsupported reaction");
+    const reaction = value[0] as Record<string, unknown>;
+    if (reaction.type !== "emoji" || typeof reaction.emoji !== "string" || Object.keys(reaction).some((key) => key !== "type" && key !== "emoji")) telegramFail(400, 400, "Bad Request: unsupported reaction");
+    return reaction.emoji;
+  }
+
+  private requirePinAuthority(actor: Actor, row: MessageRow): void {
+    this.requireChatPinAuthority(actor, row.chat_id);
+    if (actor.kind === "user" && row.from_id !== this.personFor(actor).id) telegramFail(400, 400, "Bad Request: not enough rights to pin the message");
+  }
+
+  private requireChatPinAuthority(actor: Actor, chatId: number): void {
+    const chat = this.chat(chatId);
+    if (chat.type !== "private" && actor.kind === "user") {
+      // The staged user surface has no administrator model. Users may manage
+      // their own pins only; bots represent the authorized Bot API actor.
+      telegramFail(400, 400, "Bad Request: not enough rights to pin messages");
+    }
+  }
+
+  private isBotId(id: number): boolean {
+    return Boolean(this.db.prepare("SELECT 1 AS ok FROM bots WHERE id = ?").get(id));
+  }
+
+  private pollForMessage(actor: Actor, chatId: number, messageId: number): PollRow {
+    this.requireVisibleMessage(actor, chatId, messageId);
+    const poll = this.db.prepare("SELECT * FROM polls WHERE chat_id = ? AND message_id = ?").get(chatId, messageId) as PollRow | undefined;
+    if (!poll) telegramFail(400, 400, "Bad Request: poll not found");
+    return poll;
+  }
+
+  private presentPoll(pollId: string): Record<string, unknown> {
+    const poll = this.db.prepare("SELECT * FROM polls WHERE poll_id = ?").get(pollId) as PollRow | undefined;
+    if (!poll) telegramFail(400, 400, "Bad Request: poll not found");
+    const options = JSON.parse(poll.options_json) as string[];
+    const counts = this.db.prepare("SELECT option_id, COUNT(*) AS count FROM poll_votes WHERE poll_id = ? GROUP BY option_id").all(poll.poll_id) as Array<{ option_id: number; count: number }>;
+    const countByOption = new Map(counts.map((count) => [count.option_id, count.count]));
+    const total = (this.db.prepare("SELECT COUNT(DISTINCT voter_id) AS count FROM poll_votes WHERE poll_id = ?").get(poll.poll_id) as { count: number }).count;
+    const recentVoters = poll.is_anonymous ? [] : (this.db.prepare("SELECT DISTINCT voter_id FROM poll_votes WHERE poll_id = ? ORDER BY voter_id LIMIT 3").all(poll.poll_id) as Array<{ voter_id: number }>).map((vote) => serializeUser(this.personById(vote.voter_id)));
+    return { id: poll.poll_id, question: poll.question, options: options.map((text, index) => ({ text, voter_count: countByOption.get(index) ?? 0 })), total_voter_count: total, is_closed: Boolean(poll.is_closed), is_anonymous: Boolean(poll.is_anonymous), allows_multiple_answers: Boolean(poll.allows_multiple_answers), type: "regular", ...(!poll.is_anonymous ? { recent_voters: recentVoters } : {}) };
+  }
+
   private hardDelete(chatId: number, messageId: number): void {
     this.db.prepare("DELETE FROM messages WHERE chat_id = ? AND message_id = ?").run(chatId, messageId);
     this.db.prepare("DELETE FROM message_hides WHERE chat_id = ? AND message_id = ?").run(chatId, messageId);
   }
 
   private present(row: MessageRow): Record<string, unknown> {
-    return serializeMessage(row, this.personById(row.from_id), this.chat(row.chat_id));
+    const message = serializeMessage(row, this.personById(row.from_id), this.chat(row.chat_id));
+    const poll = this.db.prepare("SELECT poll_id FROM polls WHERE chat_id = ? AND message_id = ?").get(row.chat_id, row.message_id) as { poll_id: string } | undefined;
+    return poll ? { ...message, poll: this.presentPoll(poll.poll_id) } : message;
   }
 }

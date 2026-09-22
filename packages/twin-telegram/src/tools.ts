@@ -61,6 +61,17 @@ export const toolSchemas = {
   get_message_link: z.looseObject({ ...account, chat_id: z.number().int(), message_id: z.number().int() }),
   mark_as_read: z.looseObject({ ...account, chat_id: z.number().int(), message_id: z.number().int() }),
   get_message_viewers: z.looseObject({ ...account, chat_id: z.number().int(), message_id: z.number().int() }),
+  pin_message: z.looseObject({ ...account, chat_id: z.number().int(), message_id: z.number().int() }),
+  unpin_message: z.looseObject({ ...account, chat_id: z.number().int(), message_id: z.number().int().optional() }),
+  get_pinned_messages: z.looseObject({ ...account, chat_id: z.number().int() }),
+  send_reaction: z.looseObject({ ...account, chat_id: z.number().int(), message_id: z.number().int(), emoji: z.string().min(1) }),
+  remove_reaction: z.looseObject({ ...account, chat_id: z.number().int(), message_id: z.number().int() }),
+  get_message_reactions: z.looseObject({ ...account, chat_id: z.number().int(), message_id: z.number().int() }),
+  create_poll: z.looseObject({ ...account, chat_id: z.number().int(), question: z.string().min(1), options: z.array(z.string().min(1)).min(2).max(10), is_anonymous: z.boolean().optional(), allows_multiple_answers: z.boolean().optional() }),
+  vote_poll: z.looseObject({ ...account, chat_id: z.number().int(), message_id: z.number().int(), option_ids: z.array(z.number().int()).min(1) }),
+  close_poll: z.looseObject({ ...account, chat_id: z.number().int(), message_id: z.number().int() }),
+  list_inline_buttons: z.looseObject({ ...account, chat_id: z.number().int(), message_id: z.number().int() }),
+  press_inline_button: z.looseObject({ ...account, chat_id: z.number().int(), message_id: z.number().int(), callback_data: z.string(), timeout: z.number().min(0).max(60).optional() }),
 };
 
 export const MUTATING_TOOL_NAMES = new Set([
@@ -70,6 +81,14 @@ export const MUTATING_TOOL_NAMES = new Set([
   "delete_message",
   "forward_message",
   "mark_as_read",
+  "pin_message",
+  "unpin_message",
+  "send_reaction",
+  "remove_reaction",
+  "create_poll",
+  "vote_poll",
+  "close_poll",
+  "press_inline_button",
 ]);
 
 export function isMutatingTool(name: string): boolean {
@@ -164,6 +183,32 @@ export function executeTool(
         chat_id: args.chat_id as number,
         message_id: args.message_id as number,
       });
+    case "pin_message":
+      return domain.pinChatMessage(actor(), { chat_id: args.chat_id as number, message_id: args.message_id as number }, ctx.reportDelta);
+    case "unpin_message":
+      return domain.unpinChatMessage(actor(), { chat_id: args.chat_id as number, message_id: args.message_id as number | undefined }, ctx.reportDelta);
+    case "get_pinned_messages":
+      return domain.getPinnedMessages(accountName(), { chat_id: args.chat_id as number });
+    case "send_reaction":
+      return domain.setMessageReaction(actor(), { chat_id: args.chat_id as number, message_id: args.message_id as number, reaction: [{ type: "emoji", emoji: args.emoji }] }, ctx.reportDelta);
+    case "remove_reaction":
+      return domain.setMessageReaction(actor(), { chat_id: args.chat_id as number, message_id: args.message_id as number, reaction: [] }, ctx.reportDelta);
+    case "get_message_reactions":
+      return domain.getMessageReactions(accountName(), { chat_id: args.chat_id as number, message_id: args.message_id as number });
+    case "create_poll":
+      // User-created polls share the same deterministic state model; a bot id
+      // is not required for the MCP-only creation path.
+      return domain.createPollForUser(accountName(), args as { chat_id: number; question: string; options: string[]; is_anonymous?: boolean; allows_multiple_answers?: boolean }, ctx.reportDelta);
+    case "vote_poll":
+      return domain.votePoll(accountName(), { chat_id: args.chat_id as number, message_id: args.message_id as number, option_ids: args.option_ids as number[] }, ctx.reportDelta);
+    case "close_poll":
+      return domain.closePollForUser(accountName(), { chat_id: args.chat_id as number, message_id: args.message_id as number }, ctx.reportDelta);
+    case "list_inline_buttons":
+      return domain.listInlineButtons(accountName(), { chat_id: args.chat_id as number, message_id: args.message_id as number });
+    case "press_inline_button": {
+      const pressed = domain.pressInlineButton(accountName(), { chat_id: args.chat_id as number, message_id: args.message_id as number, callback_data: args.callback_data as string }, ctx.reportDelta);
+      return args.timeout ? domain.waitForCallbackAnswer(pressed.callback_query_id, args.timeout as number) : pressed;
+    }
     default:
       throw new Error(`unknown tool ${name}`);
   }

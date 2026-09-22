@@ -47,6 +47,17 @@ describe("telegram MCP fixture", () => {
       "get_message_link",
       "mark_as_read",
       "get_message_viewers",
+      "pin_message",
+      "unpin_message",
+      "get_pinned_messages",
+      "send_reaction",
+      "remove_reaction",
+      "get_message_reactions",
+      "create_poll",
+      "vote_poll",
+      "close_poll",
+      "list_inline_buttons",
+      "press_inline_button",
     ]);
   });
 });

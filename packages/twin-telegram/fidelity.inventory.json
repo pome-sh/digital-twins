@@ -2,7 +2,7 @@
   "twin": "telegram",
   "package": "@pome-sh/twin-telegram",
   "updated": "2026-09-21",
-  "notes": "T05 history slice. MCP table is twin-authored-from-vendor-docs until a two-account capture exists.",
+  "notes": "T06 interactions slice. MCP listing is fixture-derived via the approved local provenance generator.",
   "tools": [
     { "name": "get_me", "heat": "hot", "fidelity": "semantic", "justification": "Spine identity." },
     { "name": "list_accounts", "heat": "hot", "fidelity": "semantic", "justification": "Named-account selector." },
@@ -22,7 +22,18 @@
     { "name": "message_from_link", "heat": "hot", "fidelity": "semantic", "justification": "Only emitted tg:// links." },
     { "name": "get_message_link", "heat": "hot", "fidelity": "semantic", "justification": "tg:// builder." },
     { "name": "mark_as_read", "heat": "hot", "fidelity": "semantic", "justification": "Read cursor." },
-    { "name": "get_message_viewers", "heat": "hot", "fidelity": "semantic", "justification": "Cursor disclosure." }
+    { "name": "get_message_viewers", "heat": "hot", "fidelity": "semantic", "justification": "Cursor disclosure." },
+    { "name": "pin_message", "heat": "hot", "fidelity": "bounded", "justification": "Chat-isolated persisted pin state." },
+    { "name": "unpin_message", "heat": "hot", "fidelity": "bounded", "justification": "Staged pin authority." },
+    { "name": "get_pinned_messages", "heat": "hot", "fidelity": "bounded", "justification": "Member-visible pin listing." },
+    { "name": "send_reaction", "heat": "hot", "fidelity": "bounded", "justification": "Single standard emoji per account/message." },
+    { "name": "remove_reaction", "heat": "hot", "fidelity": "bounded", "justification": "Removes caller reaction only." },
+    { "name": "get_message_reactions", "heat": "hot", "fidelity": "bounded", "justification": "Member-visible standard reaction listing." },
+    { "name": "create_poll", "heat": "hot", "fidelity": "bounded", "justification": "Regular poll subset." },
+    { "name": "vote_poll", "heat": "hot", "fidelity": "bounded", "justification": "Vote replacement and eligibility update." },
+    { "name": "close_poll", "heat": "hot", "fidelity": "bounded", "justification": "Author-only close." },
+    { "name": "list_inline_buttons", "heat": "hot", "fidelity": "bounded", "justification": "Callback-data inline buttons." },
+    { "name": "press_inline_button", "heat": "hot", "fidelity": "bounded", "justification": "Durable callback correlation." }
   ],
   "http": [
     { "name": "getMe", "heat": "hot", "fidelity": "semantic", "justification": "Bot identity." },
@@ -36,6 +47,14 @@
     { "name": "getUpdates", "heat": "hot", "fidelity": "semantic", "justification": "Durable per-bot update queue with offset acknowledgement." },
     { "name": "setWebhook", "heat": "hot", "fidelity": "bounded", "justification": "Durable bounded outbox with injected local delivery only." },
     { "name": "deleteWebhook", "heat": "hot", "fidelity": "semantic", "justification": "Disables webhook delivery and can drop queued updates." },
-    { "name": "getWebhookInfo", "heat": "hot", "fidelity": "semantic", "justification": "Reports persisted webhook state and delivery errors." }
+    { "name": "getWebhookInfo", "heat": "hot", "fidelity": "semantic", "justification": "Reports persisted webhook state and delivery errors." },
+    { "name": "editMessageReplyMarkup", "heat": "hot", "fidelity": "bounded", "justification": "Inline/reply keyboard subset." },
+    { "name": "pinChatMessage", "heat": "hot", "fidelity": "bounded", "justification": "Persisted pin state." },
+    { "name": "unpinChatMessage", "heat": "hot", "fidelity": "bounded", "justification": "Persisted pin state." },
+    { "name": "unpinAllChatMessages", "heat": "hot", "fidelity": "bounded", "justification": "Clears chat-local pins." },
+    { "name": "answerCallbackQuery", "heat": "hot", "fidelity": "bounded", "justification": "One-shot expiring callback answer." },
+    { "name": "sendPoll", "heat": "hot", "fidelity": "bounded", "justification": "Regular poll subset." },
+    { "name": "stopPoll", "heat": "hot", "fidelity": "bounded", "justification": "Bot-authored poll closure." },
+    { "name": "setMessageReaction", "heat": "hot", "fidelity": "bounded", "justification": "Standard emoji subset." }
   ]
 }

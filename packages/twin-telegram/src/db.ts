@@ -41,7 +41,62 @@ CREATE TABLE IF NOT EXISTS messages (
   edit_date INTEGER,
   forward_from_id INTEGER,
   forward_from_chat_id INTEGER,
+  reply_markup_json TEXT,
   PRIMARY KEY (chat_id, message_id)
+);
+
+CREATE TABLE IF NOT EXISTS pinned_messages (
+  chat_id INTEGER NOT NULL,
+  message_id INTEGER NOT NULL,
+  pinned_by_id INTEGER NOT NULL,
+  pinned_at INTEGER NOT NULL,
+  PRIMARY KEY (chat_id, message_id),
+  FOREIGN KEY (chat_id, message_id) REFERENCES messages(chat_id, message_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS message_reactions (
+  chat_id INTEGER NOT NULL,
+  message_id INTEGER NOT NULL,
+  actor_id INTEGER NOT NULL,
+  emoji TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (chat_id, message_id, actor_id, emoji),
+  FOREIGN KEY (chat_id, message_id) REFERENCES messages(chat_id, message_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS polls (
+  poll_id TEXT PRIMARY KEY,
+  chat_id INTEGER NOT NULL,
+  message_id INTEGER NOT NULL,
+  question TEXT NOT NULL,
+  options_json TEXT NOT NULL,
+  is_anonymous INTEGER NOT NULL,
+  allows_multiple_answers INTEGER NOT NULL,
+  is_closed INTEGER NOT NULL DEFAULT 0,
+  created_by_bot_id INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  UNIQUE(chat_id, message_id)
+);
+
+CREATE TABLE IF NOT EXISTS poll_votes (
+  poll_id TEXT NOT NULL,
+  voter_id INTEGER NOT NULL,
+  option_id INTEGER NOT NULL,
+  PRIMARY KEY (poll_id, voter_id, option_id),
+  FOREIGN KEY (poll_id) REFERENCES polls(poll_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS callback_queries (
+  callback_id TEXT PRIMARY KEY,
+  bot_id INTEGER NOT NULL,
+  chat_id INTEGER NOT NULL,
+  message_id INTEGER NOT NULL,
+  from_id INTEGER NOT NULL,
+  data TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  answered_at INTEGER,
+  answer_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS message_hides (
@@ -104,6 +159,11 @@ const RESET_SQL = `
 DELETE FROM webhook_outbox;
 DELETE FROM bot_updates;
 DELETE FROM bot_update_settings;
+DELETE FROM callback_queries;
+DELETE FROM poll_votes;
+DELETE FROM polls;
+DELETE FROM message_reactions;
+DELETE FROM pinned_messages;
 DELETE FROM read_cursors;
 DELETE FROM message_hides;
 DELETE FROM messages;
@@ -123,6 +183,7 @@ export function migrate(db: TelegramTwinDatabase): void {
     ["messages", "edit_date", "INTEGER"],
     ["messages", "forward_from_id", "INTEGER"],
     ["messages", "forward_from_chat_id", "INTEGER"],
+    ["messages", "reply_markup_json", "TEXT"],
     ["chats", "next_message_id", "INTEGER NOT NULL DEFAULT 1"],
   ] as const) {
     const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;

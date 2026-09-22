@@ -7,8 +7,8 @@
     "protocol": "JSON-RPC 2.0 over Streamable HTTP",
     "protocolVersion": "2025-06-18",
     "captureDate": "2026-09-21",
-    "rawFileSha256": "309ba4b8f75c0ccdf2da6c1bf67ab917eddc0041f9fc69275b2509a5cb450f53",
-    "liveToolCount": 19,
+    "rawFileSha256": "5f8d84da5f2df21e2d5984cd169b4e5b58718b803d44816f6563abab0e89ffa2",
+    "liveToolCount": 30,
     "liveToolOrder": [
       "get_me",
       "list_accounts",
@@ -28,7 +28,18 @@
       "message_from_link",
       "get_message_link",
       "mark_as_read",
-      "get_message_viewers"
+      "get_message_viewers",
+      "pin_message",
+      "unpin_message",
+      "get_pinned_messages",
+      "send_reaction",
+      "remove_reaction",
+      "get_message_reactions",
+      "create_poll",
+      "vote_poll",
+      "close_poll",
+      "list_inline_buttons",
+      "press_inline_button"
     ],
     "transcription": {
       "readFrom": "T04 spine tool names from the Telegram operation-ownership matrix and Tolboy's published names",
@@ -417,6 +428,274 @@
           "required": [
             "chat_id",
             "message_id"
+          ]
+        }
+      },
+      {
+        "name": "pin_message",
+        "description": "Pin an eligible message.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id"
+          ]
+        }
+      },
+      {
+        "name": "unpin_message",
+        "description": "Unpin an eligible message.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "chat_id"
+          ]
+        }
+      },
+      {
+        "name": "get_pinned_messages",
+        "description": "List pinned messages in a chat.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "chat_id"
+          ]
+        }
+      },
+      {
+        "name": "send_reaction",
+        "description": "React to a message with one standard emoji.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            },
+            "emoji": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id",
+            "emoji"
+          ]
+        }
+      },
+      {
+        "name": "remove_reaction",
+        "description": "Remove the caller's reaction.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id"
+          ]
+        }
+      },
+      {
+        "name": "get_message_reactions",
+        "description": "List supported message reactions.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id"
+          ]
+        }
+      },
+      {
+        "name": "create_poll",
+        "description": "Create a regular poll.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "question": {
+              "type": "string"
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "is_anonymous": {
+              "type": "boolean"
+            },
+            "allows_multiple_answers": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "chat_id",
+            "question",
+            "options"
+          ]
+        }
+      },
+      {
+        "name": "vote_poll",
+        "description": "Vote for poll options.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            },
+            "option_ids": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id",
+            "option_ids"
+          ]
+        }
+      },
+      {
+        "name": "close_poll",
+        "description": "Close a poll authored by the caller.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id"
+          ]
+        }
+      },
+      {
+        "name": "list_inline_buttons",
+        "description": "List callback buttons on a message.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id"
+          ]
+        }
+      },
+      {
+        "name": "press_inline_button",
+        "description": "Press an inline callback button.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "chat_id": {
+              "type": "integer"
+            },
+            "message_id": {
+              "type": "integer"
+            },
+            "callback_data": {
+              "type": "string"
+            },
+            "timeout": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "chat_id",
+            "message_id",
+            "callback_data"
           ]
         }
       }

@@ -35,6 +35,7 @@ export type MessageRow = {
   edit_date?: number | null;
   forward_from_id?: number | null;
   forward_from_chat_id?: number | null;
+  reply_markup_json?: string | null;
 };
 
 export function serializeUser(row: UserRow): Record<string, unknown> {
@@ -70,5 +71,6 @@ export function serializeMessage(
     ...(row.forward_from_id
       ? { forward_from: { id: row.forward_from_id }, forward_from_chat_id: row.forward_from_chat_id }
       : {}),
+    ...(row.reply_markup_json ? { reply_markup: JSON.parse(row.reply_markup_json) as unknown } : {}),
   };
 }

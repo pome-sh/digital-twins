@@ -12,6 +12,14 @@ import {
   POST_DELETE_MESSAGE,
   POST_DELETE_MESSAGES,
   POST_EDIT_MESSAGE_TEXT,
+  POST_EDIT_MESSAGE_REPLY_MARKUP,
+  POST_PIN_CHAT_MESSAGE,
+  POST_UNPIN_CHAT_MESSAGE,
+  POST_UNPIN_ALL_CHAT_MESSAGES,
+  POST_ANSWER_CALLBACK_QUERY,
+  POST_SEND_POLL,
+  POST_STOP_POLL,
+  POST_SET_MESSAGE_REACTION,
   POST_FORWARD_MESSAGE,
   POST_GET_CHAT,
   POST_GET_ME,
@@ -73,11 +81,50 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
             chat_id: parsed.body.chat_id,
             text: parsed.body.text,
             reply_to_message_id: parsed.body.reply_to_message_id,
+            reply_markup: parsed.body.reply_markup,
           }),
         ),
       };
     }),
   );
+
+  mountDeclaredRoute(app, POST_EDIT_MESSAGE_REPLY_MARKUP, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_EDIT_MESSAGE_REPLY_MARKUP.parse(c.req);
+    return { status: 200, body: telegramOk(domain.editMessageReplyMarkup(botActor(c), parsed.body)) };
+  }));
+  mountDeclaredRoute(app, POST_PIN_CHAT_MESSAGE, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_PIN_CHAT_MESSAGE.parse(c.req);
+    domain.pinChatMessage(botActor(c), parsed.body);
+    return { status: 200, body: telegramOk(true) };
+  }));
+  mountDeclaredRoute(app, POST_UNPIN_CHAT_MESSAGE, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_UNPIN_CHAT_MESSAGE.parse(c.req);
+    domain.unpinChatMessage(botActor(c), parsed.body);
+    return { status: 200, body: telegramOk(true) };
+  }));
+  mountDeclaredRoute(app, POST_UNPIN_ALL_CHAT_MESSAGES, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_UNPIN_ALL_CHAT_MESSAGES.parse(c.req);
+    domain.unpinAllChatMessages(botActor(c), parsed.body);
+    return { status: 200, body: telegramOk(true) };
+  }));
+  mountDeclaredRoute(app, POST_ANSWER_CALLBACK_QUERY, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_ANSWER_CALLBACK_QUERY.parse(c.req);
+    domain.answerCallbackQuery(botActor(c), parsed.body);
+    return { status: 200, body: telegramOk(true) };
+  }));
+  mountDeclaredRoute(app, POST_SEND_POLL, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_SEND_POLL.parse(c.req);
+    return { status: 200, body: telegramOk(domain.sendPoll(botActor(c), parsed.body)) };
+  }));
+  mountDeclaredRoute(app, POST_STOP_POLL, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_STOP_POLL.parse(c.req);
+    return { status: 200, body: telegramOk(domain.stopPoll(botActor(c), parsed.body)) };
+  }));
+  mountDeclaredRoute(app, POST_SET_MESSAGE_REACTION, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_SET_MESSAGE_REACTION.parse(c.req);
+    domain.setMessageReaction(botActor(c), parsed.body);
+    return { status: 200, body: telegramOk(true) };
+  }));
 
   mountDeclaredRoute(
     app,
