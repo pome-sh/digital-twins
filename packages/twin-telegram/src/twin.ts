@@ -18,6 +18,7 @@ import { defaultSeedState, parseSeed, type TelegramSeed } from "./seed.js";
 import { telegramError } from "./serializers.js";
 import { executeTool, isMutatingTool, telegramToolFixture, toolSchemas } from "./tools.js";
 import { unsupportedEnvelope } from "./unsupported-envelope.js";
+import { telegramUpdateRuntime, type TelegramWebhookDelivery } from "./updates.js";
 
 function zodIssues(err: unknown): Array<{ path: ReadonlyArray<PropertyKey>; message: string }> | undefined {
   if (err instanceof ZodError) return err.issues;
@@ -56,9 +57,22 @@ const implementations = Object.fromEntries(
   ]),
 ) as Record<string, McpToolImplementation<TelegramDomain>>;
 
+export type TelegramTwinRuntimeOptions = {
+  now?: () => number;
+  webhookFixtures?: Record<string, TelegramWebhookDelivery>;
+};
+
 export function telegramTwinDefinition(
   db: TelegramTwinDatabase,
+  runtimeOptions: TelegramTwinRuntimeOptions = {},
 ): TwinDefinition<TelegramTwinDatabase, TelegramSeed, TelegramDomain> {
+  const fixtures = runtimeOptions.webhookFixtures ?? {};
+  const fixtureUrls = new Set(Object.keys(fixtures));
+  telegramUpdateRuntime(db, async (input) => {
+    const fixture = fixtures[input.url];
+    if (!fixture) return { status: 503 };
+    return fixture(input);
+  });
   return defineTwin({
     id: "telegram",
     version: process.env.POME_TWIN_VERSION ?? "0.0.0",
@@ -76,7 +90,7 @@ export function telegramTwinDefinition(
       },
     } as unknown as z.ZodType<TelegramSeed>,
     domain: ({ seed }) => {
-      const domain = new TelegramDomain(db);
+      const domain = new TelegramDomain(db, runtimeOptions.now, fixtureUrls);
       if (seed !== undefined) domain.seed(seed);
       return domain;
     },
@@ -117,7 +131,7 @@ export function telegramTwinDefinition(
   });
 }
 
-export type CreateTelegramTwinAppOptions = {
+export type CreateTelegramTwinAppOptions = TelegramTwinRuntimeOptions & {
   db?: TelegramTwinDatabase;
   recorder?: RecorderStore;
   runId?: string;
@@ -126,7 +140,7 @@ export type CreateTelegramTwinAppOptions = {
 
 export function createTelegramTwinApp(opts: CreateTelegramTwinAppOptions = {}): Hono {
   const db = opts.db ?? openTelegramTwinDatabase(":memory:");
-  return createApp(telegramTwinDefinition(db), {
+  return createApp(telegramTwinDefinition(db, opts), {
     db,
     recorder: opts.recorder,
     runId: opts.runId ?? "spawn",

@@ -57,9 +57,53 @@ CREATE TABLE IF NOT EXISTS read_cursors (
   last_read INTEGER NOT NULL,
   PRIMARY KEY (account, chat_id)
 );
+
+-- Bot API updates stay in SQLite so polling, webhook delivery, and restart
+-- all see the same queue. A row leaves this table only after an offset ack,
+-- retention expiry, or a successful webhook delivery.
+CREATE TABLE IF NOT EXISTS bot_update_settings (
+  bot_id INTEGER PRIMARY KEY,
+  next_update_id INTEGER NOT NULL DEFAULT 1,
+  allowed_updates_json TEXT,
+  webhook_url TEXT,
+  webhook_secret_token TEXT,
+  webhook_max_connections INTEGER NOT NULL DEFAULT 40,
+  last_error_date INTEGER,
+  last_error_message TEXT,
+  FOREIGN KEY (bot_id) REFERENCES bots(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS bot_updates (
+  bot_id INTEGER NOT NULL,
+  update_id INTEGER NOT NULL,
+  update_type TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (bot_id, update_id),
+  FOREIGN KEY (bot_id) REFERENCES bots(id) ON DELETE CASCADE
+);
+
+-- The outbox is intentionally separate from bot_updates. A delivery failure
+-- must never roll back a message or make the update disappear.
+CREATE TABLE IF NOT EXISTS webhook_outbox (
+  bot_id INTEGER NOT NULL,
+  update_id INTEGER NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at INTEGER NOT NULL,
+  locked_until INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  PRIMARY KEY (bot_id, update_id),
+  FOREIGN KEY (bot_id, update_id) REFERENCES bot_updates(bot_id, update_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_bot_updates_retention ON bot_updates(created_at);
+CREATE INDEX IF NOT EXISTS idx_webhook_outbox_due ON webhook_outbox(next_attempt_at, locked_until);
 `;
 
 const RESET_SQL = `
+DELETE FROM webhook_outbox;
+DELETE FROM bot_updates;
+DELETE FROM bot_update_settings;
 DELETE FROM read_cursors;
 DELETE FROM message_hides;
 DELETE FROM messages;
