@@ -164,10 +164,9 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     const parsed = await POST_GET_FILE.parse(c.req);
     return { status: 200, body: telegramOk(domain.getFile(botActor(c), parsed.body.file_id)) };
   }));
-  mountDeclaredRoute(app, POST_SEND_CHAT_ACTION, recorder.handle({ mutation: true }, async (c) => {
+  mountDeclaredRoute(app, POST_SEND_CHAT_ACTION, recorder.handle({ mutation: false }, async (c) => {
     const parsed = await POST_SEND_CHAT_ACTION.parse(c.req);
-    const result = captureDelta((report) => domain.sendChatAction(botActor(c), parsed.body, report));
-    return { status: 200, body: telegramOk(result.value), delta: result.delta };
+    return { status: 200, body: telegramOk(domain.sendChatAction(botActor(c), parsed.body)) };
   }));
   // Byte downloads have no Bot API JSON envelope, but their path is still declared.
   mountDeclaredRoute(app, GET_FILE_DOWNLOAD, async (c: Context) => {

@@ -361,11 +361,10 @@ export class TelegramDomain {
     return { content: Buffer.from(row.content), mimeType: row.mime_type };
   }
 
-  sendChatAction(actor: Actor, args: { chat_id: number; action: string }, delta: DeltaHook = NOOP): true {
+  sendChatAction(actor: Actor, args: { chat_id: number; action: string }): true {
     this.botId(actor);
     this.requireMember(actor, args.chat_id);
     if (!["typing", "upload_photo", "record_video", "upload_video", "record_voice", "upload_voice", "upload_document", "choose_sticker", "find_location", "record_video_note", "upload_video_note"].includes(args.action)) telegramFail(400, 400, "Bad Request: unsupported chat action");
-    delta({ before: null, after: { chat_id: args.chat_id, action: args.action } });
     return true;
   }
 
@@ -1070,8 +1069,18 @@ export class TelegramDomain {
     const now = this.now();
     const existing = this.db.prepare("SELECT * FROM media_files WHERE file_id = ? AND bot_id = ? AND scope_id = ?").get(fileId, botId, scopeId) as MediaFileRow | undefined;
     if (existing) {
-      this.db.prepare("UPDATE media_files SET expires_at = ? WHERE file_id = ?").run(now + MEDIA_TTL_SEC, fileId);
-      return { ...existing, expires_at: now + MEDIA_TTL_SEC };
+      this.db.prepare("UPDATE media_files SET file_name = ?, mime_type = ?, expires_at = ? WHERE file_id = ?").run(
+        value.filename ?? null,
+        value.mimeType ?? null,
+        now + MEDIA_TTL_SEC,
+        fileId,
+      );
+      return {
+        ...existing,
+        file_name: value.filename ?? null,
+        mime_type: value.mimeType ?? null,
+        expires_at: now + MEDIA_TTL_SEC,
+      };
     }
     const row: MediaFileRow = { file_id: fileId, bot_id: botId, scope_id: scopeId, file_unique_id: `unique_${sha256.slice(0, 32)}`, file_name: value.filename ?? null, mime_type: value.mimeType ?? null, size: value.bytes.length, sha256, content: value.bytes, expires_at: now + MEDIA_TTL_SEC };
     this.db.prepare("INSERT INTO media_files (file_id, bot_id, scope_id, file_unique_id, file_name, mime_type, size, sha256, content, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(row.file_id, row.bot_id, row.scope_id, row.file_unique_id, row.file_name, row.mime_type, row.size, row.sha256, row.content, now, row.expires_at);

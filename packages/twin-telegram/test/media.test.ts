@@ -41,6 +41,26 @@ describe("HTTP media foundation domain", () => {
     expect(() => domain.sendMedia({ kind: "bot", botId: 1100002 }, { chat_id: 2001, kind: "photo", media: ownedId })).toThrow(/file not found/);
   });
 
+  it("uses the latest upload metadata for repeated bytes", () => {
+    const { domain } = domainAt();
+    const bytes = Buffer.from("same content");
+    const first = domain.sendMedia(BOT, {
+      chat_id: 2001,
+      kind: "document",
+      media: { bytes, filename: "first.txt", mimeType: "text/plain" },
+    });
+    const second = domain.sendMedia(BOT, {
+      chat_id: 2001,
+      kind: "document",
+      media: { bytes, filename: "second.json", mimeType: "application/json" },
+    });
+    const firstDocument = first.document as { file_id: string };
+    const secondDocument = second.document as { file_id: string; file_name: string; mime_type: string };
+    expect(secondDocument.file_id).toBe(firstDocument.file_id);
+    expect(secondDocument).toMatchObject({ file_name: "second.json", mime_type: "application/json" });
+    expect(domain.downloadFile(BOT, domain.getFile(BOT, secondDocument.file_id).file_path as string).mimeType).toBe("application/json");
+  });
+
   it("expires media, removes it on reset, and bounds captions and uploads", () => {
     let now = 10;
     const db = openTelegramTwinDatabase(":memory:");
@@ -104,6 +124,20 @@ function albumForm(sizes: number[]): FormData {
 }
 
 describe("HTTP media foundation", () => {
+  it("records sendChatAction as validation without a state mutation", async () => {
+    const db = openTelegramTwinDatabase(":memory:");
+    const recorder = createRecorderStore();
+    const app = createTelegramTwinApp({ db, seed: defaultSeedState(), recorder });
+    const response = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendChatAction`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: 2001, action: "typing" }),
+    });
+    expect(response.status).toBe(200);
+    expect(recorder.events().at(-1)).toMatchObject({ state_mutation: false, state_delta: null });
+    expect((db.prepare("SELECT COUNT(*) AS count FROM messages").get() as { count: number }).count).toBe(0);
+  });
+
   it("resolves attach:// album files and permits a multipart aggregate above one file limit", async () => {
     const app = createTelegramTwinApp({ seed: defaultSeedState() });
     const response = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendMediaGroup`, {
