@@ -405,7 +405,7 @@ export class TelegramDomain {
     if (offset !== undefined && offset < 0) {
       const rows = this.db
         .prepare("SELECT update_id, payload_json FROM bot_updates WHERE bot_id = ? ORDER BY update_id DESC LIMIT ?")
-        .all(botId, -offset) as Array<{ update_id: number; payload_json: string }>;
+        .all(botId, Math.min(-offset, limit)) as Array<{ update_id: number; payload_json: string }>;
       if (rows.length === 0) return [];
       const first = rows[rows.length - 1]!.update_id;
       this.db.prepare("DELETE FROM bot_updates WHERE bot_id = ? AND update_id < ?").run(botId, first);
@@ -485,6 +485,9 @@ export class TelegramDomain {
 
   deleteWebhook(actor: Actor, args: { drop_pending_updates?: boolean }): { ok: true } {
     const botId = this.botId(actor);
+    // A preserved update can reuse the same id after a reset. Invalidate an
+    // in-flight receiver before removing its outbox claim either way.
+    this.runtime.cancelAll();
     this.db.transaction(() => {
       this.settings(botId);
       this.db
@@ -583,8 +586,10 @@ export class TelegramDomain {
       })();
     }
     const next = this.db
-      .prepare("SELECT MIN(next_attempt_at) AS next_attempt_at FROM webhook_outbox WHERE locked_until <= ?")
-      .get(this.now()) as { next_attempt_at: number | null };
+      .prepare(
+        "SELECT MIN(CASE WHEN next_attempt_at > locked_until THEN next_attempt_at ELSE locked_until END) AS next_attempt_at FROM webhook_outbox",
+      )
+      .get() as { next_attempt_at: number | null };
     return {
       processed: due.length,
       ...(next.next_attempt_at === null ? {} : { nextAttemptAt: next.next_attempt_at }),

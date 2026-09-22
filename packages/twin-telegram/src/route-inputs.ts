@@ -49,15 +49,25 @@ const transferBody = {
   message_id: z.coerce.number().int(),
 };
 const dropPending = z.union([z.boolean(), z.enum(["true", "false"]).transform((value) => value === "true")]).optional();
+const allowedUpdates = z
+  .preprocess((value) => {
+    if (typeof value !== "string") return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }, z.array(z.enum(["message"])).max(1))
+  .optional();
 const updateArgs = {
   offset: z.coerce.number().int().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   timeout: z.coerce.number().int().min(0).max(50).optional(),
-  allowed_updates: z.array(z.enum(["message"])).max(1).optional(),
+  allowed_updates: allowedUpdates,
 };
 const webhookBody = {
   url: z.string().min(1),
-  allowed_updates: z.array(z.enum(["message"])).max(1).optional(),
+  allowed_updates: allowedUpdates,
   secret_token: z.string().min(1).max(256).optional(),
   max_connections: z.coerce.number().int().min(1).max(100).optional(),
   drop_pending_updates: dropPending,

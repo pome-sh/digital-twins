@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRecorderStore } from "@pome-sh/sdk/server";
 import { openTelegramTwinDatabase, type TelegramTwinDatabase } from "../src/db.js";
@@ -59,6 +62,15 @@ describe("Bot API update queue", () => {
     userMessage(domain, "three");
     expect(domain.getUpdates(BOT, { offset: -2 }).map((update) => update.update_id)).toEqual([2, 3]);
     expect(domain.getUpdates(BOT, {}).map((update) => update.update_id)).toEqual([2, 3]);
+  });
+
+  it("honours limit when a negative offset requests the tail", () => {
+    const { domain } = fresh();
+    userMessage(domain, "one");
+    userMessage(domain, "two");
+    userMessage(domain, "three");
+    expect(domain.getUpdates(BOT, { offset: -100, limit: 1 }).map((update) => update.update_id)).toEqual([3]);
+    expect(domain.getUpdates(BOT, {}).map((update) => update.update_id)).toEqual([3]);
   });
 
   it("uses the configured allowed update types for later events", () => {
@@ -163,8 +175,35 @@ describe("Bot API webhook routes", () => {
     expect(await response.json()).toMatchObject({ ok: true, result: [{ update_id: 1, message: { text: "HTTP update" } }] });
   });
 
-  it("returns Telegram validation errors for invalid webhook inputs", async () => {
+  it("accepts JSON-serialized allowed_updates in Bot API form bodies", async () => {
     const db = openTelegramTwinDatabase(":memory:");
+    const localUrl = "http://127.0.0.1:8826/form";
+    const app = createTelegramTwinApp({
+      db,
+      seed: defaultSeedState(),
+      webhookFixtures: { [localUrl]: async () => ({ status: 204 }) },
+    });
+    const getUpdates = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/getUpdates`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ allowed_updates: '["message"]' }).toString(),
+    });
+    expect(getUpdates.status).toBe(200);
+    const setWebhook = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/setWebhook`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ url: localUrl, allowed_updates: '["message"]' }).toString(),
+    });
+    expect(setWebhook.status).toBe(200);
+    const invalid = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/setWebhook`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ url: localUrl, allowed_updates: "not-json" }).toString(),
+    });
+    expect(invalid.status).toBe(400);
+  });
+
+  it("returns Telegram validation errors for invalid webhook inputs", async () => {    const db = openTelegramTwinDatabase(":memory:");
     const app = createTelegramTwinApp({ db, seed: defaultSeedState() });
     const invalid = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/setWebhook`, {
       method: "POST",
@@ -251,6 +290,81 @@ describe("controlled webhook outbox", () => {
     }
     expect(attempts).toBe(2);
     expect(domain.getWebhookInfo(BOT).pending_update_count).toBe(0);
+  });
+
+  it("resumes a persisted outbox after a file-backed restart without a new notify", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "pome-telegram-restart-"));
+    const path = join(directory, "telegram.db");
+    const localUrl = "http://127.0.0.1:8827/restart";
+    const now = Math.floor(Date.now() / 1000);
+    let firstDb: TelegramTwinDatabase | undefined;
+    let restartedDb: TelegramTwinDatabase | undefined;
+    try {
+      firstDb = openTelegramTwinDatabase(path);
+      const first = new TelegramDomain(firstDb, () => now, new Set([localUrl]), false);
+      first.seed(defaultSeedState());
+      first.setWebhook(BOT, { url: localUrl });
+      addDueOutboxRows(firstDb, 1, now);
+      firstDb.close();
+      firstDb = undefined;
+
+      restartedDb = openTelegramTwinDatabase(path);
+      let deliveries = 0;
+      createTelegramTwinApp({
+        db: restartedDb,
+        webhookFixtures: {
+          [localUrl]: async () => {
+            deliveries += 1;
+            return { status: 204 };
+          },
+        },
+      });
+      const restarted = new TelegramDomain(restartedDb);
+      const deadline = Date.now() + 500;
+      while (deliveries < 1 && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(deliveries).toBe(1);
+      expect(restarted.getWebhookInfo(BOT).pending_update_count).toBe(0);
+    } finally {
+      firstDb?.close();
+      restartedDb?.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("does not let a deleted webhook receiver acknowledge a preserved update", async () => {
+    const db = openTelegramTwinDatabase(":memory:");
+    const localUrl = "http://127.0.0.1:8828/delete";
+    let resolveDelivery: ((result: { status: number }) => void) | undefined;
+    let started: (() => void) | undefined;
+    const startedDelivery = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const app = createTelegramTwinApp({
+      db,
+      seed: defaultSeedState(),
+      webhookFixtures: {
+        [localUrl]: async () => {
+          started!();
+          return new Promise((resolve) => {
+            resolveDelivery = resolve;
+          });
+        },
+      },
+    });
+    await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/setWebhook`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: localUrl }),
+    });
+    const domain = new TelegramDomain(db);
+    userMessage(domain, "preserve while deleting");
+    await startedDelivery;
+    domain.deleteWebhook(BOT, {});
+    resolveDelivery!({ status: 204 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(domain.getUpdates(BOT, {})).toHaveLength(1);
   });
 
   it("keeps the configured injected clock after auth lookup domains and does not wall-time retry while frozen", async () => {

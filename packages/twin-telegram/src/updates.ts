@@ -49,6 +49,9 @@ export class TelegramUpdateRuntime {
     if (this.dispatcher) return;
     this.dispatcher = dispatcher;
     this.now = now;
+    // The SQLite outbox survives process restart; registration is its wakeup.
+    // A drain either delivers due rows or arms the earliest durable retry.
+    this.scheduleDrain();
   }
 
   currentGeneration(): number {
