@@ -59,7 +59,11 @@ const transferBody = {
   from_chat_id: z.coerce.number().int(),
   message_id: z.coerce.number().int(),
 };
-const dropPending = z.union([z.boolean(), z.enum(["true", "false"]).transform((value) => value === "true")]).optional();
+const formBoolean = z.union([
+  z.boolean(),
+  z.enum(["true", "false"]).transform((value) => value === "true"),
+]);
+const dropPending = formBoolean.optional();
 const allowedUpdates = z
   .preprocess((value) => {
     if (typeof value !== "string") return value;
@@ -128,7 +132,7 @@ export const POST_ANSWER_CALLBACK_QUERY = declareInputs({
   method: "POST",
   path: "/:cred{bot[^/]+}/answerCallbackQuery",
   pathParams: credParam,
-  body: { callback_query_id: z.string().min(1), text: z.string().max(200).optional(), show_alert: z.coerce.boolean().optional(), url: z.string().url().optional(), cache_time: z.coerce.number().int().min(0).optional() },
+  body: { callback_query_id: z.string().min(1), text: z.string().max(200).optional(), show_alert: formBoolean.optional(), url: z.string().url().optional(), cache_time: z.coerce.number().int().min(0).optional() },
   bodyEncoding: "form",
 });
 
@@ -136,7 +140,7 @@ export const POST_SEND_POLL = declareInputs({
   method: "POST",
   path: "/:cred{bot[^/]+}/sendPoll",
   pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), question: z.string().min(1).max(MAX_POLL_QUESTION_LENGTH), options: z.preprocess((value) => { if (typeof value !== "string") return value; try { return JSON.parse(value); } catch { return value; } }, z.array(z.string().min(1).max(MAX_POLL_OPTION_LENGTH)).min(MIN_POLL_OPTIONS).max(MAX_POLL_OPTIONS)), is_anonymous: z.coerce.boolean().optional(), allows_multiple_answers: z.coerce.boolean().optional(), allow_paid_broadcast: z.never().optional(), business_connection_id: z.never().optional(), message_effect_id: z.never().optional(), type: z.never().optional(), correct_option_id: z.never().optional(), explanation: z.never().optional() },
+  body: { chat_id: z.coerce.number().int(), question: z.string().min(1).max(MAX_POLL_QUESTION_LENGTH), options: z.preprocess((value) => { if (typeof value !== "string") return value; try { return JSON.parse(value); } catch { return value; } }, z.array(z.string().min(1).max(MAX_POLL_OPTION_LENGTH)).min(MIN_POLL_OPTIONS).max(MAX_POLL_OPTIONS)), is_anonymous: formBoolean.optional(), allows_multiple_answers: formBoolean.optional(), allow_paid_broadcast: z.never().optional(), business_connection_id: z.never().optional(), message_effect_id: z.never().optional(), type: z.never().optional(), correct_option_id: z.never().optional(), explanation: z.never().optional() },
   bodyEncoding: "form",
 });
 

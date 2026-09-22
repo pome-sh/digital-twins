@@ -27,6 +27,46 @@ describe("interaction state", () => {
     const custom = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/setMessageReaction`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id: 2001, message_id: 1, reaction: [{ type: "custom_emoji", custom_emoji_id: "1" }] }) });
     expect(custom.status).toBe(400);
   });
+  it("parses false form booleans for polls and callback answers", async () => {
+    const db = openTelegramTwinDatabase(":memory:");
+    const app = createTelegramTwinApp({ db, seed: defaultSeedState() });
+    const poll = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendPoll`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        chat_id: "2001",
+        question: "Private?",
+        options: JSON.stringify(["A", "B"]),
+        is_anonymous: "false",
+        allows_multiple_answers: "false",
+      }),
+    });
+    expect(await poll.json()).toMatchObject({
+      ok: true,
+      result: { poll: { is_anonymous: false, allows_multiple_answers: false } },
+    });
+
+    const domain = new TelegramDomain(db);
+    const message = domain.sendMessage(BOT, {
+      chat_id: 2001,
+      text: "choose",
+      reply_markup: { inline_keyboard: [[{ text: "Go", callback_data: "go" }]] },
+    });
+    const pressed = domain.pressInlineButton("alice", {
+      chat_id: 2001,
+      message_id: message.message_id as number,
+      callback_data: "go",
+    });
+    const answer = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/answerCallbackQuery`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ callback_query_id: pressed.callback_query_id, show_alert: "false" }),
+    });
+    expect(answer.status).toBe(200);
+    const stored = db.prepare("SELECT answer_json FROM callback_queries WHERE callback_id = ?").get(pressed.callback_query_id) as { answer_json: string };
+    expect(JSON.parse(stored.answer_json)).toMatchObject({ show_alert: false });
+  });
+
   it("persists pins by chat and enforces user pin authority", () => {
     const { domain } = fresh();
     const alice = domain.sendMessage({ kind: "user", account: "alice" }, { chat_id: 2001, text: "mine" });

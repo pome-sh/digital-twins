@@ -30,6 +30,15 @@ function fresh() {
   return { db, domain, app };
 }
 
+async function bot(app: ReturnType<typeof createTelegramTwinApp>, method: string, body: Record<string, unknown>) {
+  const response = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/${method}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return { status: response.status, body: (await response.json()) as { ok: boolean; result: unknown } };
+}
+
 describe("seed", () => {
   it("rejects an empty seed", () => {
     expect(() => parseSeed({})).toThrow();
@@ -149,6 +158,37 @@ describe("HTTP path token", () => {
     });
     expect(sent.status).toBe(200);
     expect(JSON.stringify(await sent.json())).toContain("café 你好");
+  });
+
+  it("keeps edit, delete, batch delete, forward, and copy on the Bot API HTTP surface", async () => {
+    const { app, domain } = fresh();
+    const source = await bot(app, "sendMessage", { chat_id: 2001, text: "source" });
+    expect(source.status).toBe(200);
+    const edited = await bot(app, "editMessageText", { chat_id: 2001, message_id: 1, text: "edited" });
+    expect(edited).toMatchObject({ status: 200, body: { ok: true, result: { text: "edited" } } });
+
+    const forwarded = await bot(app, "forwardMessage", {
+      chat_id: -1001234567890,
+      from_chat_id: 2001,
+      message_id: 1,
+    });
+    expect(forwarded).toMatchObject({ status: 200, body: { result: { text: "edited", forward_from: {} } } });
+    const copied = await bot(app, "copyMessage", {
+      chat_id: -1001234567890,
+      from_chat_id: 2001,
+      message_id: 1,
+    });
+    expect(copied.status).toBe(200);
+    expect(JSON.stringify(copied.body)).not.toContain("forward_from");
+
+    await bot(app, "sendMessage", { chat_id: -1001234567890, text: "delete one" });
+    const deleted = await bot(app, "deleteMessage", { chat_id: -1001234567890, message_id: 3 });
+    expect(deleted).toMatchObject({ status: 200, body: { ok: true, result: true } });
+    await bot(app, "sendMessage", { chat_id: -1001234567890, text: "delete two" });
+    await bot(app, "sendMessage", { chat_id: -1001234567890, text: "delete three" });
+    const batch = await bot(app, "deleteMessages", { chat_id: -1001234567890, message_ids: [4, 5] });
+    expect(batch).toMatchObject({ status: 200, body: { ok: true, result: true } });
+    expect(domain.getHistory("alice", -1001234567890).map((message) => message.text)).toEqual(["edited", "edited"]);
   });
 });
 

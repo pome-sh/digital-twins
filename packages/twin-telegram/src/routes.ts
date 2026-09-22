@@ -105,22 +105,22 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
   mountDeclaredRoute(app, POST_PIN_CHAT_MESSAGE, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_PIN_CHAT_MESSAGE.parse(c.req);
     const result = captureDelta((report) => domain.pinChatMessage(botActor(c), parsed.body, report));
-    return { status: 200, body: telegramOk(result.value), delta: result.delta };
+    return { status: 200, body: telegramOk(true), delta: result.delta };
   }));
   mountDeclaredRoute(app, POST_UNPIN_CHAT_MESSAGE, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_UNPIN_CHAT_MESSAGE.parse(c.req);
     const result = captureDelta((report) => domain.unpinChatMessage(botActor(c), parsed.body, report));
-    return { status: 200, body: telegramOk(result.value), delta: result.delta };
+    return { status: 200, body: telegramOk(true), delta: result.delta };
   }));
   mountDeclaredRoute(app, POST_UNPIN_ALL_CHAT_MESSAGES, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_UNPIN_ALL_CHAT_MESSAGES.parse(c.req);
     const result = captureDelta((report) => domain.unpinAllChatMessages(botActor(c), parsed.body, report));
-    return { status: 200, body: telegramOk(result.value), delta: result.delta };
+    return { status: 200, body: telegramOk(true), delta: result.delta };
   }));
   mountDeclaredRoute(app, POST_ANSWER_CALLBACK_QUERY, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_ANSWER_CALLBACK_QUERY.parse(c.req);
     const result = captureDelta((report) => domain.answerCallbackQuery(botActor(c), parsed.body, report));
-    return { status: 200, body: telegramOk(result.value), delta: result.delta };
+    return { status: 200, body: telegramOk(true), delta: result.delta };
   }));
   mountDeclaredRoute(app, POST_SEND_POLL, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_SEND_POLL.parse(c.req);
@@ -135,7 +135,7 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
   mountDeclaredRoute(app, POST_SET_MESSAGE_REACTION, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_SET_MESSAGE_REACTION.parse(c.req);
     const result = captureDelta((report) => domain.setMessageReaction(botActor(c), parsed.body, report));
-    return { status: 200, body: telegramOk(result.value), delta: result.delta };
+    return { status: 200, body: telegramOk(true), delta: result.delta };
   }));
 
   mountDeclaredRoute(
@@ -153,7 +153,7 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     recorder.handle({ mutation: true }, async (c) => {
       const parsed = await POST_DELETE_MESSAGE.parse(c.req);
       const result = captureDelta((report) => domain.deleteMessage(botActor(c), parsed.body, report));
-      return { status: 200, body: telegramOk(result.value), delta: result.delta };
+      return { status: 200, body: telegramOk(true), delta: result.delta };
     }),
   );
   mountDeclaredRoute(
@@ -162,7 +162,7 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     recorder.handle({ mutation: true }, async (c) => {
       const parsed = await POST_DELETE_MESSAGES.parse(c.req);
       const result = captureDelta((report) => domain.deleteMessages(botActor(c), parsed.body, report));
-      return { status: 200, body: telegramOk(result.value), delta: result.delta };
+      return { status: 200, body: telegramOk(true), delta: result.delta };
     }),
   );
   mountDeclaredRoute(
@@ -210,7 +210,7 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     recorder.handle({ mutation: true }, async (c) => {
       const parsed = await POST_SET_WEBHOOK.parse(c.req);
       const result = captureDelta((report) => domain.setWebhook(botActor(c), parsed.body, report));
-      return { status: 200, body: telegramOk(result.value), delta: result.delta };
+      return { status: 200, body: telegramOk(true), delta: result.delta };
     }),
   );
   mountDeclaredRoute(
@@ -219,7 +219,7 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     recorder.handle({ mutation: true }, async (c) => {
       const parsed = await POST_DELETE_WEBHOOK.parse(c.req);
       const result = captureDelta((report) => domain.deleteWebhook(botActor(c), parsed.body, report));
-      return { status: 200, body: telegramOk(result.value), delta: result.delta };
+      return { status: 200, body: telegramOk(true), delta: result.delta };
     }),
   );
   const getWebhookInfo = async (c: Context) => ({
