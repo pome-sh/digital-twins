@@ -1,0 +1,22 @@
+{
+  "twin": "telegram",
+  "substrate": "live-wire-unauth",
+  "captured": false,
+  "status": "deferred",
+  "endpoint": "http://127.0.0.1:8080/mcp",
+  "reason": "Pinned Tolboy with Telegram/TDLib disabled still serves MCP, but TelegramAccountRegistry then has exactly one label (`default`). Two named accounts require telegram.accounts.* or tdlib credentials, which call TdLibConfig.startAccount, Init.init(), and a live TDLib client. F-1852 forbids that path. A zero/single-account listing must not be frozen as the primary golden.",
+  "deferredTo": "F-1854 once a two-named-account tools/list can be captured with Telegram/TDLib still disabled, or a new F-1852 approval",
+  "configuration": {
+    "minNamedAccounts": 2,
+    "accountSelectorProperty": "account"
+  },
+  "evidence": {
+    "inspected": "tolboy/telegram-mcp-tdlib@da3ee1f194c104d922449bf11a3595840e163357 src/main/kotlin/dev/telegrammcp/server/client/TdLibConfig.kt (telegramAccountRegistry, configuredAccounts, startAccount)",
+    "tdlibDisabledAccount": "default",
+    "captureHostJava": "22.0.1; Tolboy pin is Java 25",
+    "captureHostGradle": "not installed",
+    "serverBooted": false
+  },
+  "revisitWhen": "local pinned Tolboy can advertise MCP_TOOL_PROFILE=all with at least two named accounts without contacting Telegram",
+  "consumerContract": "The divergence lane must report this twin as not-compared. It must never report it as zero coverage."
+}

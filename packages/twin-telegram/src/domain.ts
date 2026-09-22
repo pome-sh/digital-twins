@@ -41,6 +41,13 @@ export function isCallbackData(value: string): boolean {
   return value.length > 0 && Buffer.byteLength(value, "utf8") <= MAX_CALLBACK_DATA_BYTES;
 }
 
+function aggregateDeltas(deltas: StateDelta[]): StateDelta {
+  return {
+    before: { mutations: deltas.map((delta) => delta?.before ?? null) },
+    after: { mutations: deltas.map((delta) => delta?.after ?? null) },
+  };
+}
+
 function validatePoll(question: string, options: string[]): void {
   if (
     question.length === 0 ||
@@ -354,11 +361,15 @@ export class TelegramDomain {
     const row = this.requireVisibleMessage(actor, args.chat_id, args.message_id);
     const emoji = this.parseReaction(args.reaction);
     const person = this.personFor(actor);
+    const oldReaction = (this.db
+      .prepare("SELECT emoji FROM message_reactions WHERE chat_id = ? AND message_id = ? AND actor_id = ? ORDER BY emoji")
+      .all(args.chat_id, args.message_id, person.id) as Array<{ emoji: string }>)
+      .map((reaction) => ({ type: "emoji", emoji: reaction.emoji }));
     this.db.transaction(() => {
       this.db.prepare("DELETE FROM message_reactions WHERE chat_id = ? AND message_id = ? AND actor_id = ?").run(args.chat_id, args.message_id, person.id);
       if (emoji) this.db.prepare("INSERT INTO message_reactions (chat_id, message_id, actor_id, emoji, created_at) VALUES (?, ?, ?, ?, ?)").run(args.chat_id, args.message_id, person.id, emoji, this.now());
       if (row.from_id !== person.id && this.isBotId(row.from_id)) this.enqueueTargetedUpdate(row.from_id, "message_reaction", {
-        chat: serializeChat(this.chat(args.chat_id)), message_id: args.message_id, user: serializeUser(this.asUser(person)), old_reaction: [], new_reaction: emoji ? [{ type: "emoji", emoji }] : [],
+        chat: serializeChat(this.chat(args.chat_id)), message_id: args.message_id, user: serializeUser(this.asUser(person)), old_reaction: oldReaction, new_reaction: emoji ? [{ type: "emoji", emoji }] : [],
       }, this.now());
     })();
     if (row.from_id !== person.id && this.isBotId(row.from_id)) this.runtime.notify(row.from_id);
@@ -377,11 +388,16 @@ export class TelegramDomain {
     this.requireMember(actor, args.chat_id);
     validatePoll(args.question, args.options);
     const now = this.now();
-    const message = this.sendMessage(actor, { chat_id: args.chat_id, text: args.question }, delta);
+    const messageDeltas: StateDelta[] = [];
+    const message = this.sendMessage(actor, { chat_id: args.chat_id, text: args.question }, (change) => messageDeltas.push(change));
     const messageId = message.message_id as number;
     const pollId = `poll:${args.chat_id}:${messageId}`;
     this.db.prepare("INSERT INTO polls (poll_id, chat_id, message_id, question, options_json, is_anonymous, allows_multiple_answers, created_by_bot_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run(pollId, args.chat_id, messageId, args.question, JSON.stringify(args.options), args.is_anonymous === false ? 0 : 1, args.allows_multiple_answers ? 1 : 0, botId, now);
+    delta(aggregateDeltas([
+      ...messageDeltas,
+      { before: null, after: { poll_id: pollId, chat_id: args.chat_id, message_id: messageId } },
+    ]));
     return this.present(this.requireVisibleMessage(actor, args.chat_id, messageId));
   }
 
@@ -389,11 +405,16 @@ export class TelegramDomain {
     const actor: Actor = { kind: "user", account };
     this.requireMember(actor, args.chat_id);
     validatePoll(args.question, args.options);
-    const message = this.sendMessage(actor, { chat_id: args.chat_id, text: args.question }, delta);
+    const messageDeltas: StateDelta[] = [];
+    const message = this.sendMessage(actor, { chat_id: args.chat_id, text: args.question }, (change) => messageDeltas.push(change));
     const messageId = message.message_id as number;
     const pollId = `poll:${args.chat_id}:${messageId}`;
     this.db.prepare("INSERT INTO polls (poll_id, chat_id, message_id, question, options_json, is_anonymous, allows_multiple_answers, created_by_bot_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run(pollId, args.chat_id, messageId, args.question, JSON.stringify(args.options), args.is_anonymous === false ? 0 : 1, args.allows_multiple_answers ? 1 : 0, this.personFor(actor).id, this.now());
+    delta(aggregateDeltas([
+      ...messageDeltas,
+      { before: null, after: { poll_id: pollId, chat_id: args.chat_id, message_id: messageId } },
+    ]));
     return this.present(this.requireVisibleMessage(actor, args.chat_id, messageId));
   }
 
@@ -540,11 +561,13 @@ export class TelegramDomain {
     delta: DeltaHook = NOOP,
   ): { ok: true } {
     if (args.message_ids.length === 0) telegramFail(400, 400, "Bad Request: message_ids is empty");
+    const changes: StateDelta[] = [];
     this.db.transaction(() => {
       for (const message_id of args.message_ids) {
-        this.deleteMessage(actor, { chat_id: args.chat_id, message_id }, delta);
+        this.deleteMessage(actor, { chat_id: args.chat_id, message_id }, (change) => changes.push(change));
       }
     })();
+    delta(aggregateDeltas(changes));
     return { ok: true };
   }
 
@@ -1071,7 +1094,10 @@ export class TelegramDomain {
         }
         if (!item || typeof item !== "object" || Array.isArray(item) || typeof (item as Record<string, unknown>).text !== "string") telegramFail(400, 400, "Bad Request: reply_markup is invalid");
         const button = item as Record<string, unknown>;
-        if (!inline) return { text: button.text as string };
+        if (!inline) {
+          if (Object.keys(button).some((key) => key !== "text")) telegramFail(400, 400, "Bad Request: unsupported reply keyboard button");
+          return { text: button.text as string };
+        }
         if (typeof button.callback_data !== "string" || Object.keys(button).some((key) => key !== "text" && key !== "callback_data")) telegramFail(400, 400, "Bad Request: unsupported inline button");
         if (!isCallbackData(button.callback_data)) telegramFail(400, 400, "Bad Request: callback_data must be non-empty UTF-8 and at most 64 bytes");
         return { text: button.text as string, callback_data: button.callback_data };
@@ -1127,8 +1153,18 @@ export class TelegramDomain {
   }
 
   private hardDelete(chatId: number, messageId: number): void {
-    this.db.prepare("DELETE FROM messages WHERE chat_id = ? AND message_id = ?").run(chatId, messageId);
-    this.db.prepare("DELETE FROM message_hides WHERE chat_id = ? AND message_id = ?").run(chatId, messageId);
+    const polls = this.db
+      .prepare("SELECT poll_id FROM polls WHERE chat_id = ? AND message_id = ?")
+      .all(chatId, messageId) as Array<{ poll_id: string }>;
+    this.db.transaction(() => {
+      for (const poll of polls) {
+        this.db.prepare("DELETE FROM poll_votes WHERE poll_id = ?").run(poll.poll_id);
+        this.db.prepare("DELETE FROM polls WHERE poll_id = ?").run(poll.poll_id);
+      }
+      this.db.prepare("DELETE FROM callback_queries WHERE chat_id = ? AND message_id = ?").run(chatId, messageId);
+      this.db.prepare("DELETE FROM messages WHERE chat_id = ? AND message_id = ?").run(chatId, messageId);
+      this.db.prepare("DELETE FROM message_hides WHERE chat_id = ? AND message_id = ?").run(chatId, messageId);
+    })();
   }
 
   private present(row: MessageRow): Record<string, unknown> {

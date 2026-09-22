@@ -98,6 +98,80 @@ describe("interaction state", () => {
     expect(() => domain.sendMessage(BOT, { chat_id: 2001, text: "bad", reply_markup: { inline_keyboard: [[{ text: "x", callback_data: "é".repeat(33) }]] } })).toThrow(/non-empty UTF-8/);
   });
 
+  it("emits the prior reaction when replacing or removing it", () => {
+    const { domain } = fresh();
+    const message = domain.sendMessage(BOT, { chat_id: 2001, text: "reaction" });
+    domain.setMessageReaction(
+      { kind: "user", account: "alice" },
+      { chat_id: 2001, message_id: message.message_id as number, reaction: [{ type: "emoji", emoji: "👍" }] },
+    );
+    domain.getUpdates(BOT, { allowed_updates: ["message_reaction"], offset: 2 });
+    domain.setMessageReaction(
+      { kind: "user", account: "alice" },
+      { chat_id: 2001, message_id: message.message_id as number, reaction: [{ type: "emoji", emoji: "👎" }] },
+    );
+    expect(domain.getUpdates(BOT, {})[0]).toMatchObject({
+      message_reaction: {
+        old_reaction: [{ type: "emoji", emoji: "👍" }],
+        new_reaction: [{ type: "emoji", emoji: "👎" }],
+      },
+    });
+    domain.getUpdates(BOT, { offset: 3 });
+    domain.setMessageReaction(
+      { kind: "user", account: "alice" },
+      { chat_id: 2001, message_id: message.message_id as number, reaction: [] },
+    );
+    expect(domain.getUpdates(BOT, {})[0]).toMatchObject({
+      message_reaction: { old_reaction: [{ type: "emoji", emoji: "👎" }], new_reaction: [] },
+    });
+  });
+
+  it("rejects reply keyboard button objects with unsupported fields", () => {
+    const { domain } = fresh();
+    expect(() =>
+      domain.sendMessage(BOT, {
+        chat_id: 2001,
+        text: "reply",
+        reply_markup: { keyboard: [[{ text: "yes", request_contact: true }]] },
+      }),
+    ).toThrow(/unsupported reply keyboard button/);
+  });
+
+  it("aggregates poll and batch-delete deltas", () => {
+    const { domain } = fresh();
+    const pollDeltas: Array<unknown> = [];
+    domain.sendPoll(BOT, { chat_id: 2001, question: "Pick", options: ["A", "B"] }, (delta) => pollDeltas.push(delta));
+    expect(pollDeltas).toEqual([
+      expect.objectContaining({ after: { mutations: [expect.objectContaining({ message_id: 1 }), expect.objectContaining({ poll_id: "poll:2001:1" })] } }),
+    ]);
+
+    domain.sendMessage(BOT, { chat_id: 2001, text: "one" });
+    domain.sendMessage(BOT, { chat_id: 2001, text: "two" });
+    const deleteDeltas: Array<unknown> = [];
+    domain.deleteMessages(BOT, { chat_id: 2001, message_ids: [2, 3] }, (delta) => deleteDeltas.push(delta));
+    expect(deleteDeltas).toEqual([
+      expect.objectContaining({ after: { mutations: [null, null] } }),
+    ]);
+  });
+
+  it("removes poll votes and callback queries when their messages are hard-deleted", () => {
+    const { db, domain } = fresh();
+    const poll = domain.sendPoll(BOT, { chat_id: GROUP, question: "Pick", options: ["A", "B"] });
+    domain.votePoll("alice", { chat_id: GROUP, message_id: poll.message_id as number, option_ids: [0] });
+    domain.deleteMessage(BOT, { chat_id: GROUP, message_id: poll.message_id as number });
+    expect((db.prepare("SELECT COUNT(*) AS count FROM polls").get() as { count: number }).count).toBe(0);
+    expect((db.prepare("SELECT COUNT(*) AS count FROM poll_votes").get() as { count: number }).count).toBe(0);
+
+    const callbackMessage = domain.sendMessage(BOT, {
+      chat_id: 2001,
+      text: "choose",
+      reply_markup: { inline_keyboard: [[{ text: "Go", callback_data: "go" }]] },
+    });
+    domain.pressInlineButton("alice", { chat_id: 2001, message_id: callbackMessage.message_id as number, callback_data: "go" });
+    domain.deleteMessage(BOT, { chat_id: 2001, message_id: callbackMessage.message_id as number });
+    expect((db.prepare("SELECT COUNT(*) AS count FROM callback_queries").get() as { count: number }).count).toBe(0);
+  });
+
   it("waits for a concurrent bot callback answer without a database transaction held open", async () => {
     const { domain } = fresh();
     domain.sendMessage(BOT, { chat_id: 2001, text: "choose", reply_markup: { inline_keyboard: [[{ text: "Go", callback_data: "go" }]] } });
@@ -170,6 +244,38 @@ describe("interaction state", () => {
     const event = recorder.events().at(-1);
     expect(event?.state_mutation).toBe(true);
     expect(event?.state_delta).toMatchObject({ before: null, after: { chat_id: 2001, text: "record me" } });
+  });
+
+  it("records compound HTTP deltas for polls and batch deletion", async () => {
+    const recorder = createRecorderStore();
+    const app = createTelegramTwinApp({ seed: defaultSeedState(), recorder, runId: "telegram-compound-delta" });
+    const poll = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendPoll`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: 2001, question: "Pick", options: ["A", "B"] }),
+    });
+    expect(poll.status).toBe(200);
+    expect(recorder.events().at(-1)?.state_delta).toMatchObject({
+      after: { mutations: [expect.objectContaining({ message_id: 1 }), expect.objectContaining({ poll_id: "poll:2001:1" })] },
+    });
+
+    await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: 2001, text: "one" }),
+    });
+    await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: 2001, text: "two" }),
+    });
+    const deleted = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/deleteMessages`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: 2001, message_ids: [2, 3] }),
+    });
+    expect(deleted.status).toBe(200);
+    expect(recorder.events().at(-1)?.state_delta).toMatchObject({ after: { mutations: [null, null] } });
   });
 
   it("isolates reactions and polls to their owning bot and handles vote changes and closure", () => {
