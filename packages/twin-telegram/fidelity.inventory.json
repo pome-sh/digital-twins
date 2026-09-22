@@ -32,6 +32,10 @@
     { "name": "deleteMessage", "heat": "hot", "fidelity": "semantic", "justification": "48h bot delete." },
     { "name": "deleteMessages", "heat": "hot", "fidelity": "semantic", "justification": "Batch delete." },
     { "name": "forwardMessage", "heat": "hot", "fidelity": "semantic", "justification": "Forward." },
-    { "name": "copyMessage", "heat": "hot", "fidelity": "semantic", "justification": "Copy without attribution." }
+    { "name": "copyMessage", "heat": "hot", "fidelity": "semantic", "justification": "Copy without attribution." },
+    { "name": "getUpdates", "heat": "hot", "fidelity": "semantic", "justification": "Durable per-bot update queue with offset acknowledgement." },
+    { "name": "setWebhook", "heat": "hot", "fidelity": "bounded", "justification": "Durable bounded outbox with injected local delivery only." },
+    { "name": "deleteWebhook", "heat": "hot", "fidelity": "semantic", "justification": "Disables webhook delivery and can drop queued updates." },
+    { "name": "getWebhookInfo", "heat": "hot", "fidelity": "semantic", "justification": "Reports persisted webhook state and delivery errors." }
   ]
 }

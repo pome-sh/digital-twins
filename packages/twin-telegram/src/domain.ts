@@ -11,6 +11,14 @@ import {
   type UserRow,
 } from "./serializers.js";
 import { defaultSeedState, parseSeed, type TelegramSeed } from "./seed.js";
+import {
+  MAX_WEBHOOK_BATCH,
+  UPDATE_RETENTION_SEC,
+  telegramUpdateRuntime,
+  webhookUrlError,
+  type TelegramWebhookDelivery,
+  type WebhookDrainResult,
+} from "./updates.js";
 
 export type DeltaHook = (delta: StateDelta) => void;
 const NOOP: DeltaHook = () => {};
@@ -24,13 +32,21 @@ type PersonRow = { id: number; first_name: string; username: string | null; is_b
 export const BOT_DELETE_WINDOW_SEC = 48 * 3600;
 
 export class TelegramDomain {
+  private readonly runtime: ReturnType<typeof telegramUpdateRuntime>;
+
   constructor(
     readonly db: TelegramTwinDatabase,
     readonly now: () => number = () => Math.floor(Date.now() / 1000),
-  ) {}
+    private readonly localWebhookUrls: ReadonlySet<string> = new Set(),
+    registerRuntime = true,
+  ) {
+    this.runtime = telegramUpdateRuntime(db);
+    if (registerRuntime) this.runtime.registerDispatcher(() => this.flushWebhookOutbox(), now);
+  }
 
   seed(input: TelegramSeed | unknown): void {
     const state = parseSeed(input);
+    this.runtime.cancelAll();
     const now = this.now();
     this.db.transaction(() => {
       resetDatabase(this.db);
@@ -126,6 +142,7 @@ export class TelegramDomain {
     }
     const from = this.personFor(actor);
     const date = this.now();
+    const emittedBotIds: number[] = [];
     const next = this.db.transaction(() => {
       const allocated = (this.db.prepare("SELECT next_message_id AS next FROM chats WHERE id = ?").get(args.chat_id) as {
         next: number;
@@ -145,8 +162,26 @@ export class TelegramDomain {
           args.forward_from_id ?? null,
           args.forward_from_chat_id ?? null,
         );
+      if (actor.kind === "user") {
+        const message = serializeMessage(
+          {
+            chat_id: args.chat_id,
+            message_id: allocated,
+            from_id: from.id,
+            text: args.text,
+            date,
+            reply_to_message_id: args.reply_to_message_id ?? null,
+            forward_from_id: args.forward_from_id ?? null,
+            forward_from_chat_id: args.forward_from_chat_id ?? null,
+          },
+          this.asUser(from),
+          this.chat(args.chat_id),
+        );
+        emittedBotIds.push(...this.enqueueMessageUpdates(args.chat_id, message, date));
+      }
       return allocated;
     })();
+    for (const botId of emittedBotIds) this.runtime.notify(botId);
     const row: MessageRow = {
       chat_id: args.chat_id,
       message_id: next,
@@ -347,6 +382,220 @@ export class TelegramDomain {
     ).filter((row) => this.isMemberId(this.userByAccount(row.account).id, args.chat_id));
   }
 
+  getUpdates(
+    actor: Actor,
+    args: { offset?: number; limit?: number; allowed_updates?: string[] },
+  ): Record<string, unknown>[] {
+    const botId = this.botId(actor);
+    this.purgeExpiredUpdates();
+    let settings = this.settings(botId);
+    if (args.allowed_updates && args.allowed_updates.length > 0) {
+      this.db
+        .prepare("UPDATE bot_update_settings SET allowed_updates_json = ? WHERE bot_id = ?")
+        .run(JSON.stringify(args.allowed_updates), botId);
+      settings = this.settings(botId);
+    }
+    if (settings.webhook_url) telegramFail(409, 409, "Conflict: can't use getUpdates method while webhook is active");
+    const limit = args.limit ?? 100;
+    if (limit < 1 || limit > 100) telegramFail(400, 400, "Bad Request: limit must be between 1 and 100");
+    const offset = args.offset;
+    if (offset !== undefined && offset > 0) {
+      this.db.prepare("DELETE FROM bot_updates WHERE bot_id = ? AND update_id < ?").run(botId, offset);
+    }
+    if (offset !== undefined && offset < 0) {
+      const rows = this.db
+        .prepare("SELECT update_id, payload_json FROM bot_updates WHERE bot_id = ? ORDER BY update_id DESC LIMIT ?")
+        .all(botId, Math.min(-offset, limit)) as Array<{ update_id: number; payload_json: string }>;
+      if (rows.length === 0) return [];
+      const first = rows[rows.length - 1]!.update_id;
+      this.db.prepare("DELETE FROM bot_updates WHERE bot_id = ? AND update_id < ?").run(botId, first);
+      return rows.reverse().map((row) => JSON.parse(row.payload_json) as Record<string, unknown>);
+    }
+    const minimum = offset && offset > 0 ? offset : 0;
+    return (
+      this.db
+        .prepare("SELECT payload_json FROM bot_updates WHERE bot_id = ? AND update_id >= ? ORDER BY update_id LIMIT ?")
+        .all(botId, minimum, limit) as Array<{ payload_json: string }>
+    ).map((row) => JSON.parse(row.payload_json) as Record<string, unknown>);
+  }
+
+  async waitForUpdates(
+    actor: Actor,
+    args: { offset?: number; limit?: number; timeout?: number; allowed_updates?: string[] },
+    signal?: AbortSignal,
+  ): Promise<Record<string, unknown>[]> {
+    const botId = this.botId(actor);
+    let release: (() => void) | undefined;
+    try {
+      try {
+        release = this.runtime.acquirePoll(botId);
+      } catch {
+        telegramFail(409, 409, "Conflict: another getUpdates request is active for this bot");
+      }
+      const immediate = this.getUpdates(actor, args);
+      if (immediate.length > 0 || !args.timeout) return immediate;
+      await this.runtime.waitForUpdate(botId, args.timeout, signal);
+      return this.getUpdates(actor, args);
+    } finally {
+      release?.();
+    }
+  }
+
+  setWebhook(
+    actor: Actor,
+    args: {
+      url: string;
+      allowed_updates?: string[];
+      secret_token?: string;
+      max_connections?: number;
+      drop_pending_updates?: boolean;
+    },
+  ): { ok: true } {
+    const botId = this.botId(actor);
+    const urlError = webhookUrlError(args.url, this.localWebhookUrls);
+    if (urlError) telegramFail(400, 400, urlError);
+    if (args.secret_token !== undefined && !/^[A-Za-z0-9_-]{1,256}$/.test(args.secret_token)) {
+      telegramFail(400, 400, "Bad Request: secret_token is invalid");
+    }
+    const maxConnections = args.max_connections ?? 40;
+    if (maxConnections < 1 || maxConnections > 100) {
+      telegramFail(400, 400, "Bad Request: max_connections must be between 1 and 100");
+    }
+    this.db.transaction(() => {
+      const previous = this.settings(botId);
+      const allowed = args.allowed_updates && args.allowed_updates.length > 0 ? JSON.stringify(args.allowed_updates) : previous.allowed_updates_json;
+      this.db
+        .prepare(
+          "UPDATE bot_update_settings SET allowed_updates_json = ?, webhook_url = ?, webhook_secret_token = ?, webhook_max_connections = ?, last_error_date = NULL, last_error_message = NULL WHERE bot_id = ?",
+        )
+        .run(allowed, args.url, args.secret_token ?? null, maxConnections, botId);
+      if (args.drop_pending_updates) {
+        this.db.prepare("DELETE FROM bot_updates WHERE bot_id = ?").run(botId);
+      } else {
+        this.db
+          .prepare(
+            "INSERT OR IGNORE INTO webhook_outbox (bot_id, update_id, attempts, next_attempt_at) SELECT bot_id, update_id, 0, ? FROM bot_updates WHERE bot_id = ?",
+          )
+          .run(this.now(), botId);
+      }
+    })();
+    this.runtime.notify(botId);
+    return { ok: true };
+  }
+
+  deleteWebhook(actor: Actor, args: { drop_pending_updates?: boolean }): { ok: true } {
+    const botId = this.botId(actor);
+    // A preserved update can reuse the same id after a reset. Invalidate an
+    // in-flight receiver before removing its outbox claim either way.
+    this.runtime.cancelAll();
+    this.db.transaction(() => {
+      this.settings(botId);
+      this.db
+        .prepare("UPDATE bot_update_settings SET webhook_url = NULL, webhook_secret_token = NULL, last_error_date = NULL, last_error_message = NULL WHERE bot_id = ?")
+        .run(botId);
+      this.db.prepare("DELETE FROM webhook_outbox WHERE bot_id = ?").run(botId);
+      if (args.drop_pending_updates) this.db.prepare("DELETE FROM bot_updates WHERE bot_id = ?").run(botId);
+    })();
+    this.runtime.notify(botId);
+    return { ok: true };
+  }
+
+  getWebhookInfo(actor: Actor): Record<string, unknown> {
+    const botId = this.botId(actor);
+    this.purgeExpiredUpdates();
+    const settings = this.settings(botId);
+    const pending = (
+      this.db.prepare("SELECT COUNT(*) AS count FROM webhook_outbox WHERE bot_id = ?").get(botId) as { count: number }
+    ).count;
+    return {
+      url: settings.webhook_url ?? "",
+      has_custom_certificate: false,
+      pending_update_count: pending,
+      ...(settings.webhook_url ? { max_connections: settings.webhook_max_connections } : {}),
+      ...(settings.last_error_date ? { last_error_date: settings.last_error_date } : {}),
+      ...(settings.last_error_message ? { last_error_message: settings.last_error_message } : {}),
+    };
+  }
+
+  /** Drains at most one durable batch. It never performs a network request. */
+  async flushWebhookOutbox(
+    delivery: TelegramWebhookDelivery | undefined = this.runtime.getDelivery(),
+  ): Promise<WebhookDrainResult> {
+    this.purgeExpiredUpdates();
+    const generation = this.runtime.currentGeneration();
+    const now = this.now();
+    const due = this.db
+      .prepare(
+        "SELECT bot_id, update_id FROM webhook_outbox WHERE next_attempt_at <= ? AND locked_until <= ? ORDER BY next_attempt_at, update_id LIMIT ?",
+      )
+      .all(now, now, MAX_WEBHOOK_BATCH) as Array<{ bot_id: number; update_id: number }>;
+    for (const item of due) {
+      const claimed = this.db
+        .prepare("UPDATE webhook_outbox SET locked_until = ? WHERE bot_id = ? AND update_id = ? AND locked_until <= ?")
+        .run(now + 30, item.bot_id, item.update_id, now);
+      if (claimed.changes !== 1) continue;
+      const setting = this.settings(item.bot_id);
+      const update = this.db
+        .prepare("SELECT payload_json FROM bot_updates WHERE bot_id = ? AND update_id = ?")
+        .get(item.bot_id, item.update_id) as { payload_json: string } | undefined;
+      if (!setting.webhook_url || !update) {
+        this.db.prepare("DELETE FROM webhook_outbox WHERE bot_id = ? AND update_id = ?").run(item.bot_id, item.update_id);
+        continue;
+      }
+      let status: number | undefined;
+      let failure: string | undefined;
+      try {
+        if (!delivery) failure = "delivery_disabled";
+        else status = (await delivery({
+          url: setting.webhook_url,
+          body: JSON.parse(update.payload_json) as Record<string, unknown>,
+          headers: {
+            "content-type": "application/json",
+            ...(setting.webhook_secret_token
+              ? { "x-telegram-bot-api-secret-token": setting.webhook_secret_token }
+              : {}),
+          },
+        })).status;
+        if (status !== undefined && (status < 200 || status >= 300)) failure = `http_${status}`;
+      } catch {
+        failure = "delivery_failed";
+      }
+      // Reset can occur while an injected receiver is pending. Its completion
+      // must not acknowledge a new row that reused this bot/update id.
+      if (!this.runtime.isCurrentGeneration(generation)) return { processed: 0 };
+      if (!failure) {
+        this.db.transaction(() => {
+          this.db.prepare("DELETE FROM webhook_outbox WHERE bot_id = ? AND update_id = ?").run(item.bot_id, item.update_id);
+          this.db.prepare("DELETE FROM bot_updates WHERE bot_id = ? AND update_id = ?").run(item.bot_id, item.update_id);
+        })();
+        continue;
+      }
+      this.db.transaction(() => {
+        const current = this.db
+          .prepare("SELECT attempts FROM webhook_outbox WHERE bot_id = ? AND update_id = ?")
+          .get(item.bot_id, item.update_id) as { attempts: number } | undefined;
+        if (!current) return;
+        const attempts = current.attempts + 1;
+        const delay = Math.min(60, 2 ** Math.min(attempts - 1, 5));
+        this.db
+          .prepare("UPDATE webhook_outbox SET attempts = ?, next_attempt_at = ?, locked_until = 0, last_error = ? WHERE bot_id = ? AND update_id = ?")
+          .run(attempts, now + delay, failure, item.bot_id, item.update_id);
+        this.db
+          .prepare("UPDATE bot_update_settings SET last_error_date = ?, last_error_message = ? WHERE bot_id = ?")
+          .run(now, failure, item.bot_id);
+      })();
+    }
+    const next = this.db
+      .prepare(
+        "SELECT MIN(CASE WHEN next_attempt_at > locked_until THEN next_attempt_at ELSE locked_until END) AS next_attempt_at FROM webhook_outbox",
+      )
+      .get() as { next_attempt_at: number | null };
+    return {
+      processed: due.length,
+      ...(next.next_attempt_at === null ? {} : { nextAttemptAt: next.next_attempt_at }),
+    };
+  }
+
   manifest(): Record<string, unknown> {
     return {
       name: "telegram",
@@ -381,6 +630,64 @@ export class TelegramDomain {
       chats: this.db.prepare("SELECT id, type, title FROM chats").all(),
       messages: this.db.prepare("SELECT chat_id, message_id, from_id, text, reply_to_message_id FROM messages").all(),
     };
+  }
+
+  private botId(actor: Actor): number {
+    if (actor.kind !== "bot") telegramFail(401, 401, "Unauthorized");
+    this.personFor(actor);
+    return actor.botId;
+  }
+
+  private settings(botId: number): {
+    bot_id: number;
+    next_update_id: number;
+    allowed_updates_json: string | null;
+    webhook_url: string | null;
+    webhook_secret_token: string | null;
+    webhook_max_connections: number;
+    last_error_date: number | null;
+    last_error_message: string | null;
+  } {
+    this.db.prepare("INSERT OR IGNORE INTO bot_update_settings (bot_id) VALUES (?)").run(botId);
+    return this.db.prepare("SELECT * FROM bot_update_settings WHERE bot_id = ?").get(botId) as {
+      bot_id: number;
+      next_update_id: number;
+      allowed_updates_json: string | null;
+      webhook_url: string | null;
+      webhook_secret_token: string | null;
+      webhook_max_connections: number;
+      last_error_date: number | null;
+      last_error_message: string | null;
+    };
+  }
+
+  private enqueueMessageUpdates(chatId: number, message: Record<string, unknown>, createdAt: number): number[] {
+    const bots = this.db
+      .prepare("SELECT b.id FROM bots b JOIN chat_members m ON m.user_id = b.id WHERE m.chat_id = ? ORDER BY b.id")
+      .all(chatId) as Array<{ id: number }>;
+    const emitted: number[] = [];
+    for (const bot of bots) {
+      const settings = this.settings(bot.id);
+      const allowed = settings.allowed_updates_json ? (JSON.parse(settings.allowed_updates_json) as string[]) : undefined;
+      if (allowed && !allowed.includes("message")) continue;
+      const updateId = settings.next_update_id;
+      const payload = { update_id: updateId, message };
+      this.db
+        .prepare("INSERT INTO bot_updates (bot_id, update_id, update_type, payload_json, created_at) VALUES (?, ?, 'message', ?, ?)")
+        .run(bot.id, updateId, JSON.stringify(payload), createdAt);
+      this.db.prepare("UPDATE bot_update_settings SET next_update_id = next_update_id + 1 WHERE bot_id = ?").run(bot.id);
+      if (settings.webhook_url) {
+        this.db
+          .prepare("INSERT INTO webhook_outbox (bot_id, update_id, attempts, next_attempt_at) VALUES (?, ?, 0, ?)")
+          .run(bot.id, updateId, createdAt);
+      }
+      emitted.push(bot.id);
+    }
+    return emitted;
+  }
+
+  private purgeExpiredUpdates(): void {
+    this.db.prepare("DELETE FROM bot_updates WHERE created_at <= ?").run(this.now() - UPDATE_RETENTION_SEC);
   }
 
   private userByAccount(account: string): { id: number; account: string } {

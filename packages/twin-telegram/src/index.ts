@@ -12,3 +12,9 @@ export {
 } from "./seed.js";
 export { executeTool, isMutatingTool, MUTATING_TOOL_NAMES, telegramToolFixture, toolSchemas } from "./tools.js";
 export { extractTelegramPathToken } from "./path-token.js";
+export {
+  UPDATE_RETENTION_SEC,
+  MAX_WEBHOOK_BATCH,
+  webhookUrlError,
+  type TelegramWebhookDelivery,
+} from "./updates.js";
