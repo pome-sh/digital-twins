@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
+import { createHash, randomUUID } from "node:crypto";
 import type { Context, Hono } from "hono";
-import type { RouteContext } from "@pome-sh/sdk";
+import type { RecorderHandle, RouteContext } from "@pome-sh/sdk";
 import type { StateDelta } from "@pome-sh/wire";
 import { mountDeclaredRoute } from "@pome-sh/sdk/route-inputs";
-import { MAX_MEDIA_UPLOAD_BYTES, type TelegramDomain } from "./domain.js";
+import { MAX_MEDIA_GROUP_UPLOAD_BYTES, MAX_MEDIA_UPLOAD_BYTES, type TelegramDomain } from "./domain.js";
 import { telegramFail } from "./errors.js";
 import {
   GET_CHAT,
@@ -62,13 +63,65 @@ async function mediaInput(value: unknown): Promise<string | { bytes: Buffer; fil
   };
 }
 
-function enforceUploadBodyLimit(c: Context): void {
+const MAX_MULTIPART_FRAMING_BYTES = 1024 * 1024;
+
+function enforceUploadBodyLimit(c: Context, uploadLimit = MAX_MEDIA_UPLOAD_BYTES): void {
   const length = Number(c.req.header("content-length") ?? 0);
-  // Multipart framing is small but not free; file bytes still have the strict
-  // 20 MiB domain limit after decoding.
-  if (Number.isFinite(length) && length > MAX_MEDIA_UPLOAD_BYTES + 1024 * 1024) {
+  // Multipart framing is small but not free. The decoded attachment bytes have
+  // their own domain limits, which also cover requests without Content-Length.
+  if (Number.isFinite(length) && length > uploadLimit + MAX_MULTIPART_FRAMING_BYTES) {
     telegramFail(413, 413, "Request Entity Too Large");
   }
+}
+
+function downloadMetadata(content: Buffer, mimeType: string | null): Record<string, string | number | null> {
+  return {
+    sha256: createHash("sha256").update(content).digest("hex"),
+    size: content.length,
+    mime_type: mimeType,
+  };
+}
+
+/**
+ * Raw byte downloads cannot use recorder.handle(), whose response path is JSON.
+ * Record only stable metadata and leave recorder.record() to apply its central
+ * token/header redaction before the event reaches any store.
+ */
+function recordDownload(
+  recorder: RecorderHandle,
+  c: Context,
+  runId: string,
+  started: number,
+  status: number,
+  responseBody: unknown,
+  error: string | null,
+): void {
+  const requestId = `req_${randomUUID()}`;
+  const stepId = c.req.header("x-pome-scenario-step-id") ?? null;
+  const correlationId = c.req.header("x-pome-correlation-id") ?? requestId;
+  recorder.record({
+    ts: new Date().toISOString(),
+    run_id: runId,
+    twin: "telegram",
+    request_id: requestId,
+    correlation_id: correlationId,
+    task_step_id: stepId,
+    scenario_step_id: stepId,
+    step_id: null,
+    tool_call_id: null,
+    method: c.req.method,
+    path: new URL(c.req.url).pathname,
+    request_body: null,
+    request_headers: c.req.header(),
+    tool: null,
+    status,
+    response_body: responseBody,
+    latency_ms: Date.now() - started,
+    fidelity: "semantic",
+    state_mutation: false,
+    state_delta: null,
+    error,
+  });
 }
 
 function captureDelta<T>(fn: (report: (delta: StateDelta) => void) => T): { value: T; delta: StateDelta } {
@@ -77,7 +130,7 @@ function captureDelta<T>(fn: (report: (delta: StateDelta) => void) => T): { valu
   return { value, delta };
 }
 
-export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteContext<TelegramDomain>): void {
+export function registerTelegramRoutes(app: Hono, { domain, recorder, runId }: RouteContext<TelegramDomain>): void {
   const getMe = recorder.handle({ mutation: false }, async (c) => {
     await GET_ME.parse(c.req);
     return { status: 200, body: telegramOk(domain.getMe(botActor(c))) };
@@ -151,7 +204,7 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     return { status: 200, body: telegramOk(result.value), delta: result.delta };
   }));
   mountDeclaredRoute(app, POST_SEND_MEDIA_GROUP, recorder.handle({ mutation: true }, async (c) => {
-    enforceUploadBodyLimit(c);
+    enforceUploadBodyLimit(c, MAX_MEDIA_GROUP_UPLOAD_BYTES);
     // Keep declaration parsing authoritative for named inputs. A clone preserves
     // multipart attachment fields, whose names are selected by attach:// in the
     // declared media JSON and therefore cannot be statically enumerated.
@@ -179,12 +232,16 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
   }));
   // Byte downloads have no Bot API JSON envelope, but their path is still declared.
   mountDeclaredRoute(app, GET_FILE_DOWNLOAD, async (c: Context) => {
+    const started = Date.now();
     try {
       const parsed = await GET_FILE_DOWNLOAD.parse(c.req);
       const file = domain.downloadFile(botActor(c), parsed.path.file_path);
+      recordDownload(recorder, c, runId, started, 200, { media: downloadMetadata(file.content, file.mimeType) }, null);
       return c.body(new Uint8Array(file.content), 200, file.mimeType ? { "content-type": file.mimeType } : undefined);
     } catch {
-      return c.json({ ok: false, error_code: 404, description: "Not Found" }, 404);
+      const body = { ok: false, error_code: 404, description: "Not Found" };
+      recordDownload(recorder, c, runId, started, 404, body, "Not Found");
+      return c.json(body, 404);
     }
   });
 

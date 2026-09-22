@@ -34,6 +34,8 @@ export const BOT_DELETE_WINDOW_SEC = 48 * 3600;
 export const CALLBACK_QUERY_TTL_SEC = 60;
 export const MAX_CALLBACK_DATA_BYTES = 64;
 export const MAX_MEDIA_UPLOAD_BYTES = 20 * 1024 * 1024;
+/** Total bytes uploaded as attachments in one multipart media album. */
+export const MAX_MEDIA_GROUP_UPLOAD_BYTES = 64 * 1024 * 1024;
 export const MEDIA_TTL_SEC = 24 * 3600;
 export const MAX_CAPTION_UTF16 = 1024;
 
@@ -293,9 +295,22 @@ export class TelegramDomain {
     const scopeId = this.mediaScope(actor);
     this.requireMember(actor, args.chat_id);
     if (args.media.length < 2 || args.media.length > 10) telegramFail(400, 400, "Bad Request: media group must include 2-10 items");
+    // Keep an explicit total even when an HTTP transport omits Content-Length.
+    // Stored file references contribute no request bytes; every uploaded file is
+    // still individually capped by resolveMedia below.
+    const uploadBytes = args.media.reduce(
+      (total, item) => total + (typeof item.media === "string" ? 0 : item.media.bytes.length),
+      0,
+    );
+    if (uploadBytes > MAX_MEDIA_GROUP_UPLOAD_BYTES) {
+      telegramFail(400, 400, `Bad Request: media group uploads must total at most ${MAX_MEDIA_GROUP_UPLOAD_BYTES} bytes`);
+    }
     // Resolve every reference before writing anything: a failed album is atomic.
     const resolved = args.media.map((item) => ({ ...item, caption: this.validateCaption(item.caption), resolved: this.resolveMedia(botId, scopeId, item.media) }));
-    const mediaGroupId = `album:${botId}:${this.now()}:${createHash("sha256").update(JSON.stringify(resolved.map((item) => item.type))).digest("hex").slice(0, 12)}`;
+    // The next message id distinguishes otherwise identical albums submitted in
+    // the same second by the same bot.
+    const firstMessageId = (this.db.prepare("SELECT next_message_id AS next FROM chats WHERE id = ?").get(args.chat_id) as { next: number }).next;
+    const mediaGroupId = `album:${botId}:${this.now()}:${args.chat_id}:${firstMessageId}`;
     const result = this.db.transaction(() => resolved.map((item) => {
       const file = this.persistMedia(botId, scopeId, item.resolved);
       return this.insertMediaMessage(actor, args.chat_id, item.type, file, item.caption, mediaGroupId);
