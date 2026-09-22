@@ -119,7 +119,7 @@ export function telegramTwinDefinition(
       extractPathToken: extractTelegramPathToken,
       tokenResolvers: [extractTelegramPathToken],
       resolveCredential: (token, c) => {
-        const found = new TelegramDomain(db).lookupBotToken(token);
+        const found = new TelegramDomain(db, undefined, undefined, false).lookupBotToken(token);
         if (!found) return undefined;
         const pathSid = telegramPathIdentity(c).sid;
         return pathSid ? { ...found, sid: pathSid } : found;

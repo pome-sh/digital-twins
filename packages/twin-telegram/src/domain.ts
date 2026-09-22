@@ -38,9 +38,10 @@ export class TelegramDomain {
     readonly db: TelegramTwinDatabase,
     readonly now: () => number = () => Math.floor(Date.now() / 1000),
     private readonly localWebhookUrls: ReadonlySet<string> = new Set(),
+    registerRuntime = true,
   ) {
     this.runtime = telegramUpdateRuntime(db);
-    this.runtime.registerDispatcher(() => this.flushWebhookOutbox(), now);
+    if (registerRuntime) this.runtime.registerDispatcher(() => this.flushWebhookOutbox(), now);
   }
 
   seed(input: TelegramSeed | unknown): void {
@@ -518,6 +519,7 @@ export class TelegramDomain {
     delivery: TelegramWebhookDelivery | undefined = this.runtime.getDelivery(),
   ): Promise<WebhookDrainResult> {
     this.purgeExpiredUpdates();
+    const generation = this.runtime.currentGeneration();
     const now = this.now();
     const due = this.db
       .prepare(
@@ -555,6 +557,9 @@ export class TelegramDomain {
       } catch {
         failure = "delivery_failed";
       }
+      // Reset can occur while an injected receiver is pending. Its completion
+      // must not acknowledge a new row that reused this bot/update id.
+      if (!this.runtime.isCurrentGeneration(generation)) return { processed: 0 };
       if (!failure) {
         this.db.transaction(() => {
           this.db.prepare("DELETE FROM webhook_outbox WHERE bot_id = ? AND update_id = ?").run(item.bot_id, item.update_id);

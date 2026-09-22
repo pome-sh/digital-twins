@@ -253,6 +253,98 @@ describe("controlled webhook outbox", () => {
     expect(domain.getWebhookInfo(BOT).pending_update_count).toBe(0);
   });
 
+  it("keeps the configured injected clock after auth lookup domains and does not wall-time retry while frozen", async () => {
+    const now = 1_700_000_000;
+    const db = openTelegramTwinDatabase(":memory:");
+    const localUrl = "http://127.0.0.1:8824/frozen-clock";
+    let attempts = 0;
+    const app = createTelegramTwinApp({
+      db,
+      now: () => now,
+      seed: defaultSeedState(),
+      webhookFixtures: {
+        [localUrl]: async () => {
+          attempts += 1;
+          return { status: 503 };
+        },
+      },
+    });
+    await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/setWebhook`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: localUrl }),
+    });
+    // Auth above and this helper domain must not replace the configured clock.
+    const domain = new TelegramDomain(db, () => now, new Set(), false);
+    userMessage(domain, "frozen clock");
+    const firstDeadline = Date.now() + 500;
+    while (attempts < 1 && Date.now() < firstDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(attempts).toBe(1);
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
+    expect(attempts).toBe(1);
+  });
+
+  it("does not let a pre-reset receiver acknowledge a reused update id", async () => {
+    const db = openTelegramTwinDatabase(":memory:");
+    const localUrl = "http://127.0.0.1:8825/reset";
+    let calls = 0;
+    let resolveFirst: ((result: { status: number }) => void) | undefined;
+    let resolveSecond: ((result: { status: number }) => void) | undefined;
+    let firstStarted: (() => void) | undefined;
+    let secondStarted: (() => void) | undefined;
+    const first = new Promise<void>((resolve) => {
+      firstStarted = resolve;
+    });
+    const second = new Promise<void>((resolve) => {
+      secondStarted = resolve;
+    });
+    const app = createTelegramTwinApp({
+      db,
+      seed: defaultSeedState(),
+      webhookFixtures: {
+        [localUrl]: async () => {
+          calls += 1;
+          if (calls === 1) {
+            firstStarted!();
+            return new Promise((resolve) => {
+              resolveFirst = resolve;
+            });
+          }
+          secondStarted!();
+          return new Promise((resolve) => {
+            resolveSecond = resolve;
+          });
+        },
+      },
+    });
+    await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/setWebhook`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: localUrl }),
+    });
+    const domain = new TelegramDomain(db);
+    userMessage(domain, "before reset");
+    await first;
+    domain.seed(defaultSeedState());
+    await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/setWebhook`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: localUrl }),
+    });
+    userMessage(domain, "after reset");
+    resolveFirst!({ status: 204 });
+    await second;
+    expect(domain.getWebhookInfo(BOT).pending_update_count).toBe(1);
+    resolveSecond!({ status: 204 });
+    const deadline = Date.now() + 500;
+    while (domain.getWebhookInfo(BOT).pending_update_count !== 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(domain.getWebhookInfo(BOT).pending_update_count).toBe(0);
+  });
+
   it("handles no more than eight due rows in one direct outbox flush", async () => {
     const now = 1_700_000_000;
     const { db, domain } = fresh(() => now);

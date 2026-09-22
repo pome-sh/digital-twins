@@ -28,6 +28,7 @@ export class TelegramUpdateRuntime {
   private draining = false;
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
   private retryAt: number | undefined;
+  private generation = 0;
 
   constructor(
     readonly db: TelegramTwinDatabase,
@@ -43,8 +44,19 @@ export class TelegramUpdateRuntime {
   }
 
   registerDispatcher(dispatcher: () => Promise<WebhookDrainResult>, now: () => number): void {
+    // One domain owns the runtime clock and drain callback for this database.
+    // Read-only helper domains (notably auth lookups) must not replace it.
+    if (this.dispatcher) return;
     this.dispatcher = dispatcher;
     this.now = now;
+  }
+
+  currentGeneration(): number {
+    return this.generation;
+  }
+
+  isCurrentGeneration(generation: number): boolean {
+    return generation === this.generation;
   }
 
   notify(botId: number): void {
@@ -53,6 +65,7 @@ export class TelegramUpdateRuntime {
   }
 
   cancelAll(): void {
+    this.generation += 1;
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = undefined;
     this.retryAt = undefined;
@@ -90,9 +103,16 @@ export class TelegramUpdateRuntime {
   private scheduleDrain(): void {
     if (this.draining || !this.dispatcher) return;
     this.draining = true;
+    const generation = this.generation;
     queueMicrotask(() => {
       void this.dispatcher!().then((result) => {
         this.draining = false;
+        // A reset may have replaced every durable row while this delivery was
+        // in flight. Start a fresh drain for the new generation only.
+        if (!this.isCurrentGeneration(generation)) {
+          this.scheduleDrain();
+          return;
+        }
         // A full pass may have left due rows behind. Schedule one more bounded
         // pass; failed rows have moved into the future and stop this chain.
         if (result.processed >= MAX_WEBHOOK_BATCH) this.scheduleDrain();
@@ -107,10 +127,15 @@ export class TelegramUpdateRuntime {
     if (this.retryAt !== undefined && this.retryAt <= nextAttemptAt) return;
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryAt = nextAttemptAt;
+    const generation = this.generation;
     const delayMs = Math.max(0, nextAttemptAt - this.now()) * 1000;
     this.retryTimer = setTimeout(() => {
       this.retryTimer = undefined;
       this.retryAt = undefined;
+      if (!this.isCurrentGeneration(generation)) return;
+      // A custom clock can remain frozen while host time advances. Do not spin
+      // a wall-time retry loop before the durable logical due time.
+      if (this.now() < nextAttemptAt) return;
       this.scheduleDrain();
     }, delayMs);
   }
