@@ -31,6 +31,31 @@ type PersonRow = { id: number; first_name: string; username: string | null; is_b
 
 export const BOT_DELETE_WINDOW_SEC = 48 * 3600;
 export const CALLBACK_QUERY_TTL_SEC = 60;
+export const MAX_CALLBACK_DATA_BYTES = 64;
+export const MAX_POLL_QUESTION_LENGTH = 300;
+export const MAX_POLL_OPTION_LENGTH = 100;
+export const MIN_POLL_OPTIONS = 2;
+export const MAX_POLL_OPTIONS = 10;
+
+export function isCallbackData(value: string): boolean {
+  return value.length > 0 && Buffer.byteLength(value, "utf8") <= MAX_CALLBACK_DATA_BYTES;
+}
+
+function validatePoll(question: string, options: string[]): void {
+  if (
+    question.length === 0 ||
+    question.length > MAX_POLL_QUESTION_LENGTH ||
+    options.length < MIN_POLL_OPTIONS ||
+    options.length > MAX_POLL_OPTIONS ||
+    options.some((option) => option.length === 0 || option.length > MAX_POLL_OPTION_LENGTH)
+  ) {
+    telegramFail(
+      400,
+      400,
+      `Bad Request: poll question (1-${MAX_POLL_QUESTION_LENGTH} characters) and ${MIN_POLL_OPTIONS}-${MAX_POLL_OPTIONS} options (1-${MAX_POLL_OPTION_LENGTH} characters) are required`,
+    );
+  }
+}
 
 type ReplyMarkup =
   | { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> }
@@ -350,7 +375,7 @@ export class TelegramDomain {
   sendPoll(actor: Actor, args: { chat_id: number; question: string; options: string[]; is_anonymous?: boolean; allows_multiple_answers?: boolean }, delta: DeltaHook = NOOP): Record<string, unknown> {
     const botId = this.botId(actor);
     this.requireMember(actor, args.chat_id);
-    if (!args.question || args.options.length < 2 || args.options.length > 10 || args.options.some((option) => !option)) telegramFail(400, 400, "Bad Request: poll question and 2 to 10 non-empty options are required");
+    validatePoll(args.question, args.options);
     const now = this.now();
     const message = this.sendMessage(actor, { chat_id: args.chat_id, text: args.question }, delta);
     const messageId = message.message_id as number;
@@ -363,7 +388,7 @@ export class TelegramDomain {
   createPollForUser(account: string, args: { chat_id: number; question: string; options: string[]; is_anonymous?: boolean; allows_multiple_answers?: boolean }, delta: DeltaHook = NOOP): Record<string, unknown> {
     const actor: Actor = { kind: "user", account };
     this.requireMember(actor, args.chat_id);
-    if (!args.question || args.options.length < 2 || args.options.length > 10 || args.options.some((option) => !option)) telegramFail(400, 400, "Bad Request: poll question and 2 to 10 non-empty options are required");
+    validatePoll(args.question, args.options);
     const message = this.sendMessage(actor, { chat_id: args.chat_id, text: args.question }, delta);
     const messageId = message.message_id as number;
     const pollId = `poll:${args.chat_id}:${messageId}`;
@@ -443,7 +468,7 @@ export class TelegramDomain {
   async waitForCallbackAnswer(callbackId: string, timeoutSeconds: number, signal?: AbortSignal): Promise<{ callback_query_id: string; answered: boolean }> {
     const read = () => this.db.prepare("SELECT expires_at, answered_at FROM callback_queries WHERE callback_id = ?").get(callbackId) as { expires_at: number; answered_at: number | null } | undefined;
     const current = read();
-    if (!current || current.expires_at < this.now()) telegramFail(400, 400, "Bad Request: query is too old or invalid");
+    if (!current || current.expires_at <= this.now()) telegramFail(400, 400, "Bad Request: query is too old or invalid");
     if (current.answered_at !== null) return { callback_query_id: callbackId, answered: true };
     const bounded = Math.min(Math.max(timeoutSeconds, 0), CALLBACK_QUERY_TTL_SEC);
     if (bounded === 0 || signal?.aborted) return { callback_query_id: callbackId, answered: false };
@@ -466,13 +491,14 @@ export class TelegramDomain {
     });
   }
 
-  answerCallbackQuery(actor: Actor, args: { callback_query_id: string; text?: string; show_alert?: boolean; url?: string; cache_time?: number }): { ok: true } {
+  answerCallbackQuery(actor: Actor, args: { callback_query_id: string; text?: string; show_alert?: boolean; url?: string; cache_time?: number }, delta: DeltaHook = NOOP): { ok: true } {
     const botId = this.botId(actor);
     const query = this.db.prepare("SELECT * FROM callback_queries WHERE callback_id = ?").get(args.callback_query_id) as { bot_id: number; expires_at: number; answered_at: number | null } | undefined;
     if (!query || query.bot_id !== botId) telegramFail(400, 400, "Bad Request: query is too old or invalid");
-    if (query.expires_at < this.now() || query.answered_at !== null) telegramFail(400, 400, "Bad Request: query is too old or invalid");
-    const changed = this.db.prepare("UPDATE callback_queries SET answered_at = ?, answer_json = ? WHERE callback_id = ? AND answered_at IS NULL AND expires_at >= ?").run(this.now(), JSON.stringify(args), args.callback_query_id, this.now());
+    if (query.expires_at <= this.now() || query.answered_at !== null) telegramFail(400, 400, "Bad Request: query is too old or invalid");
+    const changed = this.db.prepare("UPDATE callback_queries SET answered_at = ?, answer_json = ? WHERE callback_id = ? AND answered_at IS NULL AND expires_at > ?").run(this.now(), JSON.stringify(args), args.callback_query_id, this.now());
     if (changed.changes !== 1) telegramFail(400, 400, "Bad Request: query is too old or invalid");
+    delta({ before: { callback_query_id: args.callback_query_id, answered: false }, after: { callback_query_id: args.callback_query_id, answered: true } });
     for (const wake of this.callbackWaiters.get(args.callback_query_id) ?? []) wake();
     return { ok: true };
   }
@@ -685,6 +711,7 @@ export class TelegramDomain {
       max_connections?: number;
       drop_pending_updates?: boolean;
     },
+    delta: DeltaHook = NOOP,
   ): { ok: true } {
     const botId = this.botId(actor);
     const urlError = webhookUrlError(args.url, this.localWebhookUrls);
@@ -715,10 +742,11 @@ export class TelegramDomain {
       }
     })();
     this.runtime.notify(botId);
+    delta({ before: null, after: { bot_id: botId, webhook_url: args.url } });
     return { ok: true };
   }
 
-  deleteWebhook(actor: Actor, args: { drop_pending_updates?: boolean }): { ok: true } {
+  deleteWebhook(actor: Actor, args: { drop_pending_updates?: boolean }, delta: DeltaHook = NOOP): { ok: true } {
     const botId = this.botId(actor);
     // A preserved update can reuse the same id after a reset. Invalidate an
     // in-flight receiver before removing its outbox claim either way.
@@ -732,6 +760,7 @@ export class TelegramDomain {
       if (args.drop_pending_updates) this.db.prepare("DELETE FROM bot_updates WHERE bot_id = ?").run(botId);
     })();
     this.runtime.notify(botId);
+    delta({ before: { bot_id: botId, webhook_url: true }, after: null });
     return { ok: true };
   }
 
@@ -1044,7 +1073,7 @@ export class TelegramDomain {
         const button = item as Record<string, unknown>;
         if (!inline) return { text: button.text as string };
         if (typeof button.callback_data !== "string" || Object.keys(button).some((key) => key !== "text" && key !== "callback_data")) telegramFail(400, 400, "Bad Request: unsupported inline button");
-        if (Buffer.byteLength(button.callback_data, "utf8") > 64) telegramFail(400, 400, "Bad Request: callback_data is too long");
+        if (!isCallbackData(button.callback_data)) telegramFail(400, 400, "Bad Request: callback_data must be non-empty UTF-8 and at most 64 bytes");
         return { text: button.text as string, callback_data: button.callback_data };
       }));
     };
@@ -1057,7 +1086,7 @@ export class TelegramDomain {
     if (value === undefined || value === null || (Array.isArray(value) && value.length === 0)) return undefined;
     if (!Array.isArray(value) || value.length !== 1 || !value[0] || typeof value[0] !== "object") telegramFail(400, 400, "Bad Request: unsupported reaction");
     const reaction = value[0] as Record<string, unknown>;
-    if (reaction.type !== "emoji" || typeof reaction.emoji !== "string" || Object.keys(reaction).some((key) => key !== "type" && key !== "emoji")) telegramFail(400, 400, "Bad Request: unsupported reaction");
+    if (reaction.type !== "emoji" || typeof reaction.emoji !== "string" || reaction.emoji.length === 0 || Object.keys(reaction).some((key) => key !== "type" && key !== "emoji")) telegramFail(400, 400, "Bad Request: unsupported reaction");
     return reaction.emoji;
   }
 

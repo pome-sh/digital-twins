@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { createRecorderStore } from "@pome-sh/sdk/server";
 import { describe, expect, it } from "vitest";
 import { openTelegramTwinDatabase } from "../src/db.js";
 import { CALLBACK_QUERY_TTL_SEC, TelegramDomain } from "../src/domain.js";
@@ -51,9 +52,10 @@ describe("interaction state", () => {
     expect(domain.answerCallbackQuery(BOT, { callback_query_id: pressed.callback_query_id })).toEqual({ ok: true });
     expect(() => domain.answerCallbackQuery(BOT, { callback_query_id: pressed.callback_query_id })).toThrow(/too old/);
     const again = domain.pressInlineButton("alice", { chat_id: 2001, message_id: 1, callback_data: "go" });
-    now += CALLBACK_QUERY_TTL_SEC + 1;
+    now += CALLBACK_QUERY_TTL_SEC;
     expect(() => domain.answerCallbackQuery(BOT, { callback_query_id: again.callback_query_id })).toThrow(/too old/);
-    expect(() => domain.sendMessage(BOT, { chat_id: 2001, text: "bad", reply_markup: { inline_keyboard: [[{ text: "x", callback_data: "é".repeat(33) }]] } })).toThrow(/too long/);
+    expect(() => domain.sendMessage(BOT, { chat_id: 2001, text: "bad", reply_markup: { inline_keyboard: [[{ text: "x", callback_data: "" }]] } })).toThrow(/non-empty/);
+    expect(() => domain.sendMessage(BOT, { chat_id: 2001, text: "bad", reply_markup: { inline_keyboard: [[{ text: "x", callback_data: "é".repeat(33) }]] } })).toThrow(/non-empty UTF-8/);
   });
 
   it("waits for a concurrent bot callback answer without a database transaction held open", async () => {
@@ -69,11 +71,65 @@ describe("interaction state", () => {
   it("turns reply keyboard taps into user messages and removes markup", () => {
     const { domain } = fresh();
     const sent = domain.sendMessage(BOT, { chat_id: 2001, text: "reply", reply_markup: { keyboard: [["yes"]] } });
+    expect(sent).toMatchObject({ reply_markup: { keyboard: [[{ text: "yes" }]] } });
     const reply = domain.pressReplyKeyboard("alice", { chat_id: 2001, message_id: sent.message_id as number, text: "yes" });
     expect(reply.text).toBe("yes");
     expect(domain.getUpdates(BOT, { allowed_updates: ["callback_query"] })[0]).toMatchObject({ message: { text: "yes" } });
     domain.editMessageReplyMarkup(BOT, { chat_id: 2001, message_id: 1, reply_markup: null });
     expect(() => domain.pressReplyKeyboard("alice", { chat_id: 2001, message_id: 1, text: "yes" })).toThrow(/not found/);
+  });
+
+  it("serializes reply keyboards as Bot API keyboard in updates", () => {
+    const { domain } = fresh();
+    domain.sendMessage({ kind: "user", account: "alice" }, {
+      chat_id: 2001,
+      text: "choose",
+      reply_markup: { keyboard: [["yes"]] },
+    });
+    expect(domain.getUpdates(BOT, {})[0]).toMatchObject({
+      message: { reply_markup: { keyboard: [[{ text: "yes" }]] } },
+    });
+  });
+
+  it("rejects the shared poll and reaction boundaries through the Bot API", async () => {
+    const app = createTelegramTwinApp({ seed: defaultSeedState() });
+    const tooLongQuestion = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendPoll`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: 2001, question: "q".repeat(301), options: ["A", "B"] }),
+    });
+    expect(tooLongQuestion.status).toBe(400);
+    const tooLongOption = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendPoll`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: 2001, question: "Pick", options: ["A".repeat(101), "B"] }),
+    });
+    expect(tooLongOption.status).toBe(400);
+    await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: 2001, text: "reaction target" }),
+    });
+    const emptyReaction = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/setMessageReaction`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: 2001, message_id: 1, reaction: [{ type: "emoji", emoji: "" }] }),
+    });
+    expect(emptyReaction.status).toBe(400);
+  });
+
+  it("records an HTTP mutation state delta", async () => {
+    const recorder = createRecorderStore();
+    const app = createTelegramTwinApp({ seed: defaultSeedState(), recorder, runId: "telegram-delta" });
+    const response = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: 2001, text: "record me" }),
+    });
+    expect(response.status).toBe(200);
+    const event = recorder.events().at(-1);
+    expect(event?.state_mutation).toBe(true);
+    expect(event?.state_delta).toMatchObject({ before: null, after: { chat_id: 2001, text: "record me" } });
   });
 
   it("isolates reactions and polls to their owning bot and handles vote changes and closure", () => {

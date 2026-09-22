@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { Context, Hono } from "hono";
 import type { RouteContext } from "@pome-sh/sdk";
+import type { StateDelta } from "@pome-sh/wire";
 import { mountDeclaredRoute } from "@pome-sh/sdk/route-inputs";
 import type { TelegramDomain } from "./domain.js";
 import {
@@ -35,6 +36,12 @@ function botActor(c: Context): { kind: "bot"; botId: number } {
   const session = c.get("session") as { bot_id?: unknown } | undefined;
   const botId = typeof session?.bot_id === "number" ? session.bot_id : Number(session?.bot_id);
   return { kind: "bot", botId };
+}
+
+function captureDelta<T>(fn: (report: (delta: StateDelta) => void) => T): { value: T; delta: StateDelta } {
+  let delta: StateDelta = null;
+  const value = fn((next) => { delta = next; });
+  return { value, delta };
 }
 
 export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteContext<TelegramDomain>): void {
@@ -74,56 +81,61 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     POST_SEND_MESSAGE,
     recorder.handle({ mutation: true }, async (c) => {
       const parsed = await POST_SEND_MESSAGE.parse(c.req);
-      return {
-        status: 200,
-        body: telegramOk(
-          domain.sendMessage(botActor(c), {
+      const result = captureDelta((report) =>
+        domain.sendMessage(
+          botActor(c),
+          {
             chat_id: parsed.body.chat_id,
             text: parsed.body.text,
             reply_to_message_id: parsed.body.reply_to_message_id,
             reply_markup: parsed.body.reply_markup,
-          }),
+          },
+          report,
         ),
-      };
+      );
+      return { status: 200, body: telegramOk(result.value), delta: result.delta };
     }),
   );
 
   mountDeclaredRoute(app, POST_EDIT_MESSAGE_REPLY_MARKUP, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_EDIT_MESSAGE_REPLY_MARKUP.parse(c.req);
-    return { status: 200, body: telegramOk(domain.editMessageReplyMarkup(botActor(c), parsed.body)) };
+    const result = captureDelta((report) => domain.editMessageReplyMarkup(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(result.value), delta: result.delta };
   }));
   mountDeclaredRoute(app, POST_PIN_CHAT_MESSAGE, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_PIN_CHAT_MESSAGE.parse(c.req);
-    domain.pinChatMessage(botActor(c), parsed.body);
-    return { status: 200, body: telegramOk(true) };
+    const result = captureDelta((report) => domain.pinChatMessage(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(result.value), delta: result.delta };
   }));
   mountDeclaredRoute(app, POST_UNPIN_CHAT_MESSAGE, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_UNPIN_CHAT_MESSAGE.parse(c.req);
-    domain.unpinChatMessage(botActor(c), parsed.body);
-    return { status: 200, body: telegramOk(true) };
+    const result = captureDelta((report) => domain.unpinChatMessage(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(result.value), delta: result.delta };
   }));
   mountDeclaredRoute(app, POST_UNPIN_ALL_CHAT_MESSAGES, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_UNPIN_ALL_CHAT_MESSAGES.parse(c.req);
-    domain.unpinAllChatMessages(botActor(c), parsed.body);
-    return { status: 200, body: telegramOk(true) };
+    const result = captureDelta((report) => domain.unpinAllChatMessages(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(result.value), delta: result.delta };
   }));
   mountDeclaredRoute(app, POST_ANSWER_CALLBACK_QUERY, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_ANSWER_CALLBACK_QUERY.parse(c.req);
-    domain.answerCallbackQuery(botActor(c), parsed.body);
-    return { status: 200, body: telegramOk(true) };
+    const result = captureDelta((report) => domain.answerCallbackQuery(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(result.value), delta: result.delta };
   }));
   mountDeclaredRoute(app, POST_SEND_POLL, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_SEND_POLL.parse(c.req);
-    return { status: 200, body: telegramOk(domain.sendPoll(botActor(c), parsed.body)) };
+    const result = captureDelta((report) => domain.sendPoll(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(result.value), delta: result.delta };
   }));
   mountDeclaredRoute(app, POST_STOP_POLL, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_STOP_POLL.parse(c.req);
-    return { status: 200, body: telegramOk(domain.stopPoll(botActor(c), parsed.body)) };
+    const result = captureDelta((report) => domain.stopPoll(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(result.value), delta: result.delta };
   }));
   mountDeclaredRoute(app, POST_SET_MESSAGE_REACTION, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_SET_MESSAGE_REACTION.parse(c.req);
-    domain.setMessageReaction(botActor(c), parsed.body);
-    return { status: 200, body: telegramOk(true) };
+    const result = captureDelta((report) => domain.setMessageReaction(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(result.value), delta: result.delta };
   }));
 
   mountDeclaredRoute(
@@ -131,7 +143,8 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     POST_EDIT_MESSAGE_TEXT,
     recorder.handle({ mutation: true }, async (c) => {
       const parsed = await POST_EDIT_MESSAGE_TEXT.parse(c.req);
-      return { status: 200, body: telegramOk(domain.editMessageText(botActor(c), parsed.body)) };
+      const result = captureDelta((report) => domain.editMessageText(botActor(c), parsed.body, report));
+      return { status: 200, body: telegramOk(result.value), delta: result.delta };
     }),
   );
   mountDeclaredRoute(
@@ -139,8 +152,8 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     POST_DELETE_MESSAGE,
     recorder.handle({ mutation: true }, async (c) => {
       const parsed = await POST_DELETE_MESSAGE.parse(c.req);
-      domain.deleteMessage(botActor(c), parsed.body);
-      return { status: 200, body: telegramOk(true) };
+      const result = captureDelta((report) => domain.deleteMessage(botActor(c), parsed.body, report));
+      return { status: 200, body: telegramOk(result.value), delta: result.delta };
     }),
   );
   mountDeclaredRoute(
@@ -148,8 +161,8 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     POST_DELETE_MESSAGES,
     recorder.handle({ mutation: true }, async (c) => {
       const parsed = await POST_DELETE_MESSAGES.parse(c.req);
-      domain.deleteMessages(botActor(c), parsed.body);
-      return { status: 200, body: telegramOk(true) };
+      const result = captureDelta((report) => domain.deleteMessages(botActor(c), parsed.body, report));
+      return { status: 200, body: telegramOk(result.value), delta: result.delta };
     }),
   );
   mountDeclaredRoute(
@@ -157,7 +170,8 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     POST_FORWARD_MESSAGE,
     recorder.handle({ mutation: true }, async (c) => {
       const parsed = await POST_FORWARD_MESSAGE.parse(c.req);
-      return { status: 200, body: telegramOk(domain.forwardMessage(botActor(c), parsed.body)) };
+      const result = captureDelta((report) => domain.forwardMessage(botActor(c), parsed.body, report));
+      return { status: 200, body: telegramOk(result.value), delta: result.delta };
     }),
   );
   mountDeclaredRoute(
@@ -165,7 +179,8 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     POST_COPY_MESSAGE,
     recorder.handle({ mutation: true }, async (c) => {
       const parsed = await POST_COPY_MESSAGE.parse(c.req);
-      return { status: 200, body: telegramOk(domain.copyMessage(botActor(c), parsed.body)) };
+      const result = captureDelta((report) => domain.copyMessage(botActor(c), parsed.body, report));
+      return { status: 200, body: telegramOk(result.value), delta: result.delta };
     }),
   );
 
@@ -194,8 +209,8 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     POST_SET_WEBHOOK,
     recorder.handle({ mutation: true }, async (c) => {
       const parsed = await POST_SET_WEBHOOK.parse(c.req);
-      domain.setWebhook(botActor(c), parsed.body);
-      return { status: 200, body: telegramOk(true) };
+      const result = captureDelta((report) => domain.setWebhook(botActor(c), parsed.body, report));
+      return { status: 200, body: telegramOk(result.value), delta: result.delta };
     }),
   );
   mountDeclaredRoute(
@@ -203,8 +218,8 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     POST_DELETE_WEBHOOK,
     recorder.handle({ mutation: true }, async (c) => {
       const parsed = await POST_DELETE_WEBHOOK.parse(c.req);
-      domain.deleteWebhook(botActor(c), parsed.body);
-      return { status: 200, body: telegramOk(true) };
+      const result = captureDelta((report) => domain.deleteWebhook(botActor(c), parsed.body, report));
+      return { status: 200, body: telegramOk(result.value), delta: result.delta };
     }),
   );
   const getWebhookInfo = async (c: Context) => ({

@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from "zod";
 import { routeInputDeclarer, type RouteInputDeclaration } from "@pome-sh/sdk/route-inputs";
+import {
+  MAX_POLL_OPTION_LENGTH,
+  MAX_POLL_QUESTION_LENGTH,
+  MAX_POLL_OPTIONS,
+  MIN_POLL_OPTIONS,
+} from "./domain.js";
 
 const declareInputs = routeInputDeclarer("ignore");
 
@@ -130,7 +136,7 @@ export const POST_SEND_POLL = declareInputs({
   method: "POST",
   path: "/:cred{bot[^/]+}/sendPoll",
   pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), question: z.string(), options: z.preprocess((value) => { if (typeof value !== "string") return value; try { return JSON.parse(value); } catch { return value; } }, z.array(z.string())), is_anonymous: z.coerce.boolean().optional(), allows_multiple_answers: z.coerce.boolean().optional(), allow_paid_broadcast: z.never().optional(), business_connection_id: z.never().optional(), message_effect_id: z.never().optional(), type: z.never().optional(), correct_option_id: z.never().optional(), explanation: z.never().optional() },
+  body: { chat_id: z.coerce.number().int(), question: z.string().min(1).max(MAX_POLL_QUESTION_LENGTH), options: z.preprocess((value) => { if (typeof value !== "string") return value; try { return JSON.parse(value); } catch { return value; } }, z.array(z.string().min(1).max(MAX_POLL_OPTION_LENGTH)).min(MIN_POLL_OPTIONS).max(MAX_POLL_OPTIONS)), is_anonymous: z.coerce.boolean().optional(), allows_multiple_answers: z.coerce.boolean().optional(), allow_paid_broadcast: z.never().optional(), business_connection_id: z.never().optional(), message_effect_id: z.never().optional(), type: z.never().optional(), correct_option_id: z.never().optional(), explanation: z.never().optional() },
   bodyEncoding: "form",
 });
 

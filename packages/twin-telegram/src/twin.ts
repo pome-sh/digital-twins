@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z, ZodError } from "zod";
-import {
-  defineTwin,
-  deriveMcpToolTable,
-  type McpToolImplementation,
-  type ToolCallContext,
-  type TwinDefinition,
-} from "@pome-sh/sdk";
+import { defineTwin, type TwinDefinition } from "@pome-sh/sdk";
 import { createApp, type RecorderStore } from "@pome-sh/sdk/server";
 import type { Hono } from "hono";
 import { openTelegramTwinDatabase, type TelegramTwinDatabase } from "./db.js";
@@ -16,7 +10,6 @@ import { extractTelegramPathToken, telegramPathIdentity } from "./path-token.js"
 import { registerTelegramRoutes } from "./routes.js";
 import { defaultSeedState, parseSeed, type TelegramSeed } from "./seed.js";
 import { telegramError } from "./serializers.js";
-import { executeTool, isMutatingTool, telegramToolFixture, toolSchemas } from "./tools.js";
 import { unsupportedEnvelope } from "./unsupported-envelope.js";
 import { isLoopbackWebhookUrl, telegramUpdateRuntime, type TelegramWebhookDelivery } from "./updates.js";
 
@@ -44,18 +37,6 @@ function telegramErrorEnvelope(err: unknown): { status: number; body: unknown } 
     body: telegramError(500, err instanceof Error ? err.message : "internal_error"),
   };
 }
-
-const implementations = Object.fromEntries(
-  Object.entries(toolSchemas).map(([name, schema]) => [
-    name,
-    {
-      schema: schema as unknown as z.ZodType<unknown>,
-      mutation: isMutatingTool(name),
-      handler: (domain: TelegramDomain, args: unknown, ctx: ToolCallContext) =>
-        executeTool(domain, name, args as Record<string, unknown>, ctx),
-    },
-  ]),
-) as Record<string, McpToolImplementation<TelegramDomain>>;
 
 export type TelegramTwinRuntimeOptions = {
   now?: () => number;
@@ -109,7 +90,10 @@ export function telegramTwinDefinition(
       errorEnvelope: (err) => telegramErrorEnvelope(err),
       forbidden: () => ({ status: 403, body: telegramError(403, "Forbidden") }),
     },
-    tools: deriveMcpToolTable(telegramToolFixture, implementations),
+    // Telegram's upstream tools/list is explicitly deferred in
+    // fixtures/mcp-tools-list/telegram.status.json; serve no MCP operations
+    // until compliant bytes can be captured without TDLib credentials.
+    tools: [],
     healthz: () => ({}),
     unsupported: () => unsupportedEnvelope,
     errorEnvelope: telegramErrorEnvelope,

@@ -55,6 +55,17 @@ export function serializeChat(row: ChatRow): Record<string, unknown> {
   };
 }
 
+function serializeReplyMarkup(raw: string): unknown {
+  const markup = JSON.parse(raw) as Record<string, unknown>;
+  // The domain distinguishes reply keyboards from inline keyboards so their
+  // interactions remain different, while Bot API wire uses `keyboard`.
+  if ("reply_keyboard" in markup) {
+    const { reply_keyboard, ...rest } = markup;
+    return { ...rest, keyboard: reply_keyboard };
+  }
+  return markup;
+}
+
 export function serializeMessage(
   row: MessageRow,
   from: UserRow,
@@ -71,6 +82,6 @@ export function serializeMessage(
     ...(row.forward_from_id
       ? { forward_from: { id: row.forward_from_id }, forward_from_chat_id: row.forward_from_chat_id }
       : {}),
-    ...(row.reply_markup_json ? { reply_markup: JSON.parse(row.reply_markup_json) as unknown } : {}),
+    ...(row.reply_markup_json ? { reply_markup: serializeReplyMarkup(row.reply_markup_json) } : {}),
   };
 }

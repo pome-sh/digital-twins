@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-import { createRecorderStore } from "@pome-sh/sdk/server";
 import { sign } from "hono/jwt";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTelegramTwinApp } from "../src/twin.js";
@@ -27,18 +26,8 @@ function fresh() {
   const db = openTelegramTwinDatabase(":memory:");
   const domain = new TelegramDomain(db);
   domain.seed(defaultSeedState());
-  const recorder = createRecorderStore();
-  const app = createTelegramTwinApp({ db, recorder, runId: "test", seed: defaultSeedState() });
-  return { db, domain, recorder, app };
-}
-
-async function mcp(app: ReturnType<typeof createTelegramTwinApp>, token: string, body: unknown) {
-  const res = await app.request(`/s/${sid}/mcp`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+  const app = createTelegramTwinApp({ db, runId: "test", seed: defaultSeedState() });
+  return { db, domain, app };
 }
 
 describe("seed", () => {
@@ -160,121 +149,6 @@ describe("HTTP path token", () => {
     });
     expect(sent.status).toBe(200);
     expect(JSON.stringify(await sent.json())).toContain("café 你好");
-  });
-});
-
-describe("loopback A → X → history", () => {
-  it("user send, bot reply, user history", async () => {
-    const { app, recorder } = fresh();
-    const token = await userToken("alice");
-
-    const sent = await mcp(app, token, {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "tools/call",
-      params: { name: "send_message", arguments: { account: "alice", chat_id: 2001, text: "hi X" } },
-    });
-    expect(sent.status).toBe(200);
-
-    const reply = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chat_id: 2001, text: "hi Alice", reply_to_message_id: 1 }),
-    });
-    expect(reply.status).toBe(200);
-
-    const history = await mcp(app, token, {
-      jsonrpc: "2.0",
-      id: 2,
-      method: "tools/call",
-      params: { name: "get_history", arguments: { account: "alice", chat_id: 2001 } },
-    });
-    const text = JSON.stringify(history.body);
-    expect(text).toContain("hi X");
-    expect(text).toContain("hi Alice");
-
-    const tape = JSON.stringify(recorder.events());
-    expect(tape).not.toContain(SYNTHETIC_BOT_TOKEN);
-  });
-
-  it("unauthorized account fails", async () => {
-    const { app } = fresh();
-    const token = await userToken("alice");
-    const asMallory = await mcp(app, token, {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "tools/call",
-      params: { name: "list_chats", arguments: { account: "mallory" } },
-    });
-    expect(JSON.stringify(asMallory.body)).toContain("unauthorized account");
-    const asBob = await mcp(app, token, {
-      jsonrpc: "2.0",
-      id: 2,
-      method: "tools/call",
-      params: {
-        name: "send_message",
-        arguments: { account: "bob", chat_id: -1001234567890, text: "impersonate" },
-      },
-    });
-    expect(JSON.stringify(asBob.body)).toContain("unauthorized account");
-    const bob = await userToken("bob");
-    const bobSend = await mcp(app, bob, {
-      jsonrpc: "2.0",
-      id: 3,
-      method: "tools/call",
-      params: { name: "send_message", arguments: { account: "bob", chat_id: -1001234567890, text: "from bob" } },
-    });
-    expect(JSON.stringify(bobSend.body)).toContain("from bob");
-    expect(JSON.stringify(bobSend.body)).not.toContain("impersonate");
-  });
-
-  it("does not treat /s/botanic/mcp as a bot path token", async () => {
-    const { app } = fresh();
-    const token = await sign(
-      { sid: "botanic", team_id: "tg", login: "alice", exp: Math.floor(Date.now() / 1000) + 3600 },
-      secret,
-    );
-    const res = await app.request("/s/botanic/mcp", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
-    });
-    expect(res.status).toBe(200);
-  });
-
-});
-
-describe("reset", () => {
-  it("admin reset restores the seed", async () => {
-    const { app } = fresh();
-    await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chat_id: 2001, text: "ephemeral" }),
-    });
-    const reset = await app.request("/admin/reset", { method: "POST" });
-    expect(reset.status).toBe(200);
-    const token = await userToken("alice");
-    const history = await mcp(app, token, {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "tools/call",
-      params: { name: "get_history", arguments: { account: "alice", chat_id: 2001 } },
-    });
-    expect(JSON.stringify(history.body)).not.toContain("ephemeral");
-    await mcp(app, token, {
-      jsonrpc: "2.0",
-      id: 2,
-      method: "tools/call",
-      params: { name: "send_message", arguments: { account: "alice", chat_id: 2001, text: "after-reset" } },
-    });
-    const again = await mcp(app, token, {
-      jsonrpc: "2.0",
-      id: 3,
-      method: "tools/call",
-      params: { name: "get_history", arguments: { account: "alice", chat_id: 2001 } },
-    });
-    expect(JSON.stringify(again.body)).toContain("after-reset");
   });
 });
 

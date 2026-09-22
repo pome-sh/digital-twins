@@ -10,7 +10,6 @@ export {
   SYNTHETIC_BOT_TOKEN,
   type TelegramSeed,
 } from "./seed.js";
-export { executeTool, isMutatingTool, MUTATING_TOOL_NAMES, telegramToolFixture, toolSchemas } from "./tools.js";
 export { extractTelegramPathToken } from "./path-token.js";
 export {
   UPDATE_RETENTION_SEC,
