@@ -170,6 +170,24 @@ export interface RecorderHandlerResult {
 
 export interface RecorderHandle {
   record(event: RecorderEvent): void;
+  /**
+   * Record a route that sends a non-JSON response itself (for example, a byte
+   * download). The route supplies its already-safe response projection; the
+   * recorder supplies standard HTTP metadata and central redaction.
+   */
+  recordRawResponse(
+    c: Context,
+    result: {
+      status: number;
+      body: unknown;
+      error: string | null;
+      started: number;
+      fidelity?: RecorderFidelity;
+      mutation?: boolean;
+      delta?: RecorderEvent["state_delta"];
+      tool?: string;
+    }
+  ): void;
   events(): RecorderEvent[];
   /** Event count without the O(N) copy `events()` makes. */
   count(): number;
@@ -194,6 +212,12 @@ export interface RecorderHandle {
     opts: {
       mutation: boolean;
       fidelity?: RecorderFidelity;
+      /**
+       * Set false for routes whose declared parser must consume a bounded
+       * binary or multipart body. This prevents recorder capture from cloning
+       * and buffering that body before the route's budget is applied.
+       */
+      captureRequestBody?: boolean;
       /** Per-surface error projection override (admin routes have their own frozen envelope on some twins). */
       errorEnvelope?: (err: unknown) => { status: number; body: unknown };
       /**

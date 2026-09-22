@@ -6,6 +6,8 @@ import {
   MAX_POLL_QUESTION_LENGTH,
   MAX_POLL_OPTIONS,
   MIN_POLL_OPTIONS,
+  MAX_MEDIA_GROUP_MULTIPART_REQUEST_BYTES,
+  MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 } from "./domain.js";
 
 const declareInputs = routeInputDeclarer("ignore");
@@ -115,27 +117,30 @@ export const POST_EDIT_MESSAGE_CAPTION = declareInputs({
 
 export const POST_SEND_PHOTO = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendPhoto", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), photo: mediaValue, caption: z.string().optional() }, bodyEncoding: "form",
+  body: { chat_id: z.coerce.number().int(), photo: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_DOCUMENT = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendDocument", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), document: mediaValue, caption: z.string().optional() }, bodyEncoding: "form",
+  body: { chat_id: z.coerce.number().int(), document: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_VIDEO = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendVideo", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), video: mediaValue, caption: z.string().optional() }, bodyEncoding: "form",
+  body: { chat_id: z.coerce.number().int(), video: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_AUDIO = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendAudio", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), audio: mediaValue, caption: z.string().optional() }, bodyEncoding: "form",
+  body: { chat_id: z.coerce.number().int(), audio: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_VOICE = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendVoice", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), voice: mediaValue, caption: z.string().optional() }, bodyEncoding: "form",
+  body: { chat_id: z.coerce.number().int(), voice: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_MEDIA_GROUP = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendMediaGroup", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), media: mediaGroup }, bodyEncoding: "form",
+  body: { chat_id: z.coerce.number().int(), media: mediaGroup },
+  bodyEncoding: "form",
+  maxBodyBytes: MAX_MEDIA_GROUP_MULTIPART_REQUEST_BYTES,
+  multipartAttachmentsFrom: "media",
 });
 export const POST_GET_FILE = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/getFile", pathParams: credParam,

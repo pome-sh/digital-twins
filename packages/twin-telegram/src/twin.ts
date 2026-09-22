@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z, ZodError } from "zod";
 import { defineTwin, type TwinDefinition } from "@pome-sh/sdk";
+import { RequestBodyTooLargeError } from "@pome-sh/sdk/route-inputs";
 import { createApp, type RecorderStore } from "@pome-sh/sdk/server";
 import type { Hono } from "hono";
 import { openTelegramTwinDatabase, type TelegramTwinDatabase } from "./db.js";
@@ -23,6 +24,9 @@ function zodIssues(err: unknown): Array<{ path: ReadonlyArray<PropertyKey>; mess
 }
 
 function telegramErrorEnvelope(err: unknown): { status: number; body: unknown } {
+  if (err instanceof RequestBodyTooLargeError) {
+    return { status: 413, body: telegramError(413, "Request Entity Too Large") };
+  }
   if (err instanceof TwinError) {
     return { status: err.status, body: telegramError(err.errorCode, err.description) };
   }

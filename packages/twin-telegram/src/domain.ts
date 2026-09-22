@@ -34,8 +34,12 @@ export const BOT_DELETE_WINDOW_SEC = 48 * 3600;
 export const CALLBACK_QUERY_TTL_SEC = 60;
 export const MAX_CALLBACK_DATA_BYTES = 64;
 export const MAX_MEDIA_UPLOAD_BYTES = 20 * 1024 * 1024;
+/** Extra encoded multipart framing accepted above uploaded attachment bytes. */
+export const MAX_MULTIPART_FRAMING_BYTES = 1024 * 1024;
+export const MAX_MEDIA_MULTIPART_REQUEST_BYTES = MAX_MEDIA_UPLOAD_BYTES + MAX_MULTIPART_FRAMING_BYTES;
 /** Total bytes uploaded as attachments in one multipart media album. */
 export const MAX_MEDIA_GROUP_UPLOAD_BYTES = 64 * 1024 * 1024;
+export const MAX_MEDIA_GROUP_MULTIPART_REQUEST_BYTES = MAX_MEDIA_GROUP_UPLOAD_BYTES + MAX_MULTIPART_FRAMING_BYTES;
 export const MEDIA_TTL_SEC = 24 * 3600;
 export const MAX_CAPTION_UTF16 = 1024;
 

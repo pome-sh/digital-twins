@@ -200,6 +200,12 @@ export interface RouteRequestSource {
   param(name: string): string | undefined;
   /** Full request URL — read for its query string, and for a wildcard segment. */
   readonly url: string;
+  /**
+   * Standard Request backing this adapter, when it has one. A declaration with
+   * `maxBodyBytes` reads this stream through its budget before any decoder can
+   * buffer a multipart body. Test adapters may omit it.
+   */
+  readonly raw?: Request;
   header(name: string): string | undefined;
   json(): Promise<unknown>;
   arrayBuffer(): Promise<ArrayBuffer>;
@@ -212,6 +218,12 @@ export interface ParsedRouteInputs<P, Q, H, B> {
   readonly query: Q;
   readonly header: H;
   readonly body: B;
+  /**
+   * Multipart files selected by `attach://` values in a declared body field.
+   * The dynamic field names never reach a route handler directly: the
+   * declaration resolves and exposes only names the declared reference named.
+   */
+  readonly attachments?: Readonly<Record<string, unknown>>;
 }
 
 type Infer<S extends Shape | undefined> = S extends Shape
@@ -230,6 +242,17 @@ export interface RouteInputSpec {
   /** Top-level body input names. Nested shape is the schemas' business. */
   body?: Shape;
   bodyEncoding?: BodyEncoding;
+  /**
+   * Maximum encoded request bytes the declaration may consume. This is a
+   * transport budget, not an input name; it protects chunked multipart bodies
+   * as well as requests that truthfully send Content-Length.
+   */
+  maxBodyBytes?: number;
+  /**
+   * Maps dynamic multipart fields named by `attach://` entries in this declared
+   * body field into `parse()`'s `attachments` result.
+   */
+  multipartAttachmentsFrom?: string;
   /** For `bodyEncoding: "media"`, the (optionally dotted) body path the media
    *  bytes land on, e.g. `"raw"` or `"message.raw"`. */
   mediaField?: string;
@@ -248,6 +271,8 @@ export interface RouteInputDeclaration<S extends RouteInputSpec = RouteInputSpec
   /** `"<METHOD> <path>"` — the identity this surface publishes under. */
   readonly surface: string;
   readonly bodyEncoding: BodyEncoding;
+  /** Maximum encoded request bytes enforced before this declaration decodes. */
+  readonly maxBodyBytes: number | undefined;
   /**
    * What `parse()` does with an undeclared query or body key. Published on the
    * declaration so a twin's own suite can assert the disposition it was ruled
@@ -376,6 +401,18 @@ export function declareRouteInputs<const S extends RouteInputSpec>(
   if (bodyEncoding === "media" && !spec.mediaField) {
     throw new Error(`route-inputs: ${surface} uses bodyEncoding 'media' without mediaField`);
   }
+  if (
+    spec.maxBodyBytes !== undefined &&
+    (!Number.isSafeInteger(spec.maxBodyBytes) || spec.maxBodyBytes < 0 || bodyEncoding === "none")
+  ) {
+    throw new Error(`route-inputs: ${surface} has an invalid maxBodyBytes declaration`);
+  }
+  if (
+    spec.multipartAttachmentsFrom !== undefined &&
+    (bodyEncoding !== "form" || !(spec.multipartAttachmentsFrom in bodyShape))
+  ) {
+    throw new Error(`route-inputs: ${surface} has an invalid multipartAttachmentsFrom declaration`);
+  }
 
   const { named, wildcard } = splitPathParams(surface, spec.path, Object.keys(pathShape));
 
@@ -446,6 +483,7 @@ export function declareRouteInputs<const S extends RouteInputSpec>(
     path: spec.path,
     surface,
     bodyEncoding,
+    maxBodyBytes: spec.maxBodyBytes,
     undeclared,
     inputs,
     // Deduplicated: pome-cloud's comparator diffs NAME sets, and a name that
@@ -474,13 +512,16 @@ export function declareRouteInputs<const S extends RouteInputSpec>(
         )
       ) as Infer<S["headers"]>;
 
-      const raw = await decodeBody(request, bodyEncoding, surface, spec.mediaField);
+      const raw = await decodeBody(request, bodyEncoding, surface, spec.mediaField, spec.maxBodyBytes);
+      const attachments = spec.multipartAttachmentsFrom
+        ? collectMultipartAttachments(raw, spec.multipartAttachmentsFrom)
+        : undefined;
       if (undeclared === "refuse") {
         refuseUndeclared("body", surface, Object.keys(raw), declaredBody, new Set());
       }
       const body = bodySchema.parse(raw) as Infer<S["body"]>;
 
-      return { path, query, header, body };
+      return { path, query, header, body, ...(attachments ? { attachments } : {}) };
     },
   };
 }
@@ -674,30 +715,128 @@ function readBracketed(searchParams: URLSearchParams, name: string): unknown {
 
 // ─── Body ────────────────────────────────────────────────────────────────────
 
+export class RequestBodyTooLargeError extends Error {
+  constructor(readonly maxBodyBytes: number) {
+    super("Request Entity Too Large");
+  }
+}
+
 async function decodeBody(
   request: RouteRequestSource,
   encoding: BodyEncoding,
   surface: string,
-  mediaField: string | undefined
+  mediaField: string | undefined,
+  maxBodyBytes: number | undefined,
 ): Promise<Record<string, unknown>> {
   if (encoding === "none") return {};
   const contentType = request.header("content-type") ?? "";
+  const bounded = maxBodyBytes === undefined ? undefined : budgetedRequest(request, maxBodyBytes);
+  const source = bounded ?? request;
   if (encoding === "json" || encoding === "json-optional") {
-    const value = await request.json().catch(() => undefined);
+    const value = await source.json().catch((error: unknown) => {
+      if (error instanceof RequestBodyTooLargeError) throw error;
+      return undefined;
+    });
     if (isPlainObject(value)) return value;
     if (encoding === "json-optional") return {};
     throw new MalformedBodyError(surface);
   }
   if (encoding === "form") {
     if (contentType.includes("application/json") || contentType === "") {
-      const value = await request.json().catch(() => undefined);
+      const value = await source.json().catch((error: unknown) => {
+        if (error instanceof RequestBodyTooLargeError) throw error;
+        return undefined;
+      });
       if (isPlainObject(value)) return value;
       if (contentType.includes("application/json")) return {};
     }
-    const form = await request.parseBody({ all: true }).catch(() => undefined);
+    const form = bounded
+      ? await decodeFormData(bounded)
+      : await request.parseBody({ all: true }).catch(() => undefined);
     return form ? expandBrackets(form) : {};
   }
-  return decodeMedia(request, contentType, surface, mediaField!);
+  return decodeMedia(source, contentType, surface, mediaField!);
+}
+
+/**
+ * Make the declaration consume a standard Request through a hard byte budget.
+ * The Content-Length check rejects before touching the stream; absent or forged
+ * lengths are enforced as chunks arrive, before a form decoder can buffer them.
+ */
+function budgetedRequest(request: RouteRequestSource, maxBodyBytes: number): Request | undefined {
+  const raw = request.raw;
+  if (!raw) return undefined;
+  const contentLength = raw.headers.get("content-length");
+  if (contentLength !== null && /^\d+$/.test(contentLength) && Number(contentLength) > maxBodyBytes) {
+    throw new RequestBodyTooLargeError(maxBodyBytes);
+  }
+  if (!raw.body) return raw;
+
+  let consumed = 0;
+  const stream = raw.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      consumed += chunk.byteLength;
+      if (consumed > maxBodyBytes) throw new RequestBodyTooLargeError(maxBodyBytes);
+      controller.enqueue(chunk);
+    },
+  }));
+  return new Request(raw.url, {
+    method: raw.method,
+    headers: raw.headers,
+    body: stream,
+    // Node requires duplex for a ReadableStream request body; browsers ignore it.
+    duplex: "half",
+  } as RequestInit);
+}
+
+async function decodeFormData(request: Request): Promise<Record<string, unknown> | undefined> {
+  try {
+    const form = await request.formData();
+    const out: Record<string, unknown> = {};
+    for (const [name, value] of form.entries()) {
+      const existing = out[name];
+      out[name] = existing === undefined ? value : Array.isArray(existing) ? [...existing, value] : [existing, value];
+    }
+    return out;
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) throw error;
+    return undefined;
+  }
+}
+
+function collectMultipartAttachments(
+  raw: Record<string, unknown>,
+  referencesField: string | undefined,
+): Readonly<Record<string, unknown>> {
+  if (!referencesField) return {};
+  const references = parseAttachmentReferences(raw[referencesField]);
+  const attachments: Record<string, unknown> = {};
+  for (const name of references) {
+    if (name in raw) {
+      attachments[name] = raw[name];
+      delete raw[name];
+    }
+  }
+  return attachments;
+}
+
+function parseAttachmentReferences(value: unknown): string[] {
+  let parsed = value;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+  const names = new Set<string>();
+  for (const item of parsed) {
+    if (!isPlainObject(item) || typeof item.media !== "string" || !item.media.startsWith("attach://")) continue;
+    const name = item.media.slice("attach://".length);
+    if (name.length > 0) names.add(name);
+  }
+  return [...names];
 }
 
 /**
@@ -706,7 +845,7 @@ async function decodeBody(
  * on `mediaField`, so `raw` means the same thing however it was sent.
  */
 async function decodeMedia(
-  request: RouteRequestSource,
+  request: Pick<RouteRequestSource, "json" | "arrayBuffer">,
   contentType: string,
   surface: string,
   mediaField: string

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
   MalformedBodyError,
+  RequestBodyTooLargeError,
   UndeclaredInputError,
   booleanInput,
   bracketedQuery,
@@ -48,6 +49,49 @@ function request(init: {
 }
 
 describe("declareRouteInputs — the declaration is derived, never written", () => {
+  it("rejects declared body budgets before Content-Length or chunked multipart can buffer", async () => {
+    const declaration = declareRouteInputs({
+      method: "POST",
+      path: "/upload",
+      body: { upload: z.unknown() },
+      bodyEncoding: "form",
+      maxBodyBytes: 3,
+    });
+    expect(declaration.maxBodyBytes).toBe(3);
+
+    const declaredLengthRaw = new Request("http://twin.invalid/upload", {
+      method: "POST",
+      headers: { "content-type": "multipart/form-data; boundary=x", "content-length": "4" },
+      body: new ReadableStream<Uint8Array>({}, { highWaterMark: 0 }),
+      duplex: "half",
+    } as RequestInit);
+    const declaredLength = request({ headers: Object.fromEntries(declaredLengthRaw.headers), form: { upload: "unreachable" } });
+    Object.assign(declaredLength, { raw: declaredLengthRaw });
+    await expect(declaration.parse(declaredLength)).rejects.toBeInstanceOf(RequestBodyTooLargeError);
+
+    let chunkPulls = 0;
+    let cancelled = false;
+    const chunkedRaw = new Request("http://twin.invalid/upload", {
+      method: "POST",
+      headers: { "content-type": "multipart/form-data; boundary=x" },
+      body: new ReadableStream<Uint8Array>({
+        pull(controller) {
+          chunkPulls += 1;
+          controller.enqueue(Buffer.from("over"));
+        },
+        cancel() {
+          cancelled = true;
+        },
+      }, { highWaterMark: 0 }),
+      duplex: "half",
+    } as RequestInit);
+    const chunked = request({ headers: Object.fromEntries(chunkedRaw.headers), form: { upload: "unreachable" } });
+    Object.assign(chunked, { raw: chunkedRaw });
+    await expect(declaration.parse(chunked)).rejects.toBeInstanceOf(RequestBodyTooLargeError);
+    expect(chunkPulls).toBe(1);
+    expect(cancelled).toBe(true);
+  });
+
   it("derives name, location, required and type from the schemas that validate", () => {
     const declaration = declareRouteInputs({
       method: "POST",

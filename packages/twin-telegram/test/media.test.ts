@@ -6,6 +6,7 @@ import {
   TelegramDomain,
   MAX_CAPTION_UTF16,
   MAX_MEDIA_GROUP_UPLOAD_BYTES,
+  MAX_MEDIA_MULTIPART_REQUEST_BYTES,
   MAX_MEDIA_UPLOAD_BYTES,
 } from "../src/domain.js";
 import { openTelegramTwinDatabase } from "../src/db.js";
@@ -115,18 +116,72 @@ describe("HTTP media foundation", () => {
     expect(body.result[0]!.media_group_id).toBe(body.result[1]!.media_group_id);
   });
 
-  it("enforces the aggregate after multipart decoding without Content-Length", async () => {
+  it("enforces the aggregate request budget without Content-Length", async () => {
     const recorder = createRecorderStore();
     const app = createTelegramTwinApp({ seed: defaultSeedState(), recorder });
-    const response = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/sendMediaGroup`, {
+    let pulls = 0;
+    let cancelled = false;
+    const request = new Request(`http://twin.invalid/bot${SYNTHETIC_BOT_TOKEN}/sendMediaGroup`, {
       method: "POST",
-      body: albumForm([17 * 1024 * 1024, 17 * 1024 * 1024, 17 * 1024 * 1024, 17 * 1024 * 1024]),
-    });
-    expect(response.status).toBe(400);
+      headers: { "content-type": "multipart/form-data; boundary=x" },
+      body: new ReadableStream<Uint8Array>({
+        pull(controller) {
+          pulls += 1;
+          controller.enqueue(Buffer.alloc(MAX_MEDIA_GROUP_UPLOAD_BYTES + 1024 * 1024 + 1));
+        },
+        cancel() {
+          cancelled = true;
+        },
+      }, { highWaterMark: 0 }),
+      duplex: "half",
+    } as RequestInit);
+    const response = await app.request(request);
+    expect(response.status).toBe(413);
     const event = recorder.events().at(-1)!;
     expect(event.request_headers?.["content-length"]).toBeUndefined();
-    expect(event.error).toMatch(/media group uploads must total/);
+    expect(event.error).toBe("Request Entity Too Large");
+    expect(pulls).toBe(1);
+    expect(cancelled).toBe(true);
     expect(MAX_MEDIA_GROUP_UPLOAD_BYTES).toBe(64 * 1024 * 1024);
+  });
+
+  it("rejects oversized declared and chunked multipart bodies before recorder capture or full buffering", async () => {
+    const recorder = createRecorderStore();
+    const app = createTelegramTwinApp({ seed: defaultSeedState(), recorder });
+    const declaredLength = new Request(`http://twin.invalid/bot${SYNTHETIC_BOT_TOKEN}/sendDocument`, {
+      method: "POST",
+      headers: {
+        "content-type": "multipart/form-data; boundary=x",
+        "content-length": String(MAX_MEDIA_MULTIPART_REQUEST_BYTES + 1),
+      },
+      body: new ReadableStream<Uint8Array>({}, { highWaterMark: 0 }),
+      duplex: "half",
+    } as RequestInit);
+    const declaredLengthResponse = await app.request(declaredLength);
+    expect(declaredLengthResponse.status).toBe(413);
+    expect(recorder.events().at(-1)?.request_body).toBeNull();
+
+    let chunkPulls = 0;
+    let cancelled = false;
+    const chunked = new Request(`http://twin.invalid/bot${SYNTHETIC_BOT_TOKEN}/sendDocument`, {
+      method: "POST",
+      headers: { "content-type": "multipart/form-data; boundary=x" },
+      body: new ReadableStream<Uint8Array>({
+        pull(controller) {
+          chunkPulls += 1;
+          controller.enqueue(Buffer.alloc(MAX_MEDIA_MULTIPART_REQUEST_BYTES + 1));
+        },
+        cancel() {
+          cancelled = true;
+        },
+      }, { highWaterMark: 0 }),
+      duplex: "half",
+    } as RequestInit);
+    const chunkedResponse = await app.request(chunked);
+    expect(chunkedResponse.status).toBe(413);
+    expect(chunkPulls).toBe(1);
+    expect(cancelled).toBe(true);
+    expect(recorder.events().at(-1)?.request_body).toBeNull();
   });
 
   it("downloads raw bytes with MIME type only in the owning session and records redacted metadata", async () => {
