@@ -2,7 +2,7 @@
 
 Last verified: 2026-09-21.
 
-Staged Bot API conversation and interaction slice. Not a Bot API or Tolboy-equivalence claim.
+Staged Bot API conversation, interaction, and **HTTP-only media foundation**. Not a Bot API or Tolboy-equivalence claim.
 
 ## Methods
 
@@ -19,6 +19,11 @@ Staged Bot API conversation and interaction slice. Not a Bot API or Tolboy-equiv
 | answerCallbackQuery | hot | bounded | Durable one-shot callback correlation; expires at 60 seconds |
 | sendPoll / stopPoll | hot | bounded | Regular polls: 1–300 character question, 2–10 1–100 character options |
 | setMessageReaction | hot | bounded | One non-empty standard emoji per actor/message |
+| sendPhoto / sendDocument / sendVideo / sendAudio / sendVoice | hot | bounded | Bot-scoped SQLite media handles; multipart upload or owned `file_id`; no URL or host-file fetch |
+| sendMediaGroup | hot | bounded | 2–10 owned media references, atomic message creation and album id |
+| editMessageCaption | hot | bounded | Author-only media captions, maximum 1024 UTF-16 code units |
+| getFile / `/file/bot<TOKEN>/...` | hot | bounded | Opaque, expiring bot-scoped handle; byte download only, not a filesystem path |
+| sendChatAction | warm | bounded | Validates membership and the staged Bot API action set; no transient update |
 
 ## MCP
 
@@ -28,7 +33,8 @@ a compliant multi-account Tolboy `tools/list` capture requires unavailable/forbi
 configuration. No official Telegram-maintained MCP server is available, and third-party MTProto
 servers require real account credentials prohibited by the no-live-account policy. This twin
 therefore serves no MCP operations or twin-authored MCP fixture/listing claims until compliant
-captured bytes are available.
+captured bytes are available. This HTTP-only media foundation deliberately does not add an MCP
+media operation or tool-table entry.
 
 Callback waiting remains an internal domain facility for a future supported operation; no currently
 served MCP operation exposes optional callback waiting.
@@ -48,3 +54,5 @@ served MCP operation exposes optional callback waiting.
 11. Polls are regular text polls only (2–10 options, 1–300 character question, 1–100 character options), with aggregate counts. Quiz, explanation, open-period, paid, and custom forms are rejected.
 12. Reactions support one non-empty standard emoji per actor/message. Custom emoji, paid reactions, and animation flags are rejected.
 13. User pin authority is limited to an authored message in a private chat; a Bot API bot is the authorized group actor in this staged slice.
+14. Media content is bounded to 20 MiB and stored as SQLite bytes for its session. `file_id` is a stable bot-scoped digest handle; `file_unique_id`, URLs, filesystem paths, traversal, and attachment paths are not valid references.
+15. Media expires after 24 hours of twin time and is removed on seed/reset. Download paths are opaque `media/file_…` handles rather than paths beneath any host storage root.

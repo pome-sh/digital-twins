@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { Context } from "hono";
 
-const BOT_PATH = /^(?:\/s\/([^/]+))?\/(?:file\/)?bot(\d+:[^/]+)(?:\/([^/]+))?$/;
+const BOT_PATH = /^(?:\/s\/([^/]+))?\/(?:file\/)?bot(\d+:[^/]+)(?:\/.*)?$/;
 const NOT_VENDOR = new Set(["mcp", "admin", "healthz"]);
 
 export function telegramPathIdentity(c: Context): { token?: string; sid?: string } {

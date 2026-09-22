@@ -3,7 +3,8 @@ import type { Context, Hono } from "hono";
 import type { RouteContext } from "@pome-sh/sdk";
 import type { StateDelta } from "@pome-sh/wire";
 import { mountDeclaredRoute } from "@pome-sh/sdk/route-inputs";
-import type { TelegramDomain } from "./domain.js";
+import { MAX_MEDIA_UPLOAD_BYTES, type TelegramDomain } from "./domain.js";
+import { telegramFail } from "./errors.js";
 import {
   GET_CHAT,
   GET_ME,
@@ -13,6 +14,16 @@ import {
   POST_DELETE_MESSAGE,
   POST_DELETE_MESSAGES,
   POST_EDIT_MESSAGE_TEXT,
+  POST_EDIT_MESSAGE_CAPTION,
+  POST_SEND_PHOTO,
+  POST_SEND_DOCUMENT,
+  POST_SEND_VIDEO,
+  POST_SEND_AUDIO,
+  POST_SEND_VOICE,
+  POST_SEND_MEDIA_GROUP,
+  POST_GET_FILE,
+  POST_SEND_CHAT_ACTION,
+  GET_FILE_DOWNLOAD,
   POST_EDIT_MESSAGE_REPLY_MARKUP,
   POST_PIN_CHAT_MESSAGE,
   POST_UNPIN_CHAT_MESSAGE,
@@ -32,10 +43,32 @@ import {
 } from "./route-inputs.js";
 import { telegramOk } from "./serializers.js";
 
-function botActor(c: Context): { kind: "bot"; botId: number } {
-  const session = c.get("session") as { bot_id?: unknown } | undefined;
+function botActor(c: Context): { kind: "bot"; botId: number; sid?: string } {
+  const session = c.get("session") as { bot_id?: unknown; sid?: unknown } | undefined;
   const botId = typeof session?.bot_id === "number" ? session.bot_id : Number(session?.bot_id);
-  return { kind: "bot", botId };
+  return { kind: "bot", botId, ...(typeof session?.sid === "string" ? { sid: session.sid } : {}) };
+}
+
+async function mediaInput(value: unknown): Promise<string | { bytes: Buffer; filename?: string; mimeType?: string }> {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object" || !("arrayBuffer" in value) || typeof (value as { arrayBuffer?: unknown }).arrayBuffer !== "function") {
+    telegramFail(400, 400, "Bad Request: media must be a file upload or file_id");
+  }
+  const file = value as { arrayBuffer(): Promise<ArrayBuffer>; name?: unknown; type?: unknown };
+  return {
+    bytes: Buffer.from(await file.arrayBuffer()),
+    ...(typeof file.name === "string" ? { filename: file.name } : {}),
+    ...(typeof file.type === "string" && file.type ? { mimeType: file.type } : {}),
+  };
+}
+
+function enforceUploadBodyLimit(c: Context): void {
+  const length = Number(c.req.header("content-length") ?? 0);
+  // Multipart framing is small but not free; file bytes still have the strict
+  // 20 MiB domain limit after decoding.
+  if (Number.isFinite(length) && length > MAX_MEDIA_UPLOAD_BYTES + 1024 * 1024) {
+    telegramFail(413, 413, "Request Entity Too Large");
+  }
 }
 
 function captureDelta<T>(fn: (report: (delta: StateDelta) => void) => T): { value: T; delta: StateDelta } {
@@ -96,6 +129,64 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
       return { status: 200, body: telegramOk(result.value), delta: result.delta };
     }),
   );
+
+  const mediaRoute = (declaration: typeof POST_SEND_PHOTO, kind: "photo" | "document" | "video" | "audio" | "voice", field: "photo" | "document" | "video" | "audio" | "voice") => {
+    mountDeclaredRoute(app, declaration, recorder.handle({ mutation: true }, async (c) => {
+      enforceUploadBodyLimit(c);
+      const parsed = await declaration.parse(c.req);
+      const media = await mediaInput((parsed.body as Record<string, unknown>)[field]);
+      const result = captureDelta((report) => domain.sendMedia(botActor(c), { chat_id: parsed.body.chat_id, kind, media, caption: parsed.body.caption }, report));
+      return { status: 200, body: telegramOk(result.value), delta: result.delta };
+    }));
+  };
+  mediaRoute(POST_SEND_PHOTO, "photo", "photo");
+  mediaRoute(POST_SEND_DOCUMENT as unknown as typeof POST_SEND_PHOTO, "document", "document");
+  mediaRoute(POST_SEND_VIDEO as unknown as typeof POST_SEND_PHOTO, "video", "video");
+  mediaRoute(POST_SEND_AUDIO as unknown as typeof POST_SEND_PHOTO, "audio", "audio");
+  mediaRoute(POST_SEND_VOICE as unknown as typeof POST_SEND_PHOTO, "voice", "voice");
+
+  mountDeclaredRoute(app, POST_EDIT_MESSAGE_CAPTION, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_EDIT_MESSAGE_CAPTION.parse(c.req);
+    const result = captureDelta((report) => domain.editMessageCaption(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(result.value), delta: result.delta };
+  }));
+  mountDeclaredRoute(app, POST_SEND_MEDIA_GROUP, recorder.handle({ mutation: true }, async (c) => {
+    enforceUploadBodyLimit(c);
+    // Keep declaration parsing authoritative for named inputs. A clone preserves
+    // multipart attachment fields, whose names are selected by attach:// in the
+    // declared media JSON and therefore cannot be statically enumerated.
+    const multipart = c.req.header("content-type")?.toLowerCase().includes("multipart/form-data")
+      ? await c.req.raw.clone().formData()
+      : undefined;
+    const parsed = await POST_SEND_MEDIA_GROUP.parse(c.req);
+    const media = await Promise.all(parsed.body.media.map(async (item) => {
+      if (!item.media.startsWith("attach://")) return item;
+      const attachment = multipart?.get(item.media.slice("attach://".length));
+      if (!attachment || typeof attachment === "string") telegramFail(400, 400, "Bad Request: attachment not found");
+      return { ...item, media: await mediaInput(attachment) };
+    }));
+    const result = captureDelta((report) => domain.sendMediaGroup(botActor(c), { chat_id: parsed.body.chat_id, media }, report));
+    return { status: 200, body: telegramOk(result.value), delta: result.delta };
+  }));
+  mountDeclaredRoute(app, POST_GET_FILE, recorder.handle({ mutation: false }, async (c) => {
+    const parsed = await POST_GET_FILE.parse(c.req);
+    return { status: 200, body: telegramOk(domain.getFile(botActor(c), parsed.body.file_id)) };
+  }));
+  mountDeclaredRoute(app, POST_SEND_CHAT_ACTION, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_SEND_CHAT_ACTION.parse(c.req);
+    const result = captureDelta((report) => domain.sendChatAction(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(result.value), delta: result.delta };
+  }));
+  // Byte downloads have no Bot API JSON envelope, but their path is still declared.
+  mountDeclaredRoute(app, GET_FILE_DOWNLOAD, async (c: Context) => {
+    try {
+      const parsed = await GET_FILE_DOWNLOAD.parse(c.req);
+      const file = domain.downloadFile(botActor(c), parsed.path.file_path);
+      return c.body(new Uint8Array(file.content), 200, file.mimeType ? { "content-type": file.mimeType } : undefined);
+    } catch {
+      return c.json({ ok: false, error_code: 404, description: "Not Found" }, 404);
+    }
+  });
 
   mountDeclaredRoute(app, POST_EDIT_MESSAGE_REPLY_MARKUP, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_EDIT_MESSAGE_REPLY_MARKUP.parse(c.req);
