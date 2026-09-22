@@ -180,7 +180,17 @@ export const POST_DELETE_MESSAGES = declareInputs({
   method: "POST",
   path: "/:cred{bot[^/]+}/deleteMessages",
   pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), message_ids: z.array(z.coerce.number().int()) },
+  body: {
+    chat_id: z.coerce.number().int(),
+    message_ids: z.preprocess((value) => {
+      if (typeof value !== "string") return value;
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value;
+      }
+    }, z.array(z.coerce.number().int())),
+  },
   bodyEncoding: "form",
 });
 

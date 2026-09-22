@@ -186,8 +186,13 @@ describe("HTTP path token", () => {
     expect(deleted).toMatchObject({ status: 200, body: { ok: true, result: true } });
     await bot(app, "sendMessage", { chat_id: -1001234567890, text: "delete two" });
     await bot(app, "sendMessage", { chat_id: -1001234567890, text: "delete three" });
-    const batch = await bot(app, "deleteMessages", { chat_id: -1001234567890, message_ids: [4, 5] });
-    expect(batch).toMatchObject({ status: 200, body: { ok: true, result: true } });
+    const batch = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/deleteMessages`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ chat_id: "-1001234567890", message_ids: "[4,5]" }),
+    });
+    expect(batch.status).toBe(200);
+    expect(await batch.json()).toEqual({ ok: true, result: true });
     expect(domain.getHistory("alice", -1001234567890).map((message) => message.text)).toEqual(["edited", "edited"]);
   });
 });
