@@ -25,8 +25,10 @@ Staged Bot API conversation and interaction slice. Not a Bot API or Tolboy-equiv
 Telegram MCP operations are deferred. The repository's permitted provenance record is
 [`fixtures/mcp-tools-list/telegram.status.json`](../../fixtures/mcp-tools-list/telegram.status.json):
 a compliant multi-account Tolboy `tools/list` capture requires unavailable/forbidden TDLib
-configuration. This twin therefore serves no MCP operations or twin-authored MCP fixture/listing
-claims until compliant captured bytes are available.
+configuration. No official Telegram-maintained MCP server is available, and third-party MTProto
+servers require real account credentials prohibited by the no-live-account policy. This twin
+therefore serves no MCP operations or twin-authored MCP fixture/listing claims until compliant
+captured bytes are available.
 
 Callback waiting remains an internal domain facility for a future supported operation; no currently
 served MCP operation exposes optional callback waiting.
