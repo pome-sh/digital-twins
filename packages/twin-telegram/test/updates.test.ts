@@ -224,6 +224,35 @@ describe("controlled webhook outbox", () => {
     expect(domain.getWebhookInfo(BOT).pending_update_count).toBe(0);
   });
 
+  it("retries a failed local fixture without a second flush or notify", async () => {
+    const db = openTelegramTwinDatabase(":memory:");
+    const localUrl = "http://127.0.0.1:8823/retry";
+    let attempts = 0;
+    const app = createTelegramTwinApp({
+      db,
+      seed: defaultSeedState(),
+      webhookFixtures: {
+        [localUrl]: async () => {
+          attempts += 1;
+          return { status: attempts === 1 ? 503 : 204 };
+        },
+      },
+    });
+    await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/setWebhook`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: localUrl }),
+    });
+    const domain = new TelegramDomain(db);
+    userMessage(domain, "retry automatically");
+    const deadline = Date.now() + 2_500;
+    while (attempts < 2 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    expect(attempts).toBe(2);
+    expect(domain.getWebhookInfo(BOT).pending_update_count).toBe(0);
+  });
+
   it("handles no more than eight due rows in one direct outbox flush", async () => {
     const now = 1_700_000_000;
     const { db, domain } = fresh(() => now);
@@ -234,7 +263,7 @@ describe("controlled webhook outbox", () => {
       deliveries += 1;
       return { status: 200 };
     });
-    expect(processed).toBe(8);
+    expect(processed.processed).toBe(8);
     expect(deliveries).toBe(8);
     expect((db.prepare("SELECT COUNT(*) AS count FROM webhook_outbox").get() as { count: number }).count).toBe(2);
   });
@@ -245,7 +274,7 @@ describe("controlled webhook outbox", () => {
     domain.setWebhook(BOT, { url: "https://receiver.invalid/telegram" });
     addDueOutboxRows(db, 1, now);
     for (const [attempt, delay] of [1, 2, 4, 8, 16, 32, 32].entries()) {
-      expect(await domain.flushWebhookOutbox(async () => ({ status: 503 }))).toBe(1);
+      expect((await domain.flushWebhookOutbox(async () => ({ status: 503 }))).processed).toBe(1);
       expect(outboxRow(db, 1)).toEqual({
         attempts: attempt + 1,
         next_attempt_at: now + delay,

@@ -17,6 +17,7 @@ import {
   telegramUpdateRuntime,
   webhookUrlError,
   type TelegramWebhookDelivery,
+  type WebhookDrainResult,
 } from "./updates.js";
 
 export type DeltaHook = (delta: StateDelta) => void;
@@ -39,7 +40,7 @@ export class TelegramDomain {
     private readonly localWebhookUrls: ReadonlySet<string> = new Set(),
   ) {
     this.runtime = telegramUpdateRuntime(db);
-    this.runtime.registerDispatcher(() => this.flushWebhookOutbox());
+    this.runtime.registerDispatcher(() => this.flushWebhookOutbox(), now);
   }
 
   seed(input: TelegramSeed | unknown): void {
@@ -513,7 +514,9 @@ export class TelegramDomain {
   }
 
   /** Drains at most one durable batch. It never performs a network request. */
-  async flushWebhookOutbox(delivery: TelegramWebhookDelivery | undefined = this.runtime.getDelivery()): Promise<number> {
+  async flushWebhookOutbox(
+    delivery: TelegramWebhookDelivery | undefined = this.runtime.getDelivery(),
+  ): Promise<WebhookDrainResult> {
     this.purgeExpiredUpdates();
     const now = this.now();
     const due = this.db
@@ -574,7 +577,13 @@ export class TelegramDomain {
           .run(now, failure, item.bot_id);
       })();
     }
-    return due.length;
+    const next = this.db
+      .prepare("SELECT MIN(next_attempt_at) AS next_attempt_at FROM webhook_outbox WHERE locked_until <= ?")
+      .get(this.now()) as { next_attempt_at: number | null };
+    return {
+      processed: due.length,
+      ...(next.next_attempt_at === null ? {} : { nextAttemptAt: next.next_attempt_at }),
+    };
   }
 
   manifest(): Record<string, unknown> {

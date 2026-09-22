@@ -11,6 +11,11 @@ export type TelegramWebhookDelivery = (input: {
 export const UPDATE_RETENTION_SEC = 24 * 60 * 60;
 export const MAX_WEBHOOK_BATCH = 8;
 
+export type WebhookDrainResult = {
+  processed: number;
+  nextAttemptAt?: number;
+};
+
 /**
  * Process-local coordination is deliberately not state. SQLite owns the queue;
  * this only wakes a long poll or starts a bounded drain after a committed write.
@@ -18,8 +23,11 @@ export const MAX_WEBHOOK_BATCH = 8;
 export class TelegramUpdateRuntime {
   private readonly waiters = new Map<number, Set<() => void>>();
   private readonly activePolls = new Set<number>();
-  private dispatcher: (() => Promise<number>) | undefined;
+  private dispatcher: (() => Promise<WebhookDrainResult>) | undefined;
+  private now: () => number = () => Math.floor(Date.now() / 1000);
   private draining = false;
+  private retryTimer: ReturnType<typeof setTimeout> | undefined;
+  private retryAt: number | undefined;
 
   constructor(
     readonly db: TelegramTwinDatabase,
@@ -34,8 +42,9 @@ export class TelegramUpdateRuntime {
     return this.delivery;
   }
 
-  registerDispatcher(dispatcher: () => Promise<number>): void {
+  registerDispatcher(dispatcher: () => Promise<WebhookDrainResult>, now: () => number): void {
     this.dispatcher = dispatcher;
+    this.now = now;
   }
 
   notify(botId: number): void {
@@ -44,7 +53,12 @@ export class TelegramUpdateRuntime {
   }
 
   cancelAll(): void {
-    for (const botId of this.waiters.keys()) this.notify(botId);
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = undefined;
+    this.retryAt = undefined;
+    for (const waiters of this.waiters.values()) {
+      for (const wake of waiters) wake();
+    }
   }
 
   acquirePoll(botId: number): () => void {
@@ -77,15 +91,28 @@ export class TelegramUpdateRuntime {
     if (this.draining || !this.dispatcher) return;
     this.draining = true;
     queueMicrotask(() => {
-      void this.dispatcher!().then((processed) => {
+      void this.dispatcher!().then((result) => {
         this.draining = false;
         // A full pass may have left due rows behind. Schedule one more bounded
         // pass; failed rows have moved into the future and stop this chain.
-        if (processed >= MAX_WEBHOOK_BATCH) this.scheduleDrain();
+        if (result.processed >= MAX_WEBHOOK_BATCH) this.scheduleDrain();
+        if (result.nextAttemptAt !== undefined) this.scheduleRetry(result.nextAttemptAt);
       }).catch(() => {
         this.draining = false;
       });
     });
+  }
+
+  private scheduleRetry(nextAttemptAt: number): void {
+    if (this.retryAt !== undefined && this.retryAt <= nextAttemptAt) return;
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryAt = nextAttemptAt;
+    const delayMs = Math.max(0, nextAttemptAt - this.now()) * 1000;
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = undefined;
+      this.retryAt = undefined;
+      this.scheduleDrain();
+    }, delayMs);
   }
 }
 
