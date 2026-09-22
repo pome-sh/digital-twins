@@ -1,15 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from "zod";
 import { routeInputDeclarer, type RouteInputDeclaration } from "@pome-sh/sdk/route-inputs";
+import {
+  MAX_POLL_OPTION_LENGTH,
+  MAX_POLL_QUESTION_LENGTH,
+  MAX_POLL_OPTIONS,
+  MIN_POLL_OPTIONS,
+} from "./domain.js";
 
 const declareInputs = routeInputDeclarer("ignore");
 
 const credParam = { cred: z.string().min(1) };
 const chatIdBody = { chat_id: z.coerce.number().int() };
+const jsonValue = z.preprocess((value) => {
+  if (typeof value !== "string") return value;
+  try { return JSON.parse(value); } catch { return value; }
+}, z.unknown());
 const sendBody = {
   chat_id: z.coerce.number().int(),
   text: z.string(),
   reply_to_message_id: z.coerce.number().int().optional(),
+  reply_markup: jsonValue.optional(),
 };
 
 export const GET_ME = declareInputs({
@@ -48,7 +59,11 @@ const transferBody = {
   from_chat_id: z.coerce.number().int(),
   message_id: z.coerce.number().int(),
 };
-const dropPending = z.union([z.boolean(), z.enum(["true", "false"]).transform((value) => value === "true")]).optional();
+const formBoolean = z.union([
+  z.boolean(),
+  z.enum(["true", "false"]).transform((value) => value === "true"),
+]);
+const dropPending = formBoolean.optional();
 const allowedUpdates = z
   .preprocess((value) => {
     if (typeof value !== "string") return value;
@@ -57,7 +72,7 @@ const allowedUpdates = z
     } catch {
       return value;
     }
-  }, z.array(z.enum(["message"])).max(1))
+  }, z.array(z.enum(["message", "callback_query", "poll_answer", "message_reaction"])).max(4))
   .optional();
 const updateArgs = {
   offset: z.coerce.number().int().optional(),
@@ -81,6 +96,70 @@ export const POST_SEND_MESSAGE = declareInputs({
   bodyEncoding: "form",
 });
 
+export const POST_EDIT_MESSAGE_REPLY_MARKUP = declareInputs({
+  method: "POST",
+  path: "/:cred{bot[^/]+}/editMessageReplyMarkup",
+  pathParams: credParam,
+  body: { ...messageBody, reply_markup: jsonValue.nullish() },
+  bodyEncoding: "form",
+});
+
+export const POST_PIN_CHAT_MESSAGE = declareInputs({
+  method: "POST",
+  path: "/:cred{bot[^/]+}/pinChatMessage",
+  pathParams: credParam,
+  body: messageBody,
+  bodyEncoding: "form",
+});
+
+export const POST_UNPIN_CHAT_MESSAGE = declareInputs({
+  method: "POST",
+  path: "/:cred{bot[^/]+}/unpinChatMessage",
+  pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), message_id: z.coerce.number().int().optional() },
+  bodyEncoding: "form",
+});
+
+export const POST_UNPIN_ALL_CHAT_MESSAGES = declareInputs({
+  method: "POST",
+  path: "/:cred{bot[^/]+}/unpinAllChatMessages",
+  pathParams: credParam,
+  body: chatIdBody,
+  bodyEncoding: "form",
+});
+
+export const POST_ANSWER_CALLBACK_QUERY = declareInputs({
+  method: "POST",
+  path: "/:cred{bot[^/]+}/answerCallbackQuery",
+  pathParams: credParam,
+  body: { callback_query_id: z.string().min(1), text: z.string().max(200).optional(), show_alert: formBoolean.optional(), url: z.string().url().optional(), cache_time: z.coerce.number().int().min(0).optional() },
+  bodyEncoding: "form",
+});
+
+export const POST_SEND_POLL = declareInputs({
+  method: "POST",
+  path: "/:cred{bot[^/]+}/sendPoll",
+  pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), question: z.string().min(1).max(MAX_POLL_QUESTION_LENGTH), options: z.preprocess((value) => { if (typeof value !== "string") return value; try { return JSON.parse(value); } catch { return value; } }, z.array(z.string().min(1).max(MAX_POLL_OPTION_LENGTH)).min(MIN_POLL_OPTIONS).max(MAX_POLL_OPTIONS)), is_anonymous: formBoolean.optional(), allows_multiple_answers: formBoolean.optional(), allow_paid_broadcast: z.never().optional(), business_connection_id: z.never().optional(), message_effect_id: z.never().optional(), type: z.never().optional(), correct_option_id: z.never().optional(), explanation: z.never().optional() },
+  bodyEncoding: "form",
+});
+
+export const POST_STOP_POLL = declareInputs({
+  method: "POST",
+  path: "/:cred{bot[^/]+}/stopPoll",
+  pathParams: credParam,
+  body: messageBody,
+  bodyEncoding: "form",
+});
+
+export const POST_SET_MESSAGE_REACTION = declareInputs({
+  method: "POST",
+  path: "/:cred{bot[^/]+}/setMessageReaction",
+  pathParams: credParam,
+  body: { ...messageBody, reaction: jsonValue.optional(), is_big: z.never().optional() },
+  bodyEncoding: "form",
+});
+
 export const POST_EDIT_MESSAGE_TEXT = declareInputs({
   method: "POST",
   path: "/:cred{bot[^/]+}/editMessageText",
@@ -101,7 +180,17 @@ export const POST_DELETE_MESSAGES = declareInputs({
   method: "POST",
   path: "/:cred{bot[^/]+}/deleteMessages",
   pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), message_ids: z.array(z.coerce.number().int()) },
+  body: {
+    chat_id: z.coerce.number().int(),
+    message_ids: z.preprocess((value) => {
+      if (typeof value !== "string") return value;
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value;
+      }
+    }, z.array(z.coerce.number().int())),
+  },
   bodyEncoding: "form",
 });
 
@@ -173,6 +262,14 @@ export const TELEGRAM_ROUTE_INPUTS: readonly RouteInputDeclaration[] = [
   GET_CHAT,
   POST_GET_CHAT,
   POST_SEND_MESSAGE,
+  POST_EDIT_MESSAGE_REPLY_MARKUP,
+  POST_PIN_CHAT_MESSAGE,
+  POST_UNPIN_CHAT_MESSAGE,
+  POST_UNPIN_ALL_CHAT_MESSAGES,
+  POST_ANSWER_CALLBACK_QUERY,
+  POST_SEND_POLL,
+  POST_STOP_POLL,
+  POST_SET_MESSAGE_REACTION,
   POST_EDIT_MESSAGE_TEXT,
   POST_DELETE_MESSAGE,
   POST_DELETE_MESSAGES,

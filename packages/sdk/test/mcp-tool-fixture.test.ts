@@ -74,6 +74,25 @@ describe("loadMcpToolFixture", () => {
     expect(loaded.meta.substrate).toBe("live-wire-unauth");
   });
 
+  it("loads a deferred status as an explicitly empty tool table", () => {
+    const loaded = loadMcpToolFixture({
+      status: {
+        twin: "telegram",
+        substrate: "live-wire-unauth",
+        captured: false,
+        status: "deferred",
+        endpoint: "http://127.0.0.1:8080/mcp",
+        reason: "No policy-compliant capture is available.",
+        consumerContract: "Report this twin as not-compared.",
+      },
+    });
+    expect(loaded).toMatchObject({
+      status: { twin: "telegram", captured: false, status: "deferred" },
+      tools: [],
+      toolNames: [],
+    });
+  });
+
   it("refuses a raw listing whose bytes do not hash to meta.rawFileSha256", () => {
     const edited = JSON.parse(rawText);
     edited.result.tools[0].name = "list_widgetz";

@@ -318,10 +318,35 @@ export interface McpToolFixtureModules {
   meta: unknown;
 }
 
+/** A producer status record when no upstream tools/list may be served. */
+export const mcpToolFixtureDeferredStatusSchema = z
+  .object({
+    twin: z.string().min(1),
+    substrate: mcpFixtureSubstrateSchema,
+    captured: z.literal(false),
+    status: z.literal("deferred"),
+    endpoint: z.string().min(1),
+    reason: z.string().min(1),
+    consumerContract: z.string().min(1),
+  })
+  .passthrough();
+export type McpToolFixtureDeferredStatus = z.infer<typeof mcpToolFixtureDeferredStatusSchema>;
+
+export interface DeferredMcpToolFixtureModules {
+  /** The parsed `<name>.status.json` record that replaces a tools/list fixture. */
+  status: unknown;
+}
+
 export interface LoadedMcpToolFixture {
   meta: McpToolFixtureMeta;
   tools: readonly CanonicalMcpTool[];
   toolNames: readonly string[];
+}
+
+export interface LoadedDeferredMcpToolFixture {
+  status: McpToolFixtureDeferredStatus;
+  tools: [];
+  toolNames: [];
 }
 
 export function sha256(text: string): string {
@@ -337,7 +362,21 @@ export function sha256(text: string): string {
  * A golden whose raw file was hand-edited must fail loudly rather than
  * silently become the new truth.
  */
-export function loadMcpToolFixture(modules: McpToolFixtureModules): LoadedMcpToolFixture {
+export function loadMcpToolFixture(modules: McpToolFixtureModules): LoadedMcpToolFixture;
+export function loadMcpToolFixture(modules: DeferredMcpToolFixtureModules): LoadedDeferredMcpToolFixture;
+export function loadMcpToolFixture(
+  modules: McpToolFixtureModules | DeferredMcpToolFixtureModules,
+): LoadedMcpToolFixture | LoadedDeferredMcpToolFixture {
+  if ("status" in modules) {
+    const parsedStatus = mcpToolFixtureDeferredStatusSchema.safeParse(modules.status);
+    if (!parsedStatus.success) {
+      throw new Error(
+        `MCP tool fixture: invalid deferred status.json — ${issues(parsedStatus.error)}`,
+      );
+    }
+    return { status: parsedStatus.data, tools: [], toolNames: [] };
+  }
+
   const parsedMeta = mcpToolFixtureMetaSchema.safeParse(modules.meta);
   if (!parsedMeta.success) {
     throw new Error(
