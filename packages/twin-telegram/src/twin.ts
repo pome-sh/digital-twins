@@ -18,7 +18,7 @@ import { defaultSeedState, parseSeed, type TelegramSeed } from "./seed.js";
 import { telegramError } from "./serializers.js";
 import { executeTool, isMutatingTool, telegramToolFixture, toolSchemas } from "./tools.js";
 import { unsupportedEnvelope } from "./unsupported-envelope.js";
-import { telegramUpdateRuntime, type TelegramWebhookDelivery } from "./updates.js";
+import { isLoopbackWebhookUrl, telegramUpdateRuntime, type TelegramWebhookDelivery } from "./updates.js";
 
 function zodIssues(err: unknown): Array<{ path: ReadonlyArray<PropertyKey>; message: string }> | undefined {
   if (err instanceof ZodError) return err.issues;
@@ -67,11 +67,12 @@ export function telegramTwinDefinition(
   runtimeOptions: TelegramTwinRuntimeOptions = {},
 ): TwinDefinition<TelegramTwinDatabase, TelegramSeed, TelegramDomain> {
   const fixtures = runtimeOptions.webhookFixtures ?? {};
-  const fixtureUrls = new Set(Object.keys(fixtures));
+  // Fixtures model a local receiver only. Never turn a public configured URL
+  // into executable transport merely because a caller supplied a callback.
+  const fixtureUrls = new Set(Object.keys(fixtures).filter(isLoopbackWebhookUrl));
   telegramUpdateRuntime(db, async (input) => {
-    const fixture = fixtures[input.url];
-    if (!fixture) return { status: 503 };
-    return fixture(input);
+    if (!fixtureUrls.has(input.url)) return { status: 503 };
+    return fixtures[input.url]!(input);
   });
   return defineTwin({
     id: "telegram",

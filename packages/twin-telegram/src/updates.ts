@@ -105,6 +105,16 @@ export function telegramUpdateRuntime(
   return runtime;
 }
 
+/** True only for a literal loopback host; this never resolves DNS. */
+export function isLoopbackWebhookUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host === "localhost" || host === "::1" || host === "127.0.0.1" || host.startsWith("127.") || host === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
 /** No DNS lookup is made: only an exact URL explicitly registered by a test may be loopback. */
 export function webhookUrlError(url: string, localFixtures: ReadonlySet<string>): string | undefined {
   let parsed: URL;
@@ -118,13 +128,7 @@ export function webhookUrlError(url: string, localFixtures: ReadonlySet<string>)
     return "Bad Request: webhook URL must use HTTP or HTTPS";
   }
   const host = parsed.hostname.toLowerCase();
-  const loopback =
-    host === "localhost" ||
-    host === "::1" ||
-    host === "127.0.0.1" ||
-    host.startsWith("127.") ||
-    host === "[::1]";
-  if (loopback && !localFixtures.has(url)) {
+  if (isLoopbackWebhookUrl(url) && !localFixtures.has(url)) {
     return "Bad Request: loopback webhook URLs require an explicit local fixture";
   }
   // Literal private addresses are refused before any transport is selected.
