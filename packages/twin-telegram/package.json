@@ -31,7 +31,8 @@
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx src/server.ts",
     "start": "node dist/src/server.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "gate:mcp-fixture": "tsx scripts/adopt-upstream-mcp-fixture.ts --check"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",

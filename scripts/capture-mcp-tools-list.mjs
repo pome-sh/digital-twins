@@ -123,7 +123,6 @@ async function readOssSource(source) {
     ["--version"],
     "The oss-source adapter clones the vendor's public repository at a pinned commit."
   );
-  requireBinary("go", ["version"], "The oss-source adapter builds the vendor's public server from source.");
 
   const root = process.env.POME_MCP_CAPTURE_CACHE ?? join(homedir(), ".cache/pome/mcp-capture");
   const checkout = join(root, `${source.twin}-${spec.commit.slice(0, 12)}`);
@@ -137,11 +136,39 @@ async function readOssSource(source) {
   });
   execFileSync("git", ["-C", checkout, "checkout", "--quiet", "--force", spec.commit], { stdio: "inherit" });
 
+  if (spec.language === "python") return { rawText: readPythonOssTools(checkout, source) };
+
+  requireBinary("go", ["version"], "The Go oss-source adapter builds the vendor's public server from source.");
   const bin = join(checkout, ".capture-bin");
   execFileSync("go", ["build", "-o", bin, spec.package], { cwd: checkout, stdio: "inherit" });
+  return { rawText: await driveStdioToolsList(bin, source) };
+}
 
-  const rawText = await driveStdioToolsList(bin, source);
-  return { rawText };
+/**
+ * Read a Python FastMCP registration table without starting its live client.
+ *
+ * telegram-mcp registers decorators at import time, but connects to Telegram
+ * only when a tool is called. Its locked `uv` environment and the dummy local
+ * session name make this a source-registration read, not a credentialed call.
+ */
+function readPythonOssTools(checkout, source) {
+  requireBinary("uv", ["--version"], "The Python oss-source adapter resolves the pinned source's uv.lock.");
+  execFileSync("uv", ["sync", "--frozen", "--no-dev"], { cwd: checkout, stdio: "inherit" });
+  const program = [
+    "import asyncio, json",
+    `import ${source.source.package}.runtime as runtime`,
+    `import ${source.source.package}.tools`,
+    "async def main():",
+    "    tools = await runtime.mcp.list_tools()",
+    "    print(json.dumps({'jsonrpc': '2.0', 'id': 1, 'result': {'tools': [tool.model_dump(mode='json', exclude_none=True) for tool in tools]}}, separators=(',', ':')))",
+    "asyncio.run(main())",
+  ].join("\n");
+  return execFileSync("uv", ["run", "--frozen", "--no-dev", "python", "-c", program], {
+    cwd: checkout,
+    encoding: "utf8",
+    env: { ...process.env, ...(source.configuration.serverEnv ?? {}) },
+    stdio: ["ignore", "pipe", "inherit"],
+  });
 }
 
 function driveStdioToolsList(bin, source) {
