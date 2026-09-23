@@ -6,17 +6,81 @@ import { z } from "zod";
 import rawListing from "../fixtures/mcp-tools-list.raw.json" with { type: "json" };
 import metaListing from "../fixtures/mcp-tools-list.meta.json" with { type: "json" };
 import type { TelegramDomain } from "./domain.js";
+import { telegramFail } from "./errors.js";
 import { accountFrom } from "./tool-adapters.js";
 
 export const telegramMcpToolFixture = loadMcpToolFixture({ raw: rawListing, meta: metaListing });
 
 type SourceResult = { result: string };
+type SourceAccount = { account?: string };
+type SourceChatId = number | string;
+type InlineButton = { text: string; callback_data: string };
+
+const accountSchema = z.string().optional();
+const chatIdSchema = z.union([z.number().int(), z.string()]);
 
 function sourceResult(value: unknown): SourceResult {
   // telegram-mcp's registered output schema is `{ result: string }`. Preserve
   // source text when the source operation returns text; structured twin values
   // are encoded in that string envelope.
   return { result: typeof value === "string" ? value : JSON.stringify(value) };
+}
+
+function numericChatId(chatId: SourceChatId): number {
+  if (typeof chatId === "number") return chatId;
+  if (/^-?\d+$/.test(chatId)) return Number(chatId);
+  // The captured source also accepts usernames. The twin has no username-to-
+  // chat mapping, so retain its normal member-visible-chat failure instead of
+  // silently routing an unrecognized identifier somewhere else.
+  telegramFail(400, 400, "Bad Request: chat not found");
+}
+
+function requireSourceAccount(args: SourceAccount, ctx: Parameters<McpToolImplementation<TelegramDomain>["handler"]>[2]): string {
+  return accountFrom(args, ctx);
+}
+
+function inlineMessages(domain: TelegramDomain, account: string, chatId: number, limit: number): Array<{ message_id: number; buttons: InlineButton[] }> {
+  const bounded = Math.max(0, limit);
+  return domain
+    .getHistory(account, chatId)
+    .reverse()
+    .flatMap((message) => {
+      const messageId = message.message_id;
+      if (typeof messageId !== "number") return [];
+      const buttons = domain.listInlineButtons(account, { chat_id: chatId, message_id: messageId });
+      return buttons.length > 0 ? [{ message_id: messageId, buttons }] : [];
+    })
+    .slice(0, bounded);
+}
+
+function inlineTarget(
+  domain: TelegramDomain,
+  account: string,
+  chatId: number,
+  messageId: number | string | null | undefined,
+): { messageId: number; buttons: InlineButton[] } {
+  if (messageId !== undefined && messageId !== null) {
+    const numericMessageId = typeof messageId === "number" ? messageId : Number(messageId);
+    if (!Number.isInteger(numericMessageId)) telegramFail(400, 400, "Bad Request: inline button not found");
+    return {
+      messageId: numericMessageId,
+      buttons: domain.listInlineButtons(account, { chat_id: chatId, message_id: numericMessageId }),
+    };
+  }
+  const [recent] = inlineMessages(domain, account, chatId, 1);
+  if (!recent) telegramFail(400, 400, "Bad Request: inline button not found");
+  return { messageId: recent.message_id, buttons: recent.buttons };
+}
+
+function limitReactionUsersPerCategory(reactions: Record<string, unknown>[], limit: number): Record<string, unknown>[] {
+  const categoryCounts = new Map<string, number>();
+  return reactions.filter((reaction) => {
+    const category = JSON.stringify(reaction.reaction);
+    const count = categoryCounts.get(category) ?? 0;
+    if (count >= limit) return false;
+    categoryCounts.set(category, count + 1);
+    return true;
+  });
 }
 
 const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
@@ -33,11 +97,187 @@ const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
     contentText: (output) => (output as SourceResult).result,
   },
   get_me: {
-    schema: z.looseObject({ account: z.string().optional() }),
+    schema: z.looseObject({ account: accountSchema }),
     mutation: false,
     handler: (domain, args, ctx) => {
-      const { account } = args as unknown as { account?: string };
-      return sourceResult(domain.getMe({ kind: "user", account: accountFrom({ account }, ctx) }));
+      const account = requireSourceAccount(args as SourceAccount, ctx);
+      return sourceResult(domain.getMe({ kind: "user", account }));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  pin_message: {
+    schema: z.looseObject({ chat_id: chatIdSchema, message_id: z.number().int(), account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; message_id: number } & SourceAccount;
+      const account = requireSourceAccount(input, ctx);
+      const chatId = numericChatId(input.chat_id);
+      const result = domain.pinChatMessage({ kind: "user", account }, { chat_id: chatId, message_id: input.message_id }, ctx.reportDelta);
+      return sourceResult(result);
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  unpin_message: {
+    schema: z.looseObject({ chat_id: chatIdSchema, message_id: z.number().int(), account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; message_id: number } & SourceAccount;
+      const account = requireSourceAccount(input, ctx);
+      const chatId = numericChatId(input.chat_id);
+      const result = domain.unpinChatMessage({ kind: "user", account }, { chat_id: chatId, message_id: input.message_id }, ctx.reportDelta);
+      return sourceResult(result);
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  unpin_all_messages: {
+    schema: z.looseObject({ chat_id: chatIdSchema, account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId } & SourceAccount;
+      const account = requireSourceAccount(input, ctx);
+      const result = domain.unpinAllChatMessages({ kind: "user", account }, { chat_id: numericChatId(input.chat_id) }, ctx.reportDelta);
+      return sourceResult(result);
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  get_pinned_messages: {
+    schema: z.looseObject({ chat_id: chatIdSchema, account: accountSchema }),
+    mutation: false,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId } & SourceAccount;
+      return sourceResult(domain.getPinnedMessages(requireSourceAccount(input, ctx), { chat_id: numericChatId(input.chat_id) }));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  create_poll: {
+    schema: z.looseObject({
+      chat_id: z.number().int(),
+      question: z.string(),
+      // The captured source schema deliberately leaves option items unconstrained.
+      options: z.array(z.unknown()),
+      multiple_choice: z.boolean().optional(),
+      quiz_mode: z.boolean().optional(),
+      public_votes: z.boolean().optional(),
+      close_date: z.string().nullable().optional(),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as {
+        chat_id: number;
+        question: string;
+        options: unknown[];
+        multiple_choice?: boolean;
+        quiz_mode?: boolean;
+        public_votes?: boolean;
+        close_date?: string | null;
+      } & SourceAccount;
+      if (input.quiz_mode || input.close_date !== undefined && input.close_date !== null) {
+        telegramFail(400, 400, "Bad Request: quiz mode and close date are unsupported");
+      }
+      if (!input.options.every((option): option is string => typeof option === "string")) {
+        telegramFail(400, 400, "Bad Request: poll options must be strings");
+      }
+      const result = domain.createPollForUser(requireSourceAccount(input, ctx), {
+        chat_id: input.chat_id,
+        question: input.question,
+        options: input.options,
+        allows_multiple_answers: input.multiple_choice,
+        is_anonymous: input.public_votes === undefined ? undefined : !input.public_votes,
+      }, ctx.reportDelta);
+      return sourceResult(result);
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  send_reaction: {
+    schema: z.looseObject({ chat_id: chatIdSchema, message_id: z.number().int(), emoji: z.string(), big: z.boolean().optional(), account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; message_id: number; emoji: string; big?: boolean } & SourceAccount;
+      if (input.big) telegramFail(400, 400, "Bad Request: big reactions are unsupported");
+      const account = requireSourceAccount(input, ctx);
+      const result = domain.setMessageReaction({ kind: "user", account }, {
+        chat_id: numericChatId(input.chat_id),
+        message_id: input.message_id,
+        reaction: [{ type: "emoji", emoji: input.emoji }],
+      }, ctx.reportDelta);
+      return sourceResult(result);
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  remove_reaction: {
+    schema: z.looseObject({ chat_id: chatIdSchema, message_id: z.number().int(), account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; message_id: number } & SourceAccount;
+      const account = requireSourceAccount(input, ctx);
+      const result = domain.setMessageReaction({ kind: "user", account }, {
+        chat_id: numericChatId(input.chat_id),
+        message_id: input.message_id,
+        reaction: [],
+      }, ctx.reportDelta);
+      return sourceResult(result);
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  get_message_reactions: {
+    schema: z.looseObject({ chat_id: chatIdSchema, message_id: z.number().int(), limit: z.number().int().optional(), account: accountSchema }),
+    mutation: false,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; message_id: number; limit?: number } & SourceAccount;
+      const reactions = domain.getMessageReactions(requireSourceAccount(input, ctx), {
+        chat_id: numericChatId(input.chat_id),
+        message_id: input.message_id,
+      });
+      return sourceResult(limitReactionUsersPerCategory(reactions, Math.max(0, input.limit ?? 50)));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  list_inline_buttons: {
+    schema: z.looseObject({ chat_id: chatIdSchema, message_id: z.union([z.number().int(), z.string(), z.null()]).optional(), limit: z.number().int().optional(), account: accountSchema }),
+    mutation: false,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; message_id?: number | string | null; limit?: number } & SourceAccount;
+      const account = requireSourceAccount(input, ctx);
+      const chatId = numericChatId(input.chat_id);
+      if (input.message_id !== undefined && input.message_id !== null) {
+        return sourceResult(inlineTarget(domain, account, chatId, input.message_id).buttons);
+      }
+      return sourceResult(inlineMessages(domain, account, chatId, input.limit ?? 20));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  press_inline_button: {
+    schema: z.looseObject({
+      chat_id: chatIdSchema,
+      message_id: z.union([z.number().int(), z.string(), z.null()]).optional(),
+      button_text: z.string().nullable().optional(),
+      button_index: z.number().int().nullable().optional(),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as {
+        chat_id: SourceChatId;
+        message_id?: number | string | null;
+        button_text?: string | null;
+        button_index?: number | null;
+      } & SourceAccount;
+      const account = requireSourceAccount(input, ctx);
+      const chatId = numericChatId(input.chat_id);
+      const target = inlineTarget(domain, account, chatId, input.message_id);
+      const button = input.button_index !== undefined && input.button_index !== null
+        ? target.buttons[input.button_index]
+        : input.button_text === undefined || input.button_text === null
+          ? undefined
+          : target.buttons.find(({ text }) => text.toLowerCase() === input.button_text!.toLowerCase());
+      if (!button) telegramFail(400, 400, "Bad Request: inline button not found");
+      const result = domain.pressInlineButton(account, {
+        chat_id: chatId,
+        message_id: target.messageId,
+        callback_data: button.callback_data,
+      }, ctx.reportDelta);
+      return sourceResult(result);
     },
     contentText: (output) => (output as SourceResult).result,
   },
