@@ -42,14 +42,20 @@ This twin serves a subtract-only projection of that listing:
 |---|---|---|
 | list_accounts | bounded | Seeded account labels and first-name profiles, rendered as the source's profile text in its `{ result: string }` envelope. Unmodeled phone and status use the source fallbacks `N/A` and `unknown`. |
 | get_me | semantic | The signed-in seeded user, serialized in the source's `{ result: string }` envelope. |
+| pin_message / unpin_message / unpin_all_messages / get_pinned_messages | bounded | Session-bound user pin operations reuse the persisted HTTP/domain pin state and source result envelope. |
+| create_poll | bounded | User-created regular text polls (2–10 string options); source quiz and close-date forms remain unsupported. |
+| send_reaction / remove_reaction / get_message_reactions | bounded | Session-bound one-standard-emoji reactions; `big` animation remains unsupported. |
+| list_inline_buttons / press_inline_button | bounded | Observes and presses HTTP-created callback-data inline buttons, creating the same durable, expiring callback query as the Bot API workflow. |
 
-The remaining 126 source registrations are deliberately absent because this change does not add
+The remaining 116 source registrations are deliberately absent because this change does not add
 unready handlers. Each omission is named in
 [`fixtures/mcp-tools-list.meta.json`](fixtures/mcp-tools-list.meta.json)'s `projection.dropped` map,
 and the projection gate fails if the source adds or retires a tool without an explicit ruling. The
 HTTP-only media foundation still does not add an MCP media operation.
 
-Callback waiting remains an internal domain facility; neither served MCP operation exposes it.
+The source registration has no tool to create or press reply keyboards, or to answer/wait for a
+callback query. Those behaviors remain HTTP-only; MCP can only inspect and press a source-registered
+inline callback. Callback waiting remains an internal domain facility.
 
 ## Divergences
 
@@ -68,3 +74,4 @@ Callback waiting remains an internal domain facility; neither served MCP operati
 13. User pin authority is limited to an authored message in a private chat; a Bot API bot is the authorized group actor in this staged slice.
 14. Media content is bounded to 20 MiB per uploaded file and stored as SQLite bytes for its session. Multipart album attachments have a separate 64 MiB aggregate cap; each multipart request admits at most an additional 1 MiB of framing and is budgeted while streaming, even when `Content-Length` is absent. `file_unique_id`, URLs, filesystem paths, traversal, and attachment paths are not valid references.
 15. Media expires after 24 hours of twin time and is removed on seed/reset. Download paths are opaque `media/file_…` handles rather than paths beneath any host storage root.
+16. The source MCP contract has no reply-keyboard or callback-answer/wait registration. Those interaction operations stay HTTP-only rather than being invented in the projection.

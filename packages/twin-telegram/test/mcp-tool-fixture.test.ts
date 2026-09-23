@@ -66,7 +66,20 @@ describe("Telegram MCP source fixture", () => {
 
     expect(meta.substrate).toBe("upstream-capture-projection");
     expect(meta.projection?.sourceRawFileSha256).toBe(sourceMeta.rawFileSha256);
-    expect(telegramMcpToolFixture.toolNames).toEqual(["list_accounts", "get_me"]);
+    expect(telegramMcpToolFixture.toolNames).toEqual([
+      "list_accounts",
+      "get_me",
+      "list_inline_buttons",
+      "press_inline_button",
+      "pin_message",
+      "unpin_message",
+      "unpin_all_messages",
+      "get_pinned_messages",
+      "create_poll",
+      "send_reaction",
+      "remove_reaction",
+      "get_message_reactions",
+    ]);
     for (const tool of telegramMcpToolFixture.tools) expect(tool).toEqual(rows.get(tool.name));
     expect(Object.keys(meta.projection?.dropped ?? []).sort()).toEqual(
       source.result.tools.map((tool) => tool.name).filter((name) => !telegramMcpToolFixture.toolNames.includes(name)).sort(),
@@ -77,7 +90,7 @@ describe("Telegram MCP source fixture", () => {
     expect(diffServedToolsAgainstFixture(await servedTools(), telegramMcpToolFixture)).toEqual([]);
   });
 
-  it("returns the source string result envelope for the two served operations", async () => {
+  it("returns the source string result envelope for account operations", async () => {
     const app = createTelegramTwinApp({ seed: defaultSeedState() });
     const response = await app.request(`/s/${sid}/mcp`, {
       method: "POST",

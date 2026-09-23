@@ -2,10 +2,14 @@
   "twin": "telegram",
   "package": "@pome-sh/twin-telegram",
   "updated": "2026-09-23",
-  "notes": "T06 interactions plus F-1859 HTTP-only media foundation. MCP derives from the approved chigwell/telegram-mcp source-registration capture; only list_accounts and get_me are currently projected because the remaining source operations are explicitly unmodeled in the fixture provenance.",
+  "notes": "T06 interactions plus F-1859 HTTP-only media foundation. MCP subtracts from the approved chigwell/telegram-mcp source-registration capture and now projects the direct source rows for persisted pins, regular polls, standard emoji reactions, and inline callback inspection/press. The source has no reply-keyboard or callback-answer/wait row, so those remain HTTP-only.",
   "tools": [
     {"name": "list_accounts", "heat": "hot", "fidelity": "bounded", "justification": "Source-schema projection of seeded account labels and first-name profiles; unavailable phone and status values use the source fallbacks N/A and unknown."},
-    {"name": "get_me", "heat": "hot", "fidelity": "semantic", "justification": "Source-schema projection of the signed-in seeded user."}
+    {"name": "get_me", "heat": "hot", "fidelity": "semantic", "justification": "Source-schema projection of the signed-in seeded user."},
+    {"name": "pin_message/unpin_message/unpin_all_messages/get_pinned_messages", "heat": "hot", "fidelity": "bounded", "justification": "Session-bound user operations over the shared persisted pin state."},
+    {"name": "create_poll", "heat": "hot", "fidelity": "bounded", "justification": "Session-bound regular poll subset; source quiz and close-date forms are rejected."},
+    {"name": "send_reaction/remove_reaction/get_message_reactions", "heat": "hot", "fidelity": "bounded", "justification": "Session-bound one-standard-emoji reaction subset; big animation is rejected."},
+    {"name": "list_inline_buttons/press_inline_button", "heat": "hot", "fidelity": "bounded", "justification": "Observes and presses HTTP-created callback-data inline buttons, with persisted deterministic callback expiry/reset behavior."}
   ],
   "http": [
     {"name": "getMe", "heat": "hot", "fidelity": "semantic", "justification": "Bot identity."},
