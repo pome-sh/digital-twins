@@ -10,7 +10,7 @@ import { TwinError } from "./errors.js";
 import { extractTelegramPathToken, telegramPathIdentity } from "./path-token.js";
 import { registerTelegramRoutes } from "./routes.js";
 import { defaultSeedState, parseSeed, type TelegramSeed } from "./seed.js";
-import { telegramMcpToolFixture } from "./mcp-deferred-status.js";
+import { telegramTools } from "./tools.js";
 import { telegramError } from "./serializers.js";
 import { unsupportedEnvelope } from "./unsupported-envelope.js";
 import { isLoopbackWebhookUrl, telegramUpdateRuntime, type TelegramWebhookDelivery } from "./updates.js";
@@ -95,9 +95,8 @@ export function telegramTwinDefinition(
       errorEnvelope: (err) => telegramErrorEnvelope(err),
       forbidden: () => ({ status: 403, body: telegramError(403, "Forbidden") }),
     },
-    // The status fixture is an explicit absence of a compliant tools/list;
-    // it loads to an empty tool table until capture policy permits one.
-    tools: telegramMcpToolFixture.tools,
+    // The served MCP listing is derived 1:1 from the source-backed fixture.
+    tools: telegramTools,
     healthz: () => ({}),
     unsupported: () => unsupportedEnvelope,
     errorEnvelope: telegramErrorEnvelope,

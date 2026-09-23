@@ -189,28 +189,27 @@
       }
     },
     "telegram": {
-      "substrate": "live-wire-unauth",
-      "capture": false,
-      "endpoint": "http://127.0.0.1:8080/mcp",
+      "substrate": "oss-source",
+      "capture": true,
+      "endpoint": "stdio://telegram-mcp/source-registration",
       "method": "tools/list",
-      "protocol": "JSON-RPC 2.0 over HTTP",
-      "reason": "Pinned Tolboy with Telegram/TDLib disabled still serves MCP, but TelegramAccountRegistry then has exactly one label (`default`). Two named accounts require telegram.accounts.* or tdlib credentials, which call TdLibConfig.startAccount, Init.init(), and a live TDLib client. F-1852 forbids that path. A zero/single-account listing must not be frozen as the primary golden.",
-      "deferredTo": "F-1854 once a two-named-account tools/list can be captured with Telegram/TDLib still disabled, or a new F-1852 approval",
-      "revisitWhen": "local pinned Tolboy can advertise MCP_TOOL_PROFILE=all with at least two named accounts without contacting Telegram",
+      "protocol": "JSON-RPC 2.0 over stdio",
+      "protocolVersion": "2025-06-18",
       "source": {
-        "repo": "https://github.com/tolboy/telegram-mcp-tdlib",
-        "commit": "da3ee1f194c104d922449bf11a3595840e163357"
+        "repo": "https://github.com/chigwell/telegram-mcp.git",
+        "commit": "45cce7e3dbf50655645f48d5f78d8a84aec6aa8f",
+        "package": "telegram_mcp",
+        "language": "python"
       },
       "configuration": {
-        "minNamedAccounts": 2,
-        "accountSelectorProperty": "account"
-      },
-      "evidence": {
-        "inspected": "tolboy/telegram-mcp-tdlib@da3ee1f194c104d922449bf11a3595840e163357 src/main/kotlin/dev/telegrammcp/server/client/TdLibConfig.kt (telegramAccountRegistry, configuredAccounts, startAccount)",
-        "tdlibDisabledAccount": "default",
-        "captureHostJava": "22.0.1; Tolboy pin is Java 25",
-        "captureHostGradle": "not installed",
-        "serverBooted": false
+        "completeness": "exact",
+        "derivation": "Offline FastMCP registration/schema harness: `uv sync --frozen --no-dev` then imports telegram_mcp.runtime and telegram_mcp.tools and calls runtime.mcp.list_tools(). The pinned uv.lock fixes dependencies; TELEGRAM_API_ID=1, TELEGRAM_API_HASH=offline, and a local session name allow import-time client construction only. No Telegram credentials are present and no tool is called, so the harness makes no Telegram connection.",
+        "serverEnv": {
+          "TELEGRAM_API_ID": "1",
+          "TELEGRAM_API_HASH": "offline",
+          "TELEGRAM_SESSION_NAME": "/tmp/pome-telegram-mcp-capture-session",
+          "TELEGRAM_EXPOSED_TOOLS": "all"
+        }
       }
     }
   }

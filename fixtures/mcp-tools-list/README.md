@@ -29,7 +29,7 @@ rather than stamped, so a re-derivation can never make an old reading look like 
 
 ## Per twin
 
-Five first-party twins are captured. `telegram` is declared and deferred — no golden.
+Six first-party twins are captured. Telegram's golden is generated from the approved pinned OSS source's offline FastMCP registration runtime; no Telegram account or network connection is used.
 
 | twin | substrate | completeness | what was read |
 | --- | --- | --- | --- |
@@ -38,7 +38,7 @@ Five first-party twins are captured. `telegram` is declared and deferred — no 
 | stripe | `live-wire-oauth` | `credential-scoped` | `mcp.stripe.com` under an OAuth grant on the Pome account in test mode, all permissions = Write (11 tools) |
 | slack | `live-wire-oauth` | `exact` | `mcp.slack.com/mcp` under a user token carrying all 30 advertised scopes (19 tools, the count Slack documents) |
 | linear | `live-wire-oauth` | `exact` | `mcp.linear.app/mcp` under a `read write` grant (58 tools) — see below |
-| telegram | `live-wire-unauth` | — | **not captured.** Pinned Tolboy with TDLib disabled registers one `default` account. Two named accounts start TDLib. See `telegram.status.json`. |
+| telegram | `oss-source` | `exact` | chigwell/telegram-mcp at `45cce7e3dbf50655645f48d5f78d8a84aec6aa8f`, imported into an offline FastMCP registration/schema harness (128 tools). The pinned `uv.lock`, dummy import-only client configuration, and source provenance are in `telegram.meta.json`. |
 
 Every file is `<twin>.{raw,meta,canonical}.json`.
 

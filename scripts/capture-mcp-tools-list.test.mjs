@@ -93,11 +93,31 @@ function sandboxWithDeferredTwin() {
   for (const id of ["gmail", "github", "stripe", "slack", "linear", "telegram"]) {
     assert(ids.includes(id), `source table declares ${id}`);
   }
-  assert(sources.twins.telegram.capture === false, "telegram stays deferred until a two-account listing exists");
+  const telegram = sources.twins.telegram;
+  assert(telegram.capture === true, "telegram is an active captured source");
+  assert(telegram.substrate === "oss-source", "telegram capture is pinned OSS source, not a live account read");
   assert(
-    sources.twins.telegram.configuration?.minNamedAccounts === 2,
-    "telegram source (when present) must declare configuration.minNamedAccounts === 2"
+    telegram.source?.repo === "https://github.com/chigwell/telegram-mcp.git" &&
+      telegram.source?.commit === "45cce7e3dbf50655645f48d5f78d8a84aec6aa8f" &&
+      telegram.source?.package === "telegram_mcp" &&
+      telegram.source?.language === "python",
+    "telegram capture pins the approved Python source and commit"
   );
+  assert(telegram.configuration?.completeness === "exact", "telegram registration listing declares exact completeness");
+  assert(
+    typeof telegram.configuration?.derivation === "string" &&
+      telegram.configuration.derivation.includes("runtime.mcp.list_tools()"),
+    "telegram records the offline FastMCP registration harness"
+  );
+  assert(
+    !Object.hasOwn(telegram.configuration ?? {}, "minNamedAccounts"),
+    "telegram's source-registration capture has no obsolete multi-account floor"
+  );
+  const telegramPaths = goldenPaths({ repoRoot: ROOT, sources, twin: "telegram" });
+  for (const kind of ["raw", "meta", "canonical"]) {
+    assert(existsSync(telegramPaths[kind]), `telegram active capture carries ${kind}.json`);
+  }
+  assert(!existsSync(telegramPaths.status), "telegram active capture does not retain a deferred status");
   for (const [id, source] of Object.entries(sources.twins)) {
     if (source.capture) continue;
     const paths = goldenPaths({ repoRoot: ROOT, sources, twin: id });
