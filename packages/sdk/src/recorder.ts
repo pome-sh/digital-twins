@@ -420,6 +420,18 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
     record(event) {
       accept(event);
     },
+    recordRawResponse(c, result) {
+      emit(
+        c,
+        result.started,
+        null,
+        { status: result.status, body: result.body, delta: result.delta },
+        result.mutation ?? false,
+        result.fidelity ?? "semantic",
+        result.error,
+        result.tool,
+      );
+    },
     events() {
       return store.events();
     },
@@ -435,16 +447,15 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
     async close() {
       await store.close?.();
     },
-    handle({ mutation, fidelity = "semantic", errorEnvelope: perCallEnvelope, tool }, fn) {
+    handle({ mutation, fidelity = "semantic", errorEnvelope: perCallEnvelope, tool, captureRequestBody = true }, fn) {
       const projectError = perCallEnvelope ?? errorEnvelope;
       return async (c) => {
         const started = Date.now();
         let requestBody: unknown = null;
         try {
-          requestBody =
-            c.req.method === "GET" || c.req.method === "HEAD"
-              ? null
-              : await readRequestJson(c);
+          if (captureRequestBody && c.req.method !== "GET" && c.req.method !== "HEAD") {
+            requestBody = await readRequestJson(c);
+          }
           const result = await fn(c);
           const effectiveMutation = result.mutation ?? mutation;
           const errorMsg =

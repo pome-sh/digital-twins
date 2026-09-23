@@ -42,8 +42,27 @@ CREATE TABLE IF NOT EXISTS messages (
   forward_from_id INTEGER,
   forward_from_chat_id INTEGER,
   reply_markup_json TEXT,
+  media_json TEXT,
   PRIMARY KEY (chat_id, message_id)
 );
+
+-- Media bytes are deliberately stored in SQLite, never read from a host path.
+-- file_id is bot-scoped; file_unique_id is response metadata, not an input handle.
+CREATE TABLE IF NOT EXISTS media_files (
+  file_id TEXT PRIMARY KEY,
+  bot_id INTEGER NOT NULL,
+  scope_id TEXT NOT NULL DEFAULT 'local',
+  file_unique_id TEXT NOT NULL,
+  file_name TEXT,
+  mime_type TEXT,
+  size INTEGER NOT NULL,
+  sha256 TEXT NOT NULL,
+  content BLOB NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  UNIQUE(bot_id, scope_id, sha256)
+);
+CREATE INDEX IF NOT EXISTS idx_media_files_expiry ON media_files(expires_at);
 
 CREATE TABLE IF NOT EXISTS pinned_messages (
   chat_id INTEGER NOT NULL,
@@ -160,6 +179,7 @@ DELETE FROM webhook_outbox;
 DELETE FROM bot_updates;
 DELETE FROM bot_update_settings;
 DELETE FROM callback_queries;
+DELETE FROM media_files;
 DELETE FROM poll_votes;
 DELETE FROM polls;
 DELETE FROM message_reactions;
@@ -184,6 +204,8 @@ export function migrate(db: TelegramTwinDatabase): void {
     ["messages", "forward_from_id", "INTEGER"],
     ["messages", "forward_from_chat_id", "INTEGER"],
     ["messages", "reply_markup_json", "TEXT"],
+    ["messages", "media_json", "TEXT"],
+    ["media_files", "scope_id", "TEXT NOT NULL DEFAULT 'local'"],
     ["chats", "next_message_id", "INTEGER NOT NULL DEFAULT 1"],
   ] as const) {
     const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;

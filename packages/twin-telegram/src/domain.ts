@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { createHash } from "node:crypto";
 import type { StateDelta } from "@pome-sh/wire";
 import { resetDatabase, type TelegramTwinDatabase } from "./db.js";
 import { telegramFail } from "./errors.js";
@@ -24,7 +25,7 @@ export type DeltaHook = (delta: StateDelta) => void;
 const NOOP: DeltaHook = () => {};
 
 export type Actor =
-  | { kind: "bot"; botId: number }
+  | { kind: "bot"; botId: number; sid?: string }
   | { kind: "user"; account: string };
 
 type PersonRow = { id: number; first_name: string; username: string | null; is_bot: number };
@@ -32,6 +33,19 @@ type PersonRow = { id: number; first_name: string; username: string | null; is_b
 export const BOT_DELETE_WINDOW_SEC = 48 * 3600;
 export const CALLBACK_QUERY_TTL_SEC = 60;
 export const MAX_CALLBACK_DATA_BYTES = 64;
+export const MAX_MEDIA_UPLOAD_BYTES = 20 * 1024 * 1024;
+/** Extra encoded multipart framing accepted above uploaded attachment bytes. */
+export const MAX_MULTIPART_FRAMING_BYTES = 1024 * 1024;
+export const MAX_MEDIA_MULTIPART_REQUEST_BYTES = MAX_MEDIA_UPLOAD_BYTES + MAX_MULTIPART_FRAMING_BYTES;
+/** Total bytes uploaded as attachments in one multipart media album. */
+export const MAX_MEDIA_GROUP_UPLOAD_BYTES = 64 * 1024 * 1024;
+export const MAX_MEDIA_GROUP_MULTIPART_REQUEST_BYTES = MAX_MEDIA_GROUP_UPLOAD_BYTES + MAX_MULTIPART_FRAMING_BYTES;
+export const MEDIA_TTL_SEC = 24 * 3600;
+export const MAX_CAPTION_UTF16 = 1024;
+
+type MediaUpload = { bytes: Buffer; filename?: string; mimeType?: string };
+type MediaReference = string | MediaUpload;
+type MediaFileRow = { file_id: string; bot_id: number; scope_id: string; file_unique_id: string; file_name: string | null; mime_type: string | null; size: number; sha256: string; content: Buffer; expires_at: number };
 export const MAX_POLL_QUESTION_LENGTH = 300;
 export const MAX_POLL_OPTION_LENGTH = 100;
 export const MIN_POLL_OPTIONS = 2;
@@ -256,6 +270,102 @@ export class TelegramDomain {
       after: { chat_id: args.chat_id, message_id: next, text: args.text, from_id: from.id },
     });
     return serializeMessage(row, this.asUser(from), this.chat(args.chat_id));
+  }
+
+  sendMedia(
+    actor: Actor,
+    args: { chat_id: number; kind: "photo" | "document" | "video" | "audio" | "voice"; media: MediaReference; caption?: string },
+    delta: DeltaHook = NOOP,
+  ): Record<string, unknown> {
+    const botId = this.botId(actor);
+    const scopeId = this.mediaScope(actor);
+    this.requireMember(actor, args.chat_id);
+    const caption = this.validateCaption(args.caption);
+    const media = this.resolveMedia(botId, scopeId, args.media);
+    const result = this.db.transaction(() => {
+      const file = this.persistMedia(botId, scopeId, media);
+      return this.insertMediaMessage(actor, args.chat_id, args.kind, file, caption);
+    })();
+    delta({ before: null, after: { chat_id: args.chat_id, message_id: result.message_id, media: args.kind } });
+    return result;
+  }
+
+  sendMediaGroup(
+    actor: Actor,
+    args: { chat_id: number; media: Array<{ type: "photo" | "document" | "video" | "audio"; media: MediaReference; caption?: string }> },
+    delta: DeltaHook = NOOP,
+  ): Record<string, unknown>[] {
+    const botId = this.botId(actor);
+    const scopeId = this.mediaScope(actor);
+    this.requireMember(actor, args.chat_id);
+    if (args.media.length < 2 || args.media.length > 10) telegramFail(400, 400, "Bad Request: media group must include 2-10 items");
+    // Keep an explicit total even when an HTTP transport omits Content-Length.
+    // Stored file references contribute no request bytes; every uploaded file is
+    // still individually capped by resolveMedia below.
+    const uploadBytes = args.media.reduce(
+      (total, item) => total + (typeof item.media === "string" ? 0 : item.media.bytes.length),
+      0,
+    );
+    if (uploadBytes > MAX_MEDIA_GROUP_UPLOAD_BYTES) {
+      telegramFail(400, 400, `Bad Request: media group uploads must total at most ${MAX_MEDIA_GROUP_UPLOAD_BYTES} bytes`);
+    }
+    // Resolve every reference before writing anything: a failed album is atomic.
+    const resolved = args.media.map((item) => ({ ...item, caption: this.validateCaption(item.caption), resolved: this.resolveMedia(botId, scopeId, item.media) }));
+    // The next message id distinguishes otherwise identical albums submitted in
+    // the same second by the same bot.
+    const firstMessageId = (this.db.prepare("SELECT next_message_id AS next FROM chats WHERE id = ?").get(args.chat_id) as { next: number }).next;
+    const mediaGroupId = `album:${botId}:${this.now()}:${args.chat_id}:${firstMessageId}`;
+    const result = this.db.transaction(() => resolved.map((item) => {
+      const file = this.persistMedia(botId, scopeId, item.resolved);
+      return this.insertMediaMessage(actor, args.chat_id, item.type, file, item.caption, mediaGroupId);
+    }))();
+    delta({ before: null, after: { chat_id: args.chat_id, media_group_id: mediaGroupId, count: result.length } });
+    return result;
+  }
+
+  editMessageCaption(
+    actor: Actor,
+    args: { chat_id: number; message_id: number; caption?: string },
+    delta: DeltaHook = NOOP,
+  ): Record<string, unknown> {
+    const row = this.requireVisibleMessage(actor, args.chat_id, args.message_id);
+    const person = this.personFor(actor);
+    if (row.from_id !== person.id || !row.media_json) telegramFail(400, 400, "Bad Request: message can't be edited");
+    const caption = this.validateCaption(args.caption);
+    if (row.text === caption) return this.present(row);
+    const editDate = this.now();
+    this.db.prepare("UPDATE messages SET text = ?, edit_date = ? WHERE chat_id = ? AND message_id = ?").run(caption, editDate, args.chat_id, args.message_id);
+    delta({ before: { caption: row.text }, after: { caption, message_id: args.message_id } });
+    return this.present({ ...row, text: caption, edit_date: editDate });
+  }
+
+  getFile(actor: Actor, fileId: string): Record<string, unknown> {
+    const botId = this.botId(actor);
+    const scopeId = this.mediaScope(actor);
+    this.purgeExpiredMedia();
+    const row = this.db.prepare("SELECT * FROM media_files WHERE file_id = ? AND bot_id = ? AND scope_id = ?").get(fileId, botId, scopeId) as MediaFileRow | undefined;
+    if (!row) telegramFail(400, 400, "Bad Request: file not found");
+    return { file_id: row.file_id, file_unique_id: row.file_unique_id, file_size: row.size, file_path: `media/${row.file_id}` };
+  }
+
+  downloadFile(actor: Actor, path: string): { content: Buffer; mimeType: string | null } {
+    const botId = this.botId(actor);
+    const scopeId = this.mediaScope(actor);
+    this.purgeExpiredMedia();
+    // The only path accepted is the one getFile emitted. It is an opaque handle,
+    // not a filesystem pathname; traversal, separators, and symlinks cannot escape SQLite.
+    if (!/^media\/file_\d+_[a-f0-9]{8}_[a-f0-9]{32}$/.test(path)) telegramFail(400, 400, "Bad Request: file not found");
+    const fileId = path.slice("media/".length);
+    const row = this.db.prepare("SELECT * FROM media_files WHERE file_id = ? AND bot_id = ? AND scope_id = ?").get(fileId, botId, scopeId) as MediaFileRow | undefined;
+    if (!row) telegramFail(404, 404, "Not Found");
+    return { content: Buffer.from(row.content), mimeType: row.mime_type };
+  }
+
+  sendChatAction(actor: Actor, args: { chat_id: number; action: string }): true {
+    this.botId(actor);
+    this.requireMember(actor, args.chat_id);
+    if (!["typing", "upload_photo", "record_video", "upload_video", "record_voice", "upload_voice", "upload_document", "choose_sticker", "find_location", "record_video_note", "upload_video_note"].includes(args.action)) telegramFail(400, 400, "Bad Request: unsupported chat action");
+    return true;
   }
 
   listAccounts(): Array<{ account: string; id: number }> {
@@ -928,6 +1038,72 @@ export class TelegramDomain {
       chats: this.db.prepare("SELECT id, type, title FROM chats").all(),
       messages: this.db.prepare("SELECT chat_id, message_id, from_id, text, reply_to_message_id FROM messages").all(),
     };
+  }
+
+  private validateCaption(caption: string | undefined): string {
+    const value = caption ?? "";
+    // String.length is UTF-16 code units, the Bot API's caption unit.
+    if (value.length > MAX_CAPTION_UTF16) telegramFail(400, 400, `Bad Request: caption is too long (max ${MAX_CAPTION_UTF16} UTF-16 characters)`);
+    return value;
+  }
+
+  private resolveMedia(botId: number, scopeId: string, source: MediaReference): MediaUpload | MediaFileRow {
+    if (typeof source !== "string") {
+      if (source.bytes.length === 0 || source.bytes.length > MAX_MEDIA_UPLOAD_BYTES) telegramFail(400, 400, `Bad Request: upload must be 1-${MAX_MEDIA_UPLOAD_BYTES} bytes`);
+      if (source.filename && (source.filename.includes("/") || source.filename.includes("\\") || source.filename === "." || source.filename === "..")) telegramFail(400, 400, "Bad Request: unsafe file name");
+      return source;
+    }
+    if (/^(?:https?:|file:|attach:\/\/)/i.test(source) || source.includes("/") || source.includes("\\") || source.includes("..")) telegramFail(400, 400, "Bad Request: URLs and host file paths are not supported");
+    if (source.startsWith("unique_")) telegramFail(400, 400, "Bad Request: file_unique_id cannot be used as a file reference");
+    this.purgeExpiredMedia();
+    const row = this.db.prepare("SELECT * FROM media_files WHERE file_id = ? AND bot_id = ? AND scope_id = ?").get(source, botId, scopeId) as MediaFileRow | undefined;
+    if (!row) telegramFail(400, 400, "Bad Request: file not found");
+    return row;
+  }
+
+  private persistMedia(botId: number, scopeId: string, value: MediaUpload | MediaFileRow): MediaFileRow {
+    if ("file_id" in value) return value;
+    const sha256 = createHash("sha256").update(value.bytes).digest("hex");
+    const scopeHash = createHash("sha256").update(scopeId).digest("hex").slice(0, 8);
+    const fileId = `file_${botId}_${scopeHash}_${sha256.slice(0, 32)}`;
+    const now = this.now();
+    const existing = this.db.prepare("SELECT * FROM media_files WHERE file_id = ? AND bot_id = ? AND scope_id = ?").get(fileId, botId, scopeId) as MediaFileRow | undefined;
+    if (existing) {
+      this.db.prepare("UPDATE media_files SET file_name = ?, mime_type = ?, expires_at = ? WHERE file_id = ?").run(
+        value.filename ?? null,
+        value.mimeType ?? null,
+        now + MEDIA_TTL_SEC,
+        fileId,
+      );
+      return {
+        ...existing,
+        file_name: value.filename ?? null,
+        mime_type: value.mimeType ?? null,
+        expires_at: now + MEDIA_TTL_SEC,
+      };
+    }
+    const row: MediaFileRow = { file_id: fileId, bot_id: botId, scope_id: scopeId, file_unique_id: `unique_${sha256.slice(0, 32)}`, file_name: value.filename ?? null, mime_type: value.mimeType ?? null, size: value.bytes.length, sha256, content: value.bytes, expires_at: now + MEDIA_TTL_SEC };
+    this.db.prepare("INSERT INTO media_files (file_id, bot_id, scope_id, file_unique_id, file_name, mime_type, size, sha256, content, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(row.file_id, row.bot_id, row.scope_id, row.file_unique_id, row.file_name, row.mime_type, row.size, row.sha256, row.content, now, row.expires_at);
+    return row;
+  }
+
+  private insertMediaMessage(actor: Actor, chatId: number, kind: "photo" | "document" | "video" | "audio" | "voice", file: MediaFileRow, caption: string, mediaGroupId?: string): Record<string, unknown> {
+    const from = this.personFor(actor);
+    const messageId = (this.db.prepare("SELECT next_message_id AS next FROM chats WHERE id = ?").get(chatId) as { next: number }).next;
+    const date = this.now();
+    const fileInfo = { file_id: file.file_id, file_unique_id: file.file_unique_id, file_size: file.size, ...(file.file_name ? { file_name: file.file_name } : {}), ...(file.mime_type ? { mime_type: file.mime_type } : {}) };
+    const media = { [kind]: kind === "photo" ? [fileInfo] : fileInfo, ...(mediaGroupId ? { media_group_id: mediaGroupId } : {}) };
+    this.db.prepare("UPDATE chats SET next_message_id = next_message_id + 1 WHERE id = ?").run(chatId);
+    this.db.prepare("INSERT INTO messages (chat_id, message_id, from_id, text, date, reply_to_message_id, edit_date, forward_from_id, forward_from_chat_id, reply_markup_json, media_json) VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?)").run(chatId, messageId, from.id, caption, date, JSON.stringify(media));
+    return this.present({ chat_id: chatId, message_id: messageId, from_id: from.id, text: caption, date, reply_to_message_id: null, media_json: JSON.stringify(media) });
+  }
+
+  private purgeExpiredMedia(): void {
+    this.db.prepare("DELETE FROM media_files WHERE expires_at <= ?").run(this.now());
+  }
+
+  private mediaScope(actor: Actor): string {
+    return actor.kind === "bot" ? actor.sid ?? "local" : "local";
   }
 
   private botId(actor: Actor): number {

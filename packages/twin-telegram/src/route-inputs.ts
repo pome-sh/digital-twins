@@ -6,6 +6,8 @@ import {
   MAX_POLL_QUESTION_LENGTH,
   MAX_POLL_OPTIONS,
   MIN_POLL_OPTIONS,
+  MAX_MEDIA_GROUP_MULTIPART_REQUEST_BYTES,
+  MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 } from "./domain.js";
 
 const declareInputs = routeInputDeclarer("ignore");
@@ -16,6 +18,15 @@ const jsonValue = z.preprocess((value) => {
   if (typeof value !== "string") return value;
   try { return JSON.parse(value); } catch { return value; }
 }, z.unknown());
+const mediaValue = z.unknown().refine((value) => value !== undefined, "media is required");
+const mediaGroup = z.preprocess((value) => {
+  if (typeof value !== "string") return value;
+  try { return JSON.parse(value); } catch { return value; }
+}, z.array(z.object({
+  type: z.enum(["photo", "document", "video", "audio"]),
+  media: z.string(),
+  caption: z.string().optional(),
+})).min(2).max(10));
 const sendBody = {
   chat_id: z.coerce.number().int(),
   text: z.string(),
@@ -94,6 +105,54 @@ export const POST_SEND_MESSAGE = declareInputs({
   pathParams: credParam,
   body: sendBody,
   bodyEncoding: "form",
+});
+
+export const POST_EDIT_MESSAGE_CAPTION = declareInputs({
+  method: "POST",
+  path: "/:cred{bot[^/]+}/editMessageCaption",
+  pathParams: credParam,
+  body: { ...messageBody, caption: z.string().optional() },
+  bodyEncoding: "form",
+});
+
+export const POST_SEND_PHOTO = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/sendPhoto", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), photo: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+});
+export const POST_SEND_DOCUMENT = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/sendDocument", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), document: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+});
+export const POST_SEND_VIDEO = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/sendVideo", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), video: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+});
+export const POST_SEND_AUDIO = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/sendAudio", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), audio: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+});
+export const POST_SEND_VOICE = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/sendVoice", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), voice: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+});
+export const POST_SEND_MEDIA_GROUP = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/sendMediaGroup", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), media: mediaGroup },
+  bodyEncoding: "form",
+  maxBodyBytes: MAX_MEDIA_GROUP_MULTIPART_REQUEST_BYTES,
+  multipartAttachmentsFrom: "media",
+});
+export const POST_GET_FILE = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/getFile", pathParams: credParam,
+  body: { file_id: z.string().min(1) }, bodyEncoding: "form",
+});
+export const POST_SEND_CHAT_ACTION = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/sendChatAction", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), action: z.string().min(1) }, bodyEncoding: "form",
+});
+/** The download path is opaque media/<file_id>, never a host path. */
+export const GET_FILE_DOWNLOAD = declareInputs({
+  method: "GET", path: "/file/:cred{bot[^/]+}/:file_path{.+}", pathParams: { ...credParam, file_path: z.string().min(1) },
 });
 
 export const POST_EDIT_MESSAGE_REPLY_MARKUP = declareInputs({
@@ -262,6 +321,16 @@ export const TELEGRAM_ROUTE_INPUTS: readonly RouteInputDeclaration[] = [
   GET_CHAT,
   POST_GET_CHAT,
   POST_SEND_MESSAGE,
+  POST_EDIT_MESSAGE_CAPTION,
+  POST_SEND_PHOTO,
+  POST_SEND_DOCUMENT,
+  POST_SEND_VIDEO,
+  POST_SEND_AUDIO,
+  POST_SEND_VOICE,
+  POST_SEND_MEDIA_GROUP,
+  POST_GET_FILE,
+  POST_SEND_CHAT_ACTION,
+  GET_FILE_DOWNLOAD,
   POST_EDIT_MESSAGE_REPLY_MARKUP,
   POST_PIN_CHAT_MESSAGE,
   POST_UNPIN_CHAT_MESSAGE,

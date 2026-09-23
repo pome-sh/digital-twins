@@ -2,7 +2,7 @@
   "twin": "telegram",
   "package": "@pome-sh/twin-telegram",
   "updated": "2026-09-21",
-  "notes": "T06 interactions slice. MCP operations are deferred pending a compliant captured multi-account tools/list artifact (fixtures/mcp-tools-list/telegram.status.json).",
+  "notes": "T06 interactions plus F-1859 HTTP-only media foundation. MCP operations, including media tools, remain deferred pending a compliant captured multi-account tools/list artifact (fixtures/mcp-tools-list/telegram.status.json).",
   "tools": [],
   "http": [
     {"name": "getMe", "heat": "hot", "fidelity": "semantic", "justification": "Bot identity."},
@@ -24,6 +24,11 @@
     {"name": "answerCallbackQuery", "heat": "hot", "fidelity": "bounded", "justification": "One-shot expiring callback answer."},
     {"name": "sendPoll", "heat": "hot", "fidelity": "bounded", "justification": "Regular poll subset."},
     {"name": "stopPoll", "heat": "hot", "fidelity": "bounded", "justification": "Bot-authored poll closure."},
-    {"name": "setMessageReaction", "heat": "hot", "fidelity": "bounded", "justification": "Standard emoji subset."}
+    {"name": "setMessageReaction", "heat": "hot", "fidelity": "bounded", "justification": "Standard emoji subset."},
+    {"name": "sendPhoto/sendDocument/sendVideo/sendAudio/sendVoice", "heat": "hot", "fidelity": "bounded", "justification": "HTTP-only bot-scoped SQLite media upload/reference subset."},
+    {"name": "sendMediaGroup", "heat": "hot", "fidelity": "bounded", "justification": "Atomic 2-10 item album subset."},
+    {"name": "editMessageCaption", "heat": "hot", "fidelity": "bounded", "justification": "Author-only UTF-16 bounded media captions."},
+    {"name": "getFile/file download", "heat": "hot", "fidelity": "bounded", "justification": "Opaque expiring bot-scoped byte handles."},
+    {"name": "sendChatAction", "heat": "warm", "fidelity": "bounded", "justification": "Membership and action validation only."}
   ]
 }
