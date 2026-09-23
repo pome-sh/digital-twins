@@ -89,4 +89,17 @@ describe("Telegram MCP source fixture", () => {
     expect(body.result).toMatchObject({ structuredContent: { result: expect.any(String) } });
     expect(JSON.parse(body.result!.structuredContent!.result!)).toMatchObject({ id: 2001, username: "alice" });
   });
+
+  it("lists seeded account profile names in the source text format", async () => {
+    const app = createTelegramTwinApp({ seed: defaultSeedState() });
+    const response = await app.request(`/s/${sid}/mcp`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "list_accounts", arguments: {} } }),
+    });
+    const body = (await response.json()) as { result?: { structuredContent?: { result?: string } }; error?: unknown };
+
+    expect(body.error).toBeUndefined();
+    expect(body.result?.structuredContent?.result).toBe("alice: Alice (+N/A) — unknown\nbob: Bob (+N/A) — unknown");
+  });
 });

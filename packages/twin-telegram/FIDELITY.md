@@ -40,7 +40,7 @@ This twin serves a subtract-only projection of that listing:
 
 | Tool | Fidelity | Notes |
 |---|---|---|
-| list_accounts | bounded | Seeded account labels and ids, serialized in the source's `{ result: string }` envelope; source profile details are not modeled. |
+| list_accounts | bounded | Seeded account labels and first-name profiles, rendered as the source's profile text in its `{ result: string }` envelope. Unmodeled phone and status use the source fallbacks `N/A` and `unknown`. |
 | get_me | semantic | The signed-in seeded user, serialized in the source's `{ result: string }` envelope. |
 
 The remaining 126 source registrations are deliberately absent because this change does not add

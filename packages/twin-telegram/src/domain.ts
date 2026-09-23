@@ -368,13 +368,11 @@ export class TelegramDomain {
     return true;
   }
 
-  listAccounts(): Array<{ account: string; id: number }> {
-    return (
-      this.db.prepare("SELECT account, id FROM users ORDER BY account").all() as Array<{
-        account: string;
-        id: number;
-      }>
-    );
+  listAccounts(): Array<{ account: string; first_name: string }> {
+    return this.db.prepare("SELECT account, first_name FROM users ORDER BY account").all() as Array<{
+      account: string;
+      first_name: string;
+    }>;
   }
 
   listChats(account: string): Record<string, unknown>[] {

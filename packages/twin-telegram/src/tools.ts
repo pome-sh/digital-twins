@@ -13,17 +13,23 @@ export const telegramMcpToolFixture = loadMcpToolFixture({ raw: rawListing, meta
 type SourceResult = { result: string };
 
 function sourceResult(value: unknown): SourceResult {
-  // telegram-mcp's registered output schema is `{ result: string }`. Its
-  // result text is intentionally opaque to this source projection, so retain
-  // the local structured value as JSON instead of inventing a second schema.
-  return { result: JSON.stringify(value) };
+  // telegram-mcp's registered output schema is `{ result: string }`. Preserve
+  // source text when the source operation returns text; structured twin values
+  // are encoded in that string envelope.
+  return { result: typeof value === "string" ? value : JSON.stringify(value) };
 }
 
 const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
   list_accounts: {
     schema: z.looseObject({}),
     mutation: false,
-    handler: (domain) => sourceResult(domain.listAccounts()),
+    handler: (domain) =>
+      sourceResult(
+        domain
+          .listAccounts()
+          .map(({ account, first_name }) => `${account}: ${first_name} (+N/A) — unknown`)
+          .join("\n"),
+      ),
     contentText: (output) => (output as SourceResult).result,
   },
   get_me: {
