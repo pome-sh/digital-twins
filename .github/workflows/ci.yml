@@ -317,16 +317,18 @@ jobs:
       # be. twin-slack subtracts the tools ruled unexposed; twin-gmail subtracts
       # nothing; twin-github is the one that can also ADD, since two tools GitHub
       # gates behind `X-MCP-Features` cannot appear in a flags-off golden and are
-      # carried forward — so this also catches a carried row GitHub has since
-      # started declaring. The sha in each meta.json only catches a hand edit to
-      # the raw file. Needs the build: the scripts import @pome-sh/sdk.
-      - name: MCP fixture gates (slack, gmail, github)
+      # carried forward; twin-telegram subtracts every source registration its
+      # seeded user-MCP slice cannot honestly serve. The sha in each meta.json
+      # only catches a hand edit to the raw file. Needs the build: the scripts
+      # import @pome-sh/sdk.
+      - name: MCP fixture gates (slack, gmail, github, telegram)
         if: steps.scope.outputs.heavy == 'true'
         run: |
           set -euo pipefail
           npm run gate:mcp-fixture -w @pome-sh/twin-slack
           npm run gate:mcp-fixture -w @pome-sh/twin-gmail
           npm run gate:mcp-fixture -w @pome-sh/twin-github
+          npm run gate:mcp-fixture -w @pome-sh/twin-telegram
 
       # twin-github's per-operation `documentation_url` slice of GitHub's OpenAPI
       # description. The 12.9 MB description is NOT committed, so this is what
@@ -398,9 +400,9 @@ jobs:
           npm run probe:twins
           node scripts/probe-twin-endpoints.test.mjs
 
-      - name: Unit tests (wire, sdk, stripe, gmail, linear, checks, sandbox-domains, dashboard)
+      - name: Unit tests (wire, sdk, stripe, gmail, linear, telegram, checks, sandbox-domains, dashboard)
         if: steps.scope.outputs.heavy == 'true'
-        run: npx vitest run --project wire --project sdk --project twin-stripe --project twin-gmail --project twin-linear --project checks --project sandbox-domains --project dashboard
+        run: npx vitest run --project wire --project sdk --project twin-stripe --project twin-gmail --project twin-linear --project twin-telegram --project checks --project sandbox-domains --project dashboard
 
       # The tarball half of the @pome-sh/checks audit: the engine is not inlined,
       # zod stayed external (one schema identity), the DSL exists exactly once
