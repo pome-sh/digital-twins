@@ -82,6 +82,32 @@ describe("Telegram MCP interaction projection", () => {
     ]));
   });
 
+  it("limits reaction users independently for each reaction category", async () => {
+    const seed = defaultSeedState();
+    seed.messages = [{ chat_id: -1001234567890, message_id: 1, from_id: 2001, text: "target" }];
+    const app = createTelegramTwinApp({ seed });
+
+    expect(JSON.parse(resultText(await call(app, aliceToken, "send_reaction", {
+      chat_id: -1001234567890,
+      message_id: 1,
+      emoji: "👍",
+    })))).toEqual({ ok: true });
+    expect(JSON.parse(resultText(await call(app, bobToken, "send_reaction", {
+      chat_id: -1001234567890,
+      message_id: 1,
+      emoji: "❤️",
+    })))).toEqual({ ok: true });
+
+    expect(JSON.parse(resultText(await call(app, aliceToken, "get_message_reactions", {
+      chat_id: -1001234567890,
+      message_id: 1,
+      limit: 1,
+    })))).toEqual([
+      { user: { id: 2001, is_bot: false, first_name: "Alice", username: "alice" }, reaction: { type: "emoji", emoji: "👍" } },
+      { user: { id: 2002, is_bot: false, first_name: "Bob", username: "bob" }, reaction: { type: "emoji", emoji: "❤️" } },
+    ]);
+  });
+
   it("operates HTTP-created inline callbacks, isolates sessions, and clears callback state on reset", async () => {
     let now = 1_700_000_000;
     const app = createTelegramTwinApp({ seed: defaultSeedState(), now: () => now });

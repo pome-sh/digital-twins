@@ -72,6 +72,17 @@ function inlineTarget(
   return { messageId: recent.message_id, buttons: recent.buttons };
 }
 
+function limitReactionUsersPerCategory(reactions: Record<string, unknown>[], limit: number): Record<string, unknown>[] {
+  const categoryCounts = new Map<string, number>();
+  return reactions.filter((reaction) => {
+    const category = JSON.stringify(reaction.reaction);
+    const count = categoryCounts.get(category) ?? 0;
+    if (count >= limit) return false;
+    categoryCounts.set(category, count + 1);
+    return true;
+  });
+}
+
 const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
   list_accounts: {
     schema: z.looseObject({}),
@@ -218,7 +229,7 @@ const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
         chat_id: numericChatId(input.chat_id),
         message_id: input.message_id,
       });
-      return sourceResult(reactions.slice(0, Math.max(0, input.limit ?? 50)));
+      return sourceResult(limitReactionUsersPerCategory(reactions, Math.max(0, input.limit ?? 50)));
     },
     contentText: (output) => (output as SourceResult).result,
   },
