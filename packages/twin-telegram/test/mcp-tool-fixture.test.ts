@@ -79,6 +79,12 @@ describe("Telegram MCP source fixture", () => {
       "send_reaction",
       "remove_reaction",
       "get_message_reactions",
+      "get_media_info",
+      "download_media",
+      "send_file",
+      "send_voice",
+      "send_sticker",
+      "get_sticker_sets",
     ]);
     for (const tool of telegramMcpToolFixture.tools) expect(tool).toEqual(rows.get(tool.name));
     expect(Object.keys(meta.projection?.dropped ?? []).sort()).toEqual(
