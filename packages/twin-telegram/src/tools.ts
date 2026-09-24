@@ -7,7 +7,7 @@ import rawListing from "../fixtures/mcp-tools-list.raw.json" with { type: "json"
 import metaListing from "../fixtures/mcp-tools-list.meta.json" with { type: "json" };
 import type { TelegramDomain } from "./domain.js";
 import { telegramFail } from "./errors.js";
-import { listStickerSets, resolveCatalogFile, type CatalogFile } from "./media-catalog.js";
+import { listStickerSets, resolveCatalogFile, resolveChatPhoto, type CatalogFile } from "./media-catalog.js";
 import { accountFrom } from "./tool-adapters.js";
 
 export const telegramMcpToolFixture = loadMcpToolFixture({ raw: rawListing, meta: metaListing });
@@ -398,10 +398,369 @@ const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
     },
     contentText: (output) => (output as SourceResult).result,
   },
+  create_group: {
+    schema: z.looseObject({
+      title: z.string(),
+      user_ids: z.array(z.union([z.number().int(), z.string()])),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { title: string; user_ids: Array<number | string> } & SourceAccount;
+      return sourceResult(domain.createGroup(requireSourceAccount(input, ctx), input, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  invite_to_group: {
+    schema: z.looseObject({
+      group_id: chatIdSchema,
+      user_ids: z.array(z.union([z.number().int(), z.string()])),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { group_id: SourceChatId; user_ids: Array<number | string> } & SourceAccount;
+      return sourceResult(domain.inviteToGroup(requireSourceAccount(input, ctx), {
+        group_id: numericChatId(input.group_id),
+        user_ids: input.user_ids,
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  leave_chat: {
+    schema: z.looseObject({ chat_id: chatIdSchema, account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId } & SourceAccount;
+      return sourceResult(domain.leaveChat({ kind: "user", account: requireSourceAccount(input, ctx) }, {
+        chat_id: numericChatId(input.chat_id),
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  get_participants: {
+    schema: z.looseObject({
+      chat_id: chatIdSchema,
+      page: z.number().int().optional(),
+      page_size: z.number().int().optional(),
+      account: accountSchema,
+    }),
+    mutation: false,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; page?: number; page_size?: number } & SourceAccount;
+      return sourceResult(domain.getParticipants(requireSourceAccount(input, ctx), {
+        chat_id: numericChatId(input.chat_id),
+        page: input.page,
+        page_size: input.page_size,
+      }));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  edit_chat_title: {
+    schema: z.looseObject({ chat_id: chatIdSchema, title: z.string(), account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; title: string } & SourceAccount;
+      return sourceResult(domain.setChatTitle({ kind: "user", account: requireSourceAccount(input, ctx) }, {
+        chat_id: numericChatId(input.chat_id),
+        title: input.title,
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  edit_chat_about: {
+    schema: z.looseObject({ chat_id: chatIdSchema, about: z.string(), account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; about: string } & SourceAccount;
+      return sourceResult(domain.setChatDescription({ kind: "user", account: requireSourceAccount(input, ctx) }, {
+        chat_id: numericChatId(input.chat_id),
+        description: input.about,
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  edit_chat_photo: {
+    schema: z.looseObject({ chat_id: chatIdSchema, file_path: z.string(), account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; file_path: string } & SourceAccount;
+      const account = requireSourceAccount(input, ctx);
+      return sourceResult(domain.editChatPhoto({ kind: "user", account }, {
+        chat_id: numericChatId(input.chat_id),
+        media: catalogMedia(resolveChatPhoto(input.file_path)),
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  delete_chat_photo: {
+    schema: z.looseObject({ chat_id: chatIdSchema, account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId } & SourceAccount;
+      return sourceResult(domain.deleteChatPhoto({ kind: "user", account: requireSourceAccount(input, ctx) }, {
+        chat_id: numericChatId(input.chat_id),
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  promote_admin: {
+    schema: z.looseObject({
+      group_id: chatIdSchema,
+      user_id: z.union([z.number().int(), z.string()]),
+      rights: z.record(z.string(), z.unknown()).nullable().optional(),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { group_id: SourceChatId; user_id: number | string; rights?: Record<string, unknown> | null } & SourceAccount;
+      return sourceResult(domain.promoteChatMember({ kind: "user", account: requireSourceAccount(input, ctx) }, {
+        chat_id: numericChatId(input.group_id),
+        user_id: input.user_id,
+        rights: input.rights ?? undefined,
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  demote_admin: {
+    schema: z.looseObject({
+      group_id: chatIdSchema,
+      user_id: z.union([z.number().int(), z.string()]),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { group_id: SourceChatId; user_id: number | string } & SourceAccount;
+      return sourceResult(domain.demoteChatMember({ kind: "user", account: requireSourceAccount(input, ctx) }, {
+        chat_id: numericChatId(input.group_id),
+        user_id: input.user_id,
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  ban_user: {
+    schema: z.looseObject({
+      chat_id: chatIdSchema,
+      user_id: z.union([z.number().int(), z.string()]),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; user_id: number | string } & SourceAccount;
+      return sourceResult(domain.banChatMember({ kind: "user", account: requireSourceAccount(input, ctx) }, {
+        chat_id: numericChatId(input.chat_id),
+        user_id: input.user_id,
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  unban_user: {
+    schema: z.looseObject({
+      chat_id: chatIdSchema,
+      user_id: z.union([z.number().int(), z.string()]),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; user_id: number | string } & SourceAccount;
+      return sourceResult(domain.unbanChatMember({ kind: "user", account: requireSourceAccount(input, ctx) }, {
+        chat_id: numericChatId(input.chat_id),
+        user_id: input.user_id,
+        only_if_banned: true,
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  remove_user: {
+    schema: z.looseObject({
+      chat_id: chatIdSchema,
+      user_id: z.union([z.number().int(), z.string()]),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; user_id: number | string } & SourceAccount;
+      return sourceResult(domain.removeUser({ kind: "user", account: requireSourceAccount(input, ctx) }, {
+        chat_id: numericChatId(input.chat_id),
+        user_id: input.user_id,
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  set_default_chat_permissions: {
+    schema: z.looseObject({
+      chat_id: chatIdSchema,
+      send_messages: z.boolean().optional(),
+      send_media: z.boolean().optional(),
+      send_stickers: z.boolean().optional(),
+      send_gifs: z.boolean().optional(),
+      send_games: z.boolean().optional(),
+      send_inline: z.boolean().optional(),
+      embed_links: z.boolean().optional(),
+      send_polls: z.boolean().optional(),
+      change_info: z.boolean().optional(),
+      invite_users: z.boolean().optional(),
+      pin_messages: z.boolean().optional(),
+      until_date: z.number().int().optional(),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as {
+        chat_id: SourceChatId;
+        send_messages?: boolean;
+        send_media?: boolean;
+        send_stickers?: boolean;
+        send_gifs?: boolean;
+        send_games?: boolean;
+        send_inline?: boolean;
+        embed_links?: boolean;
+        send_polls?: boolean;
+        change_info?: boolean;
+        invite_users?: boolean;
+        pin_messages?: boolean;
+        until_date?: number;
+      } & SourceAccount;
+      return sourceResult(domain.setChatPermissions({ kind: "user", account: requireSourceAccount(input, ctx) }, {
+        chat_id: numericChatId(input.chat_id),
+        permissions: pickBooleanFlags(input, SOURCE_PERMISSION_FLAGS),
+        until_date: input.until_date,
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  toggle_slow_mode: {
+    schema: z.looseObject({
+      chat_id: chatIdSchema,
+      seconds: z.number().int().optional(),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; seconds?: number } & SourceAccount;
+      return sourceResult(domain.toggleSlowMode({ kind: "user", account: requireSourceAccount(input, ctx) }, {
+        chat_id: numericChatId(input.chat_id),
+        seconds: input.seconds,
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  edit_admin_rights: {
+    schema: z.looseObject({
+      chat_id: chatIdSchema,
+      user_id: z.union([z.number().int(), z.string()]),
+      rank: z.string().optional(),
+      change_info: z.boolean().optional(),
+      post_messages: z.boolean().optional(),
+      edit_messages: z.boolean().optional(),
+      delete_messages: z.boolean().optional(),
+      ban_users: z.boolean().optional(),
+      invite_users: z.boolean().optional(),
+      pin_messages: z.boolean().optional(),
+      add_admins: z.boolean().optional(),
+      anonymous: z.boolean().optional(),
+      manage_call: z.boolean().optional(),
+      manage_topics: z.boolean().optional(),
+      other: z.boolean().optional(),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as {
+        chat_id: SourceChatId;
+        user_id: number | string;
+        rank?: string;
+        change_info?: boolean;
+        post_messages?: boolean;
+        edit_messages?: boolean;
+        delete_messages?: boolean;
+        ban_users?: boolean;
+        invite_users?: boolean;
+        pin_messages?: boolean;
+        add_admins?: boolean;
+        anonymous?: boolean;
+        manage_call?: boolean;
+        manage_topics?: boolean;
+        other?: boolean;
+      } & SourceAccount;
+      const flags = pickBooleanFlags(input, SOURCE_ADMIN_RIGHT_FLAGS);
+      return sourceResult(domain.editAdminRights({ kind: "user", account: requireSourceAccount(input, ctx) }, {
+        chat_id: numericChatId(input.chat_id),
+        user_id: input.user_id,
+        rank: input.rank,
+        rights: Object.keys(flags).length > 0 ? flags : undefined,
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  get_admins: {
+    schema: z.looseObject({ chat_id: chatIdSchema, account: accountSchema }),
+    mutation: false,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId } & SourceAccount;
+      return sourceResult(domain.getAdmins(requireSourceAccount(input, ctx), { chat_id: numericChatId(input.chat_id) }));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  get_banned_users: {
+    schema: z.looseObject({ chat_id: chatIdSchema, account: accountSchema }),
+    mutation: false,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId } & SourceAccount;
+      return sourceResult(domain.getBannedUsers(requireSourceAccount(input, ctx), { chat_id: numericChatId(input.chat_id) }));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  get_recent_actions: {
+    schema: z.looseObject({ chat_id: chatIdSchema, account: accountSchema }),
+    mutation: false,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId } & SourceAccount;
+      return sourceResult(domain.getRecentActions(requireSourceAccount(input, ctx), { chat_id: numericChatId(input.chat_id) }));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
 };
 
 function catalogMedia(source: CatalogFile | string): { bytes: Buffer; filename: string; mimeType: string } | string {
   return typeof source === "string" ? source : { bytes: source.bytes, filename: source.filename, mimeType: source.mimeType };
+}
+
+const SOURCE_ADMIN_RIGHT_FLAGS = [
+  "change_info",
+  "post_messages",
+  "edit_messages",
+  "delete_messages",
+  "ban_users",
+  "invite_users",
+  "pin_messages",
+  "add_admins",
+  "anonymous",
+  "manage_call",
+  "manage_topics",
+  "other",
+] as const;
+
+const SOURCE_PERMISSION_FLAGS = [
+  "send_messages",
+  "send_media",
+  "send_stickers",
+  "send_gifs",
+  "send_games",
+  "send_inline",
+  "embed_links",
+  "send_polls",
+  "change_info",
+  "invite_users",
+  "pin_messages",
+] as const;
+
+function pickBooleanFlags<K extends string>(input: Record<string, unknown>, keys: readonly K[]): Partial<Record<K, boolean>> {
+  const flags: Partial<Record<K, boolean>> = {};
+  for (const key of keys) {
+    if (typeof input[key] === "boolean") flags[key] = input[key];
+  }
+  return flags;
 }
 
 export const telegramTools = deriveMcpToolTable(telegramMcpToolFixture, implementations);

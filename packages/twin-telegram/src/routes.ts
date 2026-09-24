@@ -41,7 +41,22 @@ import {
   POST_SEND_MESSAGE,
   POST_SET_WEBHOOK,
   POST_DELETE_WEBHOOK,
+  GET_CHAT_ADMINISTRATORS,
+  POST_GET_CHAT_ADMINISTRATORS,
+  GET_CHAT_MEMBER_COUNT,
+  POST_GET_CHAT_MEMBER_COUNT,
+  GET_CHAT_MEMBER,
+  POST_GET_CHAT_MEMBER,
+  POST_SET_CHAT_TITLE,
+  POST_SET_CHAT_DESCRIPTION,
+  POST_SET_CHAT_PERMISSIONS,
+  POST_BAN_CHAT_MEMBER,
+  POST_UNBAN_CHAT_MEMBER,
+  POST_RESTRICT_CHAT_MEMBER,
+  POST_PROMOTE_CHAT_MEMBER,
+  POST_LEAVE_CHAT,
 } from "./route-inputs.js";
+import { ZERO_ADMIN_RIGHTS, adminRightsFromFlags } from "./membership.js";
 import { telegramOk } from "./serializers.js";
 
 function botActor(c: Context): { kind: "bot"; botId: number; sid?: string } {
@@ -316,5 +331,78 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
   mountDeclaredRoute(app, POST_GET_WEBHOOK_INFO, recorder.handle({ mutation: false }, async (c) => {
     await POST_GET_WEBHOOK_INFO.parse(c.req);
     return getWebhookInfo(c);
+  }));
+
+  mountDeclaredRoute(app, GET_CHAT_ADMINISTRATORS, recorder.handle({ mutation: false }, async (c) => {
+    const parsed = await GET_CHAT_ADMINISTRATORS.parse(c.req);
+    return { status: 200, body: telegramOk(domain.getChatAdministrators(botActor(c), parsed.query.chat_id)) };
+  }));
+  mountDeclaredRoute(app, POST_GET_CHAT_ADMINISTRATORS, recorder.handle({ mutation: false }, async (c) => {
+    const parsed = await POST_GET_CHAT_ADMINISTRATORS.parse(c.req);
+    return { status: 200, body: telegramOk(domain.getChatAdministrators(botActor(c), parsed.body.chat_id)) };
+  }));
+  mountDeclaredRoute(app, GET_CHAT_MEMBER_COUNT, recorder.handle({ mutation: false }, async (c) => {
+    const parsed = await GET_CHAT_MEMBER_COUNT.parse(c.req);
+    return { status: 200, body: telegramOk(domain.getChatMemberCount(botActor(c), parsed.query.chat_id)) };
+  }));
+  mountDeclaredRoute(app, POST_GET_CHAT_MEMBER_COUNT, recorder.handle({ mutation: false }, async (c) => {
+    const parsed = await POST_GET_CHAT_MEMBER_COUNT.parse(c.req);
+    return { status: 200, body: telegramOk(domain.getChatMemberCount(botActor(c), parsed.body.chat_id)) };
+  }));
+  mountDeclaredRoute(app, GET_CHAT_MEMBER, recorder.handle({ mutation: false }, async (c) => {
+    const parsed = await GET_CHAT_MEMBER.parse(c.req);
+    return { status: 200, body: telegramOk(domain.getChatMember(botActor(c), parsed.query)) };
+  }));
+  mountDeclaredRoute(app, POST_GET_CHAT_MEMBER, recorder.handle({ mutation: false }, async (c) => {
+    const parsed = await POST_GET_CHAT_MEMBER.parse(c.req);
+    return { status: 200, body: telegramOk(domain.getChatMember(botActor(c), parsed.body)) };
+  }));
+  mountDeclaredRoute(app, POST_SET_CHAT_TITLE, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_SET_CHAT_TITLE.parse(c.req);
+    const result = captureDelta((report) => domain.setChatTitle(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(true), delta: result.delta };
+  }));
+  mountDeclaredRoute(app, POST_SET_CHAT_DESCRIPTION, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_SET_CHAT_DESCRIPTION.parse(c.req);
+    const result = captureDelta((report) => domain.setChatDescription(botActor(c), {
+      ...parsed.body,
+      description: parsed.body.description ?? "",
+    }, report));
+    return { status: 200, body: telegramOk(true), delta: result.delta };
+  }));
+  mountDeclaredRoute(app, POST_SET_CHAT_PERMISSIONS, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_SET_CHAT_PERMISSIONS.parse(c.req);
+    const result = captureDelta((report) => domain.setChatPermissions(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(true), delta: result.delta };
+  }));
+  mountDeclaredRoute(app, POST_BAN_CHAT_MEMBER, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_BAN_CHAT_MEMBER.parse(c.req);
+    const result = captureDelta((report) => domain.banChatMember(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(true), delta: result.delta };
+  }));
+  mountDeclaredRoute(app, POST_UNBAN_CHAT_MEMBER, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_UNBAN_CHAT_MEMBER.parse(c.req);
+    const result = captureDelta((report) => domain.unbanChatMember(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(true), delta: result.delta };
+  }));
+  mountDeclaredRoute(app, POST_RESTRICT_CHAT_MEMBER, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_RESTRICT_CHAT_MEMBER.parse(c.req);
+    const result = captureDelta((report) => domain.restrictChatMember(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(true), delta: result.delta };
+  }));
+  mountDeclaredRoute(app, POST_PROMOTE_CHAT_MEMBER, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_PROMOTE_CHAT_MEMBER.parse(c.req);
+    const { chat_id, user_id, ...flags } = parsed.body;
+    const result = captureDelta((report) => domain.promoteChatMember(botActor(c), {
+      chat_id,
+      user_id,
+      rights: adminRightsFromFlags(flags, ZERO_ADMIN_RIGHTS),
+    }, report));
+    return { status: 200, body: telegramOk(true), delta: result.delta };
+  }));
+  mountDeclaredRoute(app, POST_LEAVE_CHAT, recorder.handle({ mutation: true }, async (c) => {
+    const parsed = await POST_LEAVE_CHAT.parse(c.req);
+    const result = captureDelta((report) => domain.leaveChat(botActor(c), parsed.body, report));
+    return { status: 200, body: telegramOk(true), delta: result.delta };
   }));
 }

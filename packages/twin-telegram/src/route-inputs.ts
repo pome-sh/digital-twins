@@ -314,6 +314,79 @@ export const POST_GET_WEBHOOK_INFO = declareInputs({
   bodyEncoding: "form",
 });
 
+const userIdBody = { chat_id: z.coerce.number().int(), user_id: z.coerce.number().int() };
+const permissionsValue = jsonValue.refine((value) => value !== undefined && value !== null, "permissions is required");
+const adminFlags = {
+  is_anonymous: formBoolean.optional(),
+  can_manage_chat: formBoolean.optional(),
+  can_delete_messages: formBoolean.optional(),
+  can_manage_video_chats: formBoolean.optional(),
+  can_restrict_members: formBoolean.optional(),
+  can_promote_members: formBoolean.optional(),
+  can_change_info: formBoolean.optional(),
+  can_invite_users: formBoolean.optional(),
+  can_post_stories: formBoolean.optional(),
+  can_edit_stories: formBoolean.optional(),
+  can_delete_stories: formBoolean.optional(),
+  can_post_messages: formBoolean.optional(),
+  can_edit_messages: formBoolean.optional(),
+  can_pin_messages: formBoolean.optional(),
+  can_manage_topics: formBoolean.optional(),
+};
+
+export const GET_CHAT_ADMINISTRATORS = declareInputs({
+  method: "GET", path: "/:cred{bot[^/]+}/getChatAdministrators", pathParams: credParam, query: chatIdBody,
+});
+export const POST_GET_CHAT_ADMINISTRATORS = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/getChatAdministrators", pathParams: credParam, body: chatIdBody, bodyEncoding: "form",
+});
+export const GET_CHAT_MEMBER_COUNT = declareInputs({
+  method: "GET", path: "/:cred{bot[^/]+}/getChatMemberCount", pathParams: credParam, query: chatIdBody,
+});
+export const POST_GET_CHAT_MEMBER_COUNT = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/getChatMemberCount", pathParams: credParam, body: chatIdBody, bodyEncoding: "form",
+});
+export const GET_CHAT_MEMBER = declareInputs({
+  method: "GET", path: "/:cred{bot[^/]+}/getChatMember", pathParams: credParam, query: userIdBody,
+});
+export const POST_GET_CHAT_MEMBER = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/getChatMember", pathParams: credParam, body: userIdBody, bodyEncoding: "form",
+});
+export const POST_SET_CHAT_TITLE = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/setChatTitle", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), title: z.string() }, bodyEncoding: "form",
+});
+export const POST_SET_CHAT_DESCRIPTION = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/setChatDescription", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), description: z.string().optional() }, bodyEncoding: "form",
+});
+export const POST_SET_CHAT_PERMISSIONS = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/setChatPermissions", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), permissions: permissionsValue, use_independent_chat_permissions: formBoolean.optional() },
+  bodyEncoding: "form",
+});
+export const POST_BAN_CHAT_MEMBER = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/banChatMember", pathParams: credParam,
+  body: { ...userIdBody, until_date: z.coerce.number().int().optional(), revoke_messages: formBoolean.optional() },
+  bodyEncoding: "form",
+});
+export const POST_UNBAN_CHAT_MEMBER = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/unbanChatMember", pathParams: credParam,
+  body: { ...userIdBody, only_if_banned: formBoolean.optional() }, bodyEncoding: "form",
+});
+export const POST_RESTRICT_CHAT_MEMBER = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/restrictChatMember", pathParams: credParam,
+  body: { ...userIdBody, permissions: permissionsValue, until_date: z.coerce.number().int().optional(), use_independent_chat_permissions: formBoolean.optional() },
+  bodyEncoding: "form",
+});
+export const POST_PROMOTE_CHAT_MEMBER = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/promoteChatMember", pathParams: credParam,
+  body: { ...userIdBody, ...adminFlags }, bodyEncoding: "form",
+});
+export const POST_LEAVE_CHAT = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/leaveChat", pathParams: credParam, body: chatIdBody, bodyEncoding: "form",
+});
+
 /** Every Bot API surface mounted by routes.ts. Telegram is not yet in the global artifact lane. */
 export const TELEGRAM_ROUTE_INPUTS: readonly RouteInputDeclaration[] = [
   GET_ME,
@@ -350,4 +423,18 @@ export const TELEGRAM_ROUTE_INPUTS: readonly RouteInputDeclaration[] = [
   POST_DELETE_WEBHOOK,
   GET_WEBHOOK_INFO,
   POST_GET_WEBHOOK_INFO,
+  GET_CHAT_ADMINISTRATORS,
+  POST_GET_CHAT_ADMINISTRATORS,
+  GET_CHAT_MEMBER_COUNT,
+  POST_GET_CHAT_MEMBER_COUNT,
+  GET_CHAT_MEMBER,
+  POST_GET_CHAT_MEMBER,
+  POST_SET_CHAT_TITLE,
+  POST_SET_CHAT_DESCRIPTION,
+  POST_SET_CHAT_PERMISSIONS,
+  POST_BAN_CHAT_MEMBER,
+  POST_UNBAN_CHAT_MEMBER,
+  POST_RESTRICT_CHAT_MEMBER,
+  POST_PROMOTE_CHAT_MEMBER,
+  POST_LEAVE_CHAT,
 ];

@@ -6,7 +6,7 @@
 import { createHash } from "node:crypto";
 import { telegramFail } from "./errors.js";
 
-export type CatalogKind = "document" | "voice" | "sticker";
+export type CatalogKind = "document" | "voice" | "sticker" | "photo";
 
 export type CatalogFile = {
   path: string;
@@ -31,6 +31,15 @@ const VOICE_OGG = Buffer.from(
 );
 const WAVE_WEBP = Buffer.from("UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoCAAIAAUAmJaQAA3AA/vz0AAA=", "base64");
 const OK_WEBP = Buffer.from("UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoCAAIAAUAmJaQAA3AA/v02aAA=", "base64");
+const PHOTO_WEBP = Buffer.from("UklGRh4AAABXRUJQVlA4TBEAAAAvAUAAAAdQqEIUtP+BiOh/AAA=", "base64");
+
+const SAMPLE_PHOTO: CatalogFile = {
+  path: "photo.webp",
+  kind: "photo",
+  filename: "photo.webp",
+  mimeType: "image/webp",
+  bytes: PHOTO_WEBP,
+};
 
 const SAMPLE_FILE: CatalogFile = {
   path: "sample.txt",
@@ -71,7 +80,7 @@ export const TELEGRAM_STICKER_SETS: CatalogStickerSet[] = [
 ];
 
 const CATALOG = new Map<string, CatalogFile>(
-  [SAMPLE_FILE, SAMPLE_VOICE, WAVE_STICKER, OK_STICKER].map((file) => [file.path, file]),
+  [SAMPLE_FILE, SAMPLE_VOICE, SAMPLE_PHOTO, WAVE_STICKER, OK_STICKER].map((file) => [file.path, file]),
 );
 
 const CATALOG_BY_DIGEST = new Map(
@@ -115,6 +124,18 @@ function catalogProvenance(fileId: string): CatalogFile | undefined {
 function assertExpectedKind(file: CatalogFile, expected: CatalogKind): void {
   if (expected === "voice" && file.kind !== "voice") telegramFail(400, 400, "Bad Request: file must be an OGG/OPUS voice note");
   if (expected === "sticker" && file.kind !== "sticker") telegramFail(400, 400, "Bad Request: sticker not found");
+}
+
+/** Chat photos accept the fixture catalog or an owned opaque file_id. No host path. */
+export function resolveChatPhoto(path: string): CatalogFile | string {
+  assertSafeMediaPath(path);
+  const catalog = CATALOG.get(path) ?? (isOpaqueFileId(path) ? catalogProvenance(path) : undefined);
+  if (catalog) {
+    if (catalog.kind !== "photo") telegramFail(400, 400, "Bad Request: file must be a photo");
+    return CATALOG.has(path) ? catalog : path;
+  }
+  if (isOpaqueFileId(path)) return path;
+  telegramFail(400, 400, "Bad Request: file not found");
 }
 
 export function resolveCatalogFile(path: string, expected: CatalogKind): CatalogFile | string {
