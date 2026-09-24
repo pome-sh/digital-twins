@@ -364,7 +364,10 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
   }));
   mountDeclaredRoute(app, POST_SET_CHAT_DESCRIPTION, recorder.handle({ mutation: true }, async (c) => {
     const parsed = await POST_SET_CHAT_DESCRIPTION.parse(c.req);
-    const result = captureDelta((report) => domain.setChatDescription(botActor(c), parsed.body, report));
+    const result = captureDelta((report) => domain.setChatDescription(botActor(c), {
+      ...parsed.body,
+      description: parsed.body.description ?? "",
+    }, report));
     return { status: 200, body: telegramOk(true), delta: result.delta };
   }));
   mountDeclaredRoute(app, POST_SET_CHAT_PERMISSIONS, recorder.handle({ mutation: true }, async (c) => {

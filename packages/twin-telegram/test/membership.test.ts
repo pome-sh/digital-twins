@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { createRecorderStore } from "@pome-sh/sdk/server";
 import { describe, expect, it } from "vitest";
 import { openTelegramTwinDatabase } from "../src/db.js";
 import { TelegramDomain } from "../src/domain.js";
+import { resolveCatalogFile, resolveChatPhoto, type CatalogFile } from "../src/media-catalog.js";
+import { FULL_CHAT_PERMISSIONS } from "../src/membership.js";
 import { defaultSeedState, SYNTHETIC_BOT_TOKEN } from "../src/seed.js";
 import { createTelegramTwinApp } from "../src/twin.js";
 
@@ -125,5 +131,81 @@ describe("Telegram membership domain", () => {
     first.setChatTitle(ALICE, { chat_id: GROUP, title: "Keep" });
     const second = new TelegramDomain(db);
     expect(second.getChat(ALICE, GROUP).title).toBe("Keep");
+  });
+
+  it("refuses to kick creator, admin, or self through unban when only_if_banned is false", () => {
+    const { domain } = fresh();
+    expect(() => domain.unbanChatMember(ALICE, { chat_id: GROUP, user_id: 2001, only_if_banned: false })).toThrow(/self/);
+    domain.promoteChatMember(ALICE, { chat_id: GROUP, user_id: 2002, rights: { can_restrict_members: true } });
+    expect(() => domain.unbanChatMember(BOB, { chat_id: GROUP, user_id: 2001, only_if_banned: false })).toThrow(/creator/);
+    domain.promoteChatMember(ALICE, { chat_id: GROUP, user_id: 1100001, rights: { can_invite_users: true } });
+    expect(() => domain.unbanChatMember(BOB, { chat_id: GROUP, user_id: 1100001, only_if_banned: false })).toThrow(/administrator/);
+    expect(domain.getChatMember(ALICE, { chat_id: GROUP, user_id: 1100001 })).toMatchObject({ status: "administrator" });
+  });
+
+  it("grants only the supplied editAdminRights flags", () => {
+    const { domain } = fresh();
+    domain.editAdminRights(ALICE, { chat_id: GROUP, user_id: 2002, rights: { delete_messages: true } });
+    expect(domain.getChatMember(ALICE, { chat_id: GROUP, user_id: 2002 })).toMatchObject({
+      status: "administrator",
+      can_delete_messages: true,
+      can_manage_chat: false,
+      can_restrict_members: false,
+      can_promote_members: false,
+      can_invite_users: false,
+    });
+  });
+
+  it("restores a restricted member when restrictChatMember is a full allow", () => {
+    const { domain } = fresh();
+    domain.restrictChatMember(ALICE, { chat_id: GROUP, user_id: 2002, permissions: { can_send_messages: false } });
+    expect(domain.getChatMember(ALICE, { chat_id: GROUP, user_id: 2002 })).toMatchObject({ status: "restricted" });
+    expect(() => domain.sendMessage(BOB, { chat_id: GROUP, text: "blocked" })).toThrow(/rights/);
+    domain.restrictChatMember(ALICE, { chat_id: GROUP, user_id: 2002, permissions: FULL_CHAT_PERMISSIONS });
+    expect(domain.getChatMember(ALICE, { chat_id: GROUP, user_id: 2002 })).toMatchObject({ status: "member" });
+    expect(domain.sendMessage(BOB, { chat_id: GROUP, text: "restored" }).text).toBe("restored");
+  });
+
+  it("rejects non-photo chat catalog files and keeps photo.webp bytes distinct from stickers", () => {
+    expect(() => resolveChatPhoto("pome_lab/wave.webp")).toThrow(/photo/);
+    expect(() => resolveChatPhoto("sample.txt")).toThrow(/photo/);
+    const photo = resolveChatPhoto("photo.webp") as CatalogFile;
+    const sticker = resolveCatalogFile("pome_lab/wave.webp", "sticker") as CatalogFile;
+    expect(photo.kind).toBe("photo");
+    expect(sticker.kind).toBe("sticker");
+    expect(photo.bytes.equals(sticker.bytes)).toBe(false);
+  });
+
+  it("requires a permissions object on setChatPermissions and restrictChatMember", () => {
+    const { domain } = fresh();
+    expect(() => domain.setChatPermissions(ALICE, { chat_id: GROUP })).toThrow(/permissions/);
+    expect(() => domain.restrictChatMember(ALICE, { chat_id: GROUP, user_id: 2002 })).toThrow(/permissions/);
+  });
+
+  it("backfills creator_id on existing file-backed chats the same way seed assigns a creator", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tg-migrate-"));
+    const path = join(dir, "twin.db");
+    try {
+      const old = new DatabaseSync(path);
+      old.exec(`
+        CREATE TABLE chats (id INTEGER PRIMARY KEY, type TEXT NOT NULL, title TEXT);
+        CREATE TABLE chat_members (chat_id INTEGER NOT NULL, user_id INTEGER NOT NULL, PRIMARY KEY (chat_id, user_id));
+        CREATE TABLE users (id INTEGER PRIMARY KEY, account TEXT, first_name TEXT, username TEXT);
+        INSERT INTO users VALUES (2001, 'alice', 'Alice', 'alice');
+        INSERT INTO users VALUES (2002, 'bob', 'Bob', 'bob');
+        INSERT INTO chats VALUES (-100, 'supergroup', 'Old');
+        INSERT INTO chats VALUES (2001, 'private', NULL);
+        INSERT INTO chat_members VALUES (-100, 2001);
+        INSERT INTO chat_members VALUES (-100, 2002);
+        INSERT INTO chat_members VALUES (2001, 2001);
+      `);
+      old.close();
+      const db = openTelegramTwinDatabase(path);
+      expect(db.prepare("SELECT creator_id FROM chats WHERE id = -100").get()).toEqual({ creator_id: 2001 });
+      expect(db.prepare("SELECT status FROM chat_members WHERE chat_id = -100 AND user_id = 2001").get()).toEqual({ status: "creator" });
+      expect(db.prepare("SELECT creator_id FROM chats WHERE id = 2001").get()).toEqual({ creator_id: null });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

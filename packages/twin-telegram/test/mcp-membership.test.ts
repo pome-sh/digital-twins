@@ -135,6 +135,23 @@ describe("Telegram MCP membership projection", () => {
     expect(JSON.parse(resultText(await call(app, aliceToken, "get_recent_actions", { chat_id: created.id }))).length).toBeGreaterThan(0);
   });
 
+  it("grants only delete_messages from a partial edit_admin_rights payload", async () => {
+    const app = createTelegramTwinApp({ seed: defaultSeedState() });
+    expect(JSON.parse(resultText(await call(app, aliceToken, "edit_admin_rights", {
+      chat_id: -1001234567890,
+      user_id: 2002,
+      delete_messages: true,
+    })))).toEqual({ ok: true });
+    const member = await bot(app, "getChatMember", { chat_id: -1001234567890, user_id: 2002 });
+    expect(member.body.result).toMatchObject({
+      status: "administrator",
+      can_delete_messages: true,
+      can_manage_chat: false,
+      can_restrict_members: false,
+      can_invite_users: false,
+    });
+  });
+
   it("lists the previous 18 tools plus these 19 membership tools", async () => {
     const app = createTelegramTwinApp({ seed: defaultSeedState() });
     const response = await app.request(`/s/${sid}/mcp`, {

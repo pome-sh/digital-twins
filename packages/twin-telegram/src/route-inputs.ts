@@ -315,7 +315,7 @@ export const POST_GET_WEBHOOK_INFO = declareInputs({
 });
 
 const userIdBody = { chat_id: z.coerce.number().int(), user_id: z.coerce.number().int() };
-const permissionsValue = jsonValue.optional();
+const permissionsValue = jsonValue.refine((value) => value !== undefined && value !== null, "permissions is required");
 const adminFlags = {
   is_anonymous: formBoolean.optional(),
   can_manage_chat: formBoolean.optional(),
@@ -358,7 +358,7 @@ export const POST_SET_CHAT_TITLE = declareInputs({
 });
 export const POST_SET_CHAT_DESCRIPTION = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/setChatDescription", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), description: z.string() }, bodyEncoding: "form",
+  body: { chat_id: z.coerce.number().int(), description: z.string().optional() }, bodyEncoding: "form",
 });
 export const POST_SET_CHAT_PERMISSIONS = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/setChatPermissions", pathParams: credParam,

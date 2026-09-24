@@ -59,8 +59,6 @@ export function serializeChat(row: ChatRow, extras: Record<string, unknown> = {}
     id: row.id,
     type: row.type,
     ...(row.title ? { title: row.title } : {}),
-    ...(row.description ? { description: row.description } : {}),
-    ...(row.slow_mode_seconds ? { slow_mode_delay: row.slow_mode_seconds } : {}),
     ...extras,
   };
 }

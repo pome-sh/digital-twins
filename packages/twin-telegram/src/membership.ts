@@ -65,6 +65,23 @@ export const DEFAULT_CHAT_PERMISSIONS: ChatPermissions = {
   can_manage_topics: false,
 };
 
+export const FULL_CHAT_PERMISSIONS: ChatPermissions = {
+  can_send_messages: true,
+  can_send_audios: true,
+  can_send_documents: true,
+  can_send_photos: true,
+  can_send_videos: true,
+  can_send_video_notes: true,
+  can_send_voice_notes: true,
+  can_send_polls: true,
+  can_send_other_messages: true,
+  can_add_web_page_previews: true,
+  can_change_info: true,
+  can_invite_users: true,
+  can_pin_messages: true,
+  can_manage_topics: true,
+};
+
 export const FULL_ADMIN_RIGHTS: AdminRights = {
   is_anonymous: false,
   can_manage_chat: true,
@@ -239,10 +256,22 @@ export function rightsSubset(granted: AdminRights, actor: AdminRights): boolean 
   return ADMIN_KEYS.every((key) => key === "is_anonymous" || !granted[key] || actor[key]);
 }
 
-export function parseUntilDate(value: unknown): number {
+export function requireChatPermissions(input: unknown): ChatPermissions {
+  if (input === undefined || input === null) telegramFail(400, 400, "Bad Request: permissions is required");
+  return parseChatPermissions(input);
+}
+
+export function allPermissionsAllowed(permissions: ChatPermissions): boolean {
+  return PERMISSION_KEYS.every((key) => permissions[key]);
+}
+
+export function parseUntilDate(value: unknown, now: number): number {
   if (value === undefined || value === null || value === "") return 0;
   const until = typeof value === "number" ? value : Number(value);
   if (!Number.isInteger(until) || until < 0) telegramFail(400, 400, "Bad Request: until_date is invalid");
+  if (until === 0) return 0;
+  const delta = until - now;
+  if (delta < 30 || delta > 366 * 24 * 60 * 60) return 0;
   return until;
 }
 

@@ -31,13 +31,14 @@ const VOICE_OGG = Buffer.from(
 );
 const WAVE_WEBP = Buffer.from("UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoCAAIAAUAmJaQAA3AA/vz0AAA=", "base64");
 const OK_WEBP = Buffer.from("UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoCAAIAAUAmJaQAA3AA/v02aAA=", "base64");
+const PHOTO_WEBP = Buffer.from("UklGRh4AAABXRUJQVlA4TBEAAAAvAUAAAAdQqEIUtP+BiOh/AAA=", "base64");
 
 const SAMPLE_PHOTO: CatalogFile = {
   path: "photo.webp",
   kind: "photo",
   filename: "photo.webp",
   mimeType: "image/webp",
-  bytes: WAVE_WEBP,
+  bytes: PHOTO_WEBP,
 };
 
 const SAMPLE_FILE: CatalogFile = {
@@ -129,7 +130,10 @@ function assertExpectedKind(file: CatalogFile, expected: CatalogKind): void {
 export function resolveChatPhoto(path: string): CatalogFile | string {
   assertSafeMediaPath(path);
   const catalog = CATALOG.get(path) ?? (isOpaqueFileId(path) ? catalogProvenance(path) : undefined);
-  if (catalog) return CATALOG.has(path) ? catalog : path;
+  if (catalog) {
+    if (catalog.kind !== "photo") telegramFail(400, 400, "Bad Request: file must be a photo");
+    return CATALOG.has(path) ? catalog : path;
+  }
   if (isOpaqueFileId(path)) return path;
   telegramFail(400, 400, "Bad Request: file not found");
 }

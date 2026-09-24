@@ -623,7 +623,7 @@ const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
       } & SourceAccount;
       return sourceResult(domain.setChatPermissions({ kind: "user", account: requireSourceAccount(input, ctx) }, {
         chat_id: numericChatId(input.chat_id),
-        permissions: input,
+        permissions: pickBooleanFlags(input, SOURCE_PERMISSION_FLAGS),
         until_date: input.until_date,
       }, ctx.reportDelta));
     },
@@ -683,11 +683,12 @@ const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
         manage_topics?: boolean;
         other?: boolean;
       } & SourceAccount;
+      const flags = pickBooleanFlags(input, SOURCE_ADMIN_RIGHT_FLAGS);
       return sourceResult(domain.editAdminRights({ kind: "user", account: requireSourceAccount(input, ctx) }, {
         chat_id: numericChatId(input.chat_id),
         user_id: input.user_id,
         rank: input.rank,
-        rights: input,
+        rights: Object.keys(flags).length > 0 ? flags : undefined,
       }, ctx.reportDelta));
     },
     contentText: (output) => (output as SourceResult).result,
@@ -723,6 +724,43 @@ const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
 
 function catalogMedia(source: CatalogFile | string): { bytes: Buffer; filename: string; mimeType: string } | string {
   return typeof source === "string" ? source : { bytes: source.bytes, filename: source.filename, mimeType: source.mimeType };
+}
+
+const SOURCE_ADMIN_RIGHT_FLAGS = [
+  "change_info",
+  "post_messages",
+  "edit_messages",
+  "delete_messages",
+  "ban_users",
+  "invite_users",
+  "pin_messages",
+  "add_admins",
+  "anonymous",
+  "manage_call",
+  "manage_topics",
+  "other",
+] as const;
+
+const SOURCE_PERMISSION_FLAGS = [
+  "send_messages",
+  "send_media",
+  "send_stickers",
+  "send_gifs",
+  "send_games",
+  "send_inline",
+  "embed_links",
+  "send_polls",
+  "change_info",
+  "invite_users",
+  "pin_messages",
+] as const;
+
+function pickBooleanFlags<K extends string>(input: Record<string, unknown>, keys: readonly K[]): Partial<Record<K, boolean>> {
+  const flags: Partial<Record<K, boolean>> = {};
+  for (const key of keys) {
+    if (typeof input[key] === "boolean") flags[key] = input[key];
+  }
+  return flags;
 }
 
 export const telegramTools = deriveMcpToolTable(telegramMcpToolFixture, implementations);

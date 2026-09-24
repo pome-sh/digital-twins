@@ -17,12 +17,14 @@ import {
   DEFAULT_PROMOTE_RIGHTS,
   FULL_ADMIN_RIGHTS,
   ZERO_ADMIN_RIGHTS,
+  allPermissionsAllowed,
   effectivePermissions,
   noAdminRights,
   parseAdminRights,
   parseChatPermissions,
   parseSlowMode,
   parseUntilDate,
+  requireChatPermissions,
   presentParticipant,
   requireAdminTitle,
   requireChatAbout,
@@ -343,7 +345,8 @@ export class TelegramDomain {
     const botId = this.botId(actor);
     const scopeId = this.mediaScope(actor);
     this.requireMember(actor, args.chat_id);
-    this.assertCanSend(actor, args.chat_id, "photos");
+    const sendKind = { photo: "photos", document: "documents", video: "videos", audio: "audios" } as const;
+    for (const item of args.media) this.assertCanSend(actor, args.chat_id, sendKind[item.type]);
     if (args.media.length < 2 || args.media.length > 10) telegramFail(400, 400, "Bad Request: media group must include 2-10 items");
     // Keep an explicit total even when an HTTP transport omits Content-Length.
     // Stored file references contribute no request bytes; every uploaded file is
@@ -1281,7 +1284,14 @@ export class TelegramDomain {
   createGroup(account: string, args: { title: string; user_ids: Array<number | string> }, delta: DeltaHook = NOOP): Record<string, unknown> {
     const title = requireChatTitle(args.title);
     const creator = this.personFor({ kind: "user", account });
-    const invitees = args.user_ids.map((ref) => this.resolvePersonRef(ref)).filter((person) => person.id !== creator.id);
+    const invitees: PersonRow[] = [];
+    const seen = new Set<number>([creator.id]);
+    for (const ref of args.user_ids) {
+      const person = this.resolvePersonRef(ref);
+      if (seen.has(person.id)) continue;
+      seen.add(person.id);
+      invitees.push(person);
+    }
     const chatId = this.nextGroupId();
     this.db.transaction(() => {
       this.db.prepare(
@@ -1359,8 +1369,8 @@ export class TelegramDomain {
     return { ok: true };
   }
 
-  setChatDescription(actor: Actor, args: { chat_id: number; description: string }, delta: DeltaHook = NOOP): { ok: true } {
-    const description = requireChatAbout(args.description);
+  setChatDescription(actor: Actor, args: { chat_id: number; description?: string }, delta: DeltaHook = NOOP): { ok: true } {
+    const description = requireChatAbout(args.description ?? "");
     const snapshot = this.requirePermission(actor, args.chat_id, "can_change_info", "can_change_info");
     const before = this.chat(args.chat_id).description ?? "";
     if (before !== description) {
@@ -1434,12 +1444,13 @@ export class TelegramDomain {
     delta: DeltaHook = NOOP,
   ): { ok: true } {
     const rank = requireAdminTitle(args.rank ?? "");
-    if (args.rights !== undefined && noAdminRights(parseAdminRights(args.rights, ZERO_ADMIN_RIGHTS))) {
+    const rights = args.rights === undefined ? undefined : parseAdminRights(args.rights, ZERO_ADMIN_RIGHTS);
+    if (rights !== undefined && noAdminRights(rights)) {
       const result = this.demoteChatMember(actor, { chat_id: args.chat_id, user_id: args.user_id }, delta);
       if (rank) this.db.prepare("UPDATE chat_members SET custom_title = NULL WHERE chat_id = ? AND user_id = ?").run(args.chat_id, this.resolvePersonRef(args.user_id).id);
       return result;
     }
-    const result = this.promoteChatMember(actor, { chat_id: args.chat_id, user_id: args.user_id, rights: args.rights }, delta);
+    const result = this.promoteChatMember(actor, { chat_id: args.chat_id, user_id: args.user_id, rights }, delta);
     if (rank) {
       this.db.prepare("UPDATE chat_members SET custom_title = ? WHERE chat_id = ? AND user_id = ?").run(rank, args.chat_id, this.resolvePersonRef(args.user_id).id);
     }
@@ -1449,7 +1460,7 @@ export class TelegramDomain {
   banChatMember(actor: Actor, args: { chat_id: number; user_id: number | string; until_date?: unknown }, delta: DeltaHook = NOOP): { ok: true } {
     const actorSnap = this.requireAdminRight(actor, args.chat_id, "can_restrict_members");
     const target = this.targetMember(args.chat_id, args.user_id);
-    const until = parseUntilDate(args.until_date);
+    const until = parseUntilDate(args.until_date, this.now());
     this.assertModerationTarget(actorSnap, target, "ban");
     const already = this.banRow(args.chat_id, target.person.id);
     if (!already || already.until_date !== until) {
@@ -1475,6 +1486,9 @@ export class TelegramDomain {
     this.expireMembership(args.chat_id, person.id);
     const banned = this.banRow(args.chat_id, person.id);
     const member = this.isMemberId(person.id, args.chat_id);
+    if (!args.only_if_banned && member) {
+      this.assertModerationTarget(actorSnap, this.targetMember(args.chat_id, person.id), "remove");
+    }
     this.db.transaction(() => {
       if (banned) this.db.prepare("DELETE FROM chat_bans WHERE chat_id = ? AND user_id = ?").run(args.chat_id, person.id);
       if (!args.only_if_banned && member) {
@@ -1514,8 +1528,16 @@ export class TelegramDomain {
     const target = this.targetMember(args.chat_id, args.user_id);
     this.assertModerationTarget(actorSnap, target, "restrict");
     if (!target.isMember) telegramFail(400, 400, "Bad Request: user not found");
-    const permissions = parseChatPermissions(args.permissions);
-    const until = parseUntilDate(args.until_date);
+    const permissions = requireChatPermissions(args.permissions);
+    const until = parseUntilDate(args.until_date, this.now());
+    if (allPermissionsAllowed(permissions)) {
+      this.db.prepare(
+        "UPDATE chat_members SET status = 'member', admin_rights_json = NULL, restrictions_json = NULL, until_date = 0 WHERE chat_id = ? AND user_id = ?",
+      ).run(args.chat_id, target.person.id);
+      this.recordAdminLog(args.chat_id, actorSnap.person.id, "restrict", target.person.id, { permissions, until_date: until });
+      delta({ before: { status: target.status }, after: { status: "member", permissions, until_date: until } });
+      return { ok: true };
+    }
     this.db.prepare(
       "UPDATE chat_members SET status = 'restricted', admin_rights_json = NULL, restrictions_json = ?, until_date = ? WHERE chat_id = ? AND user_id = ?",
     ).run(JSON.stringify(permissions), until, args.chat_id, target.person.id);
@@ -1530,8 +1552,8 @@ export class TelegramDomain {
     delta: DeltaHook = NOOP,
   ): { ok: true } {
     const actorSnap = this.requireAdminRight(actor, args.chat_id, "can_restrict_members");
-    const permissions = parseChatPermissions(args.permissions);
-    const until = parseUntilDate(args.until_date);
+    const permissions = requireChatPermissions(args.permissions);
+    const until = parseUntilDate(args.until_date, this.now());
     const before = this.defaultPermissions(args.chat_id);
     this.db.prepare("UPDATE chats SET permissions_json = ?, permissions_until = ? WHERE id = ?").run(
       JSON.stringify(permissions),
@@ -1808,9 +1830,11 @@ export class TelegramDomain {
   }
 
   private presentChat(row: ChatRow): Record<string, unknown> {
-    const permissions = this.defaultPermissions(row.id);
+    if (row.type === "private") return serializeChat(row);
     return serializeChat(row, {
-      permissions,
+      permissions: this.defaultPermissions(row.id),
+      ...(row.description ? { description: row.description } : {}),
+      ...(row.slow_mode_seconds ? { slow_mode_delay: row.slow_mode_seconds } : {}),
       ...(row.photo_file_id
         ? { photo: { small_file_id: row.photo_file_id, big_file_id: row.photo_file_id } }
         : {}),
@@ -2053,7 +2077,7 @@ export class TelegramDomain {
                   : snapshot.permissions.can_send_other_messages;
     if (!permission) telegramFail(400, 400, "Bad Request: not enough rights to send");
     const delay = chat.slow_mode_seconds ?? 0;
-    if (delay > 0 && kind === "messages") {
+    if (delay > 0) {
       const last = this.db.prepare("SELECT MAX(date) AS date FROM messages WHERE chat_id = ? AND from_id = ?").get(chatId, snapshot.person.id) as { date: number | null };
       if (last.date !== null && this.now() < last.date + delay) telegramFail(400, 400, "Bad Request: slow mode is active");
     }

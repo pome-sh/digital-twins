@@ -269,6 +269,36 @@ export function migrate(db: TelegramTwinDatabase): void {
       SELECT COALESCE(MAX(message_id), 0) FROM messages WHERE chat_id = chats.id
     )
   `);
+  db.exec(`
+    UPDATE chats SET creator_id = (
+      SELECT m.user_id FROM chat_members m
+      WHERE m.chat_id = chats.id AND m.status = 'creator'
+      LIMIT 1
+    )
+    WHERE creator_id IS NULL AND type != 'private';
+    UPDATE chats SET creator_id = (
+      SELECT m.user_id FROM chat_members m
+      JOIN users u ON u.id = m.user_id
+      WHERE m.chat_id = chats.id
+      ORDER BY m.rowid
+      LIMIT 1
+    )
+    WHERE creator_id IS NULL AND type != 'private';
+    UPDATE chats SET creator_id = (
+      SELECT m.user_id FROM chat_members m
+      WHERE m.chat_id = chats.id
+      ORDER BY m.rowid
+      LIMIT 1
+    )
+    WHERE creator_id IS NULL AND type != 'private';
+    UPDATE chat_members SET status = 'creator'
+    WHERE status != 'creator'
+      AND user_id = (SELECT creator_id FROM chats WHERE id = chat_members.chat_id)
+      AND EXISTS (
+        SELECT 1 FROM chats
+        WHERE id = chat_members.chat_id AND type != 'private' AND creator_id IS NOT NULL
+      );
+  `);
 }
 
 export function resetDatabase(db: TelegramTwinDatabase): void {
