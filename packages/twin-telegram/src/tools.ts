@@ -7,7 +7,7 @@ import rawListing from "../fixtures/mcp-tools-list.raw.json" with { type: "json"
 import metaListing from "../fixtures/mcp-tools-list.meta.json" with { type: "json" };
 import type { TelegramDomain } from "./domain.js";
 import { telegramFail } from "./errors.js";
-import { assertSafeMediaPath, listStickerSets, resolveCatalogFile, type CatalogFile } from "./media-catalog.js";
+import { listStickerSets, resolveCatalogFile, type CatalogFile } from "./media-catalog.js";
 import { accountFrom } from "./tool-adapters.js";
 
 export const telegramMcpToolFixture = loadMcpToolFixture({ raw: rawListing, meta: metaListing });
@@ -304,7 +304,9 @@ const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
     mutation: false,
     handler: (domain, args, ctx) => {
       const input = args as { chat_id: SourceChatId; message_id: number; file_path?: string | null } & SourceAccount;
-      if (input.file_path !== undefined && input.file_path !== null) assertSafeMediaPath(input.file_path);
+      if (input.file_path !== undefined && input.file_path !== null) {
+        telegramFail(400, 400, "Bad Request: destination file paths are unsupported");
+      }
       const downloaded = domain.downloadVisibleMedia(requireSourceAccount(input, ctx), {
         chat_id: numericChatId(input.chat_id),
         message_id: input.message_id,

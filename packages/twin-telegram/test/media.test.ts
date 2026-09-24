@@ -41,6 +41,24 @@ describe("HTTP media foundation domain", () => {
     expect(() => domain.sendMedia({ kind: "bot", botId: 1100002 }, { chat_id: 2001, kind: "photo", media: ownedId })).toThrow(/file not found/);
   });
 
+  it("lets a receiving bot getFile user-sent media and keeps a foreign bot out", () => {
+    const { domain } = domainAt();
+    const state = defaultSeedState();
+    state.bots.push({ id: 1100002, token: "1100002:BBHBBBBBBBBBBBBBBBBBBBBB", first_name: "Y", username: "y_bot" });
+    state.chats[1]!.members.push(1100002);
+    domain.seed(state);
+    const bytes = Buffer.from("pome-telegram-fixture-file\n");
+    const sent = domain.sendMedia({ kind: "user", account: "alice" }, {
+      chat_id: 2001,
+      kind: "document",
+      media: { bytes, filename: "sample.txt", mimeType: "text/plain" },
+    });
+    const fileId = (sent.document as { file_id: string }).file_id;
+    const file = domain.getFile(BOT, fileId);
+    expect(domain.downloadFile(BOT, file.file_path as string).content.equals(bytes)).toBe(true);
+    expect(() => domain.getFile({ kind: "bot", botId: 1100002 }, fileId)).toThrow(/file not found/);
+  });
+
   it("uses the latest upload metadata for repeated bytes", () => {
     const { domain } = domainAt();
     const bytes = Buffer.from("same content");

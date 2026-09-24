@@ -296,30 +296,14 @@ export class TelegramDomain {
   }
 
   getMediaInfo(account: string, args: { chat_id: number; message_id: number }): Record<string, unknown> {
-    const row = this.requireVisibleMessage({ kind: "user", account }, args.chat_id, args.message_id);
-    const parsed = this.mediaFromMessage(row);
-    this.purgeExpiredMedia();
-    const file = this.db.prepare("SELECT * FROM media_files WHERE file_id = ?").get(parsed.file_id) as MediaFileRow | undefined;
-    if (!file) telegramFail(400, 400, "Bad Request: file not found");
-    return {
-      chat_id: args.chat_id,
-      message_id: args.message_id,
-      kind: parsed.kind,
-      file_id: file.file_id,
-      file_unique_id: file.file_unique_id,
-      file_size: file.size,
-      ...(file.file_name ? { file_name: file.file_name } : {}),
-      ...(file.mime_type ? { mime_type: file.mime_type } : {}),
-    };
+    return this.loadVisibleMedia(account, args).info;
   }
 
   downloadVisibleMedia(account: string, args: { chat_id: number; message_id: number }): {
     info: Record<string, unknown>;
     content: Buffer;
   } {
-    const info = this.getMediaInfo(account, args);
-    const file = this.db.prepare("SELECT * FROM media_files WHERE file_id = ?").get(info.file_id) as MediaFileRow | undefined;
-    if (!file) telegramFail(400, 400, "Bad Request: file not found");
+    const { info, file } = this.loadVisibleMedia(account, args);
     return { info, content: Buffer.from(file.content) };
   }
 
@@ -373,23 +357,21 @@ export class TelegramDomain {
   }
 
   getFile(actor: Actor, fileId: string): Record<string, unknown> {
-    const botId = this.botId(actor);
-    const scopeId = this.mediaScope(actor);
+    this.botId(actor);
     this.purgeExpiredMedia();
-    const row = this.db.prepare("SELECT * FROM media_files WHERE file_id = ? AND bot_id = ? AND scope_id = ?").get(fileId, botId, scopeId) as MediaFileRow | undefined;
+    const row = this.accessibleMediaFile(actor, fileId);
     if (!row) telegramFail(400, 400, "Bad Request: file not found");
     return { file_id: row.file_id, file_unique_id: row.file_unique_id, file_size: row.size, file_path: `media/${row.file_id}` };
   }
 
   downloadFile(actor: Actor, path: string): { content: Buffer; mimeType: string | null } {
-    const botId = this.botId(actor);
-    const scopeId = this.mediaScope(actor);
+    this.botId(actor);
     this.purgeExpiredMedia();
     // The only path accepted is the one getFile emitted. It is an opaque handle,
     // not a filesystem pathname; traversal, separators, and symlinks cannot escape SQLite.
     if (!/^media\/file_\d+_[a-f0-9]{8}_[a-f0-9]{32}$/.test(path)) telegramFail(400, 400, "Bad Request: file not found");
     const fileId = path.slice("media/".length);
-    const row = this.db.prepare("SELECT * FROM media_files WHERE file_id = ? AND bot_id = ? AND scope_id = ?").get(fileId, botId, scopeId) as MediaFileRow | undefined;
+    const row = this.accessibleMediaFile(actor, fileId);
     if (!row) telegramFail(404, 404, "Not Found");
     return { content: Buffer.from(row.content), mimeType: row.mime_type };
   }
@@ -1122,6 +1104,49 @@ export class TelegramDomain {
     const row: MediaFileRow = { file_id: fileId, bot_id: botId, scope_id: scopeId, file_unique_id: `unique_${sha256.slice(0, 32)}`, file_name: value.filename ?? null, mime_type: value.mimeType ?? null, size: value.bytes.length, sha256, content: value.bytes, expires_at: now + MEDIA_TTL_SEC };
     this.db.prepare("INSERT INTO media_files (file_id, bot_id, scope_id, file_unique_id, file_name, mime_type, size, sha256, content, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(row.file_id, row.bot_id, row.scope_id, row.file_unique_id, row.file_name, row.mime_type, row.size, row.sha256, row.content, now, row.expires_at);
     return row;
+  }
+
+  private loadVisibleMedia(account: string, args: { chat_id: number; message_id: number }): {
+    info: Record<string, unknown>;
+    file: MediaFileRow;
+  } {
+    const row = this.requireVisibleMessage({ kind: "user", account }, args.chat_id, args.message_id);
+    const parsed = this.mediaFromMessage(row);
+    const file = this.db.prepare("SELECT * FROM media_files WHERE file_id = ? AND expires_at > ?").get(parsed.file_id, this.now()) as MediaFileRow | undefined;
+    if (!file) telegramFail(400, 400, "Bad Request: file not found");
+    return {
+      info: {
+        chat_id: args.chat_id,
+        message_id: args.message_id,
+        kind: parsed.kind,
+        file_id: file.file_id,
+        file_unique_id: file.file_unique_id,
+        file_size: file.size,
+        ...(file.file_name ? { file_name: file.file_name } : {}),
+        ...(file.mime_type ? { mime_type: file.mime_type } : {}),
+      },
+      file,
+    };
+  }
+
+  private accessibleMediaFile(actor: Actor, fileId: string): MediaFileRow | undefined {
+    const botId = this.botId(actor);
+    const scopeId = this.mediaScope(actor);
+    const owned = this.db.prepare("SELECT * FROM media_files WHERE file_id = ? AND bot_id = ? AND scope_id = ?").get(fileId, botId, scopeId) as MediaFileRow | undefined;
+    if (owned) return owned;
+    const row = this.db.prepare("SELECT * FROM media_files WHERE file_id = ?").get(fileId) as MediaFileRow | undefined;
+    // A different session of the same bot keeps owner-scope isolation for files it stored.
+    if (!row || (row.bot_id === botId && row.scope_id !== scopeId)) return undefined;
+    if (!this.botSeesFileInMemberChat(botId, fileId)) return undefined;
+    return row;
+  }
+
+  private botSeesFileInMemberChat(botId: number, fileId: string): boolean {
+    return Boolean(
+      this.db.prepare(
+        `SELECT 1 AS ok FROM messages m JOIN chat_members cm ON cm.chat_id = m.chat_id WHERE cm.user_id = ? AND instr(m.media_json, '"file_id":"' || ? || '"') > 0`,
+      ).get(botId, fileId),
+    );
   }
 
   private mediaFromMessage(row: MessageRow): { kind: string; file_id: string } {

@@ -2,7 +2,6 @@
 import { createRecorderStore } from "@pome-sh/sdk/server";
 import { sign } from "hono/jwt";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { listStickerSets } from "../src/media-catalog.js";
 import { defaultSeedState, SYNTHETIC_BOT_TOKEN } from "../src/seed.js";
 import { telegramMcpToolFixture } from "../src/tools.js";
 import { createTelegramTwinApp } from "../src/twin.js";
@@ -34,7 +33,7 @@ async function call(app: ReturnType<typeof createTelegramTwinApp>, token: string
   });
   expect(response.status).toBe(200);
   return (await response.json()) as {
-    result: { isError?: boolean; structuredContent?: { result?: string } };
+    result: { isError?: boolean; content?: Array<{ text: string }>; structuredContent?: { result?: string } };
   };
 }
 
@@ -47,8 +46,7 @@ function resultText(body: Awaited<ReturnType<typeof call>>): string {
 function twoBotSeed() {
   const seed = defaultSeedState();
   seed.bots.push({ id: 1100002, token: OTHER_BOT_TOKEN, first_name: "Y", username: "y_bot" });
-  seed.chats[0]!.members.push(1100002);
-  seed.chats[2]!.members.push(1100002);
+  seed.chats[1]!.members.push(1100002);
   return seed;
 }
 
@@ -111,14 +109,18 @@ describe("Telegram MCP media projection", () => {
     ]) {
       expect((await call(app, aliceToken, "send_file", { chat_id: 2001, file_path })).result.isError).toBe(true);
     }
-    expect((await call(app, aliceToken, "download_media", {
-      chat_id: 2001,
-      message_id: message.result.message_id,
-      file_path: "https://example.test/out.bin",
-    })).result.isError).toBe(true);
+    for (const file_path of ["out.bin", "https://example.test/out.bin", "/tmp/out.bin"]) {
+      const denied = await call(app, aliceToken, "download_media", {
+        chat_id: 2001,
+        message_id: message.result.message_id,
+        file_path,
+      });
+      expect(denied.result.isError).toBe(true);
+      expect(denied.result.content?.[0]?.text).toContain("destination file paths are unsupported");
+    }
   });
 
-  it("creates visible send_file and send_voice messages that stay out of another bot's getFile scope", async () => {
+  it("creates visible send_file and send_voice messages that the receiving bot can getFile", async () => {
     const seed = twoBotSeed();
     const app = createTelegramTwinApp({ seed });
 
@@ -129,12 +131,26 @@ describe("Telegram MCP media projection", () => {
     }))) as { message_id: number; document: { file_id: string }; caption: string };
     expect(fileMessage).toMatchObject({ caption: "fixture file" });
     expect(fileMessage.document.file_id).toMatch(/^file_/);
+    expect((await call(app, aliceToken, "send_voice", {
+      chat_id: 2001,
+      file_path: fileMessage.document.file_id,
+    })).result.isError).toBe(true);
+    expect((await call(app, aliceToken, "send_sticker", {
+      chat_id: 2001,
+      file_path: fileMessage.document.file_id,
+    })).result.isError).toBe(true);
 
     const voiceMessage = JSON.parse(resultText(await call(app, aliceToken, "send_voice", {
       chat_id: 2001,
       file_path: "voice.ogg",
     }))) as { message_id: number; voice: { file_id: string } };
     expect(voiceMessage.voice.file_id).toMatch(/^file_/);
+    const voiceDownload = JSON.parse(resultText(await call(app, aliceToken, "download_media", {
+      chat_id: 2001,
+      message_id: voiceMessage.message_id,
+    }))) as { content_base64: string };
+    const voiceBytes = Buffer.from(voiceDownload.content_base64, "base64");
+    expect(voiceBytes.subarray(0, 4).toString()).toBe("OggS");
 
     const updates = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/getUpdates`, {
       method: "POST",
@@ -144,6 +160,22 @@ describe("Telegram MCP media projection", () => {
     const updateBody = (await updates.json()) as { result: Array<{ message?: { message_id: number; document?: unknown; voice?: unknown } }> };
     expect(updateBody.result.some((update) => update.message?.message_id === fileMessage.message_id && update.message.document)).toBe(true);
     expect(updateBody.result.some((update) => update.message?.message_id === voiceMessage.message_id && update.message.voice)).toBe(true);
+
+    const catalogBytes = Buffer.from("pome-telegram-fixture-file\n");
+    const visible = JSON.parse(resultText(await call(app, aliceToken, "download_media", {
+      chat_id: 2001,
+      message_id: fileMessage.message_id,
+    }))) as { content_base64: string };
+    expect(Buffer.from(visible.content_base64, "base64").equals(catalogBytes)).toBe(true);
+
+    const owned = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/getFile`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ file_id: fileMessage.document.file_id }),
+    });
+    expect(owned.status).toBe(200);
+    const ownedBody = await owned.json() as { ok: boolean; result: { file_path: string; file_size: number } };
+    expect(ownedBody).toMatchObject({ ok: true, result: { file_size: catalogBytes.length } });
 
     const foreign = await app.request(`/bot${OTHER_BOT_TOKEN}/getFile`, {
       method: "POST",
@@ -155,12 +187,31 @@ describe("Telegram MCP media projection", () => {
 
   it("serves only the fixture sticker catalog and rejects unknown stickers", async () => {
     const app = createTelegramTwinApp({ seed: defaultSeedState() });
-    expect(JSON.parse(resultText(await call(app, aliceToken, "get_sticker_sets", {})))).toEqual(listStickerSets());
+    const sets = JSON.parse(resultText(await call(app, aliceToken, "get_sticker_sets", {}))) as Array<{
+      name: string;
+      stickers: Array<{ file_path: string }>;
+    }>;
+    expect(sets).toEqual([
+      expect.objectContaining({
+        name: "pome_lab",
+        stickers: [
+          expect.objectContaining({ file_path: "pome_lab/wave.webp" }),
+          expect.objectContaining({ file_path: "pome_lab/ok.webp" }),
+        ],
+      }),
+    ]);
     const sent = JSON.parse(resultText(await call(app, aliceToken, "send_sticker", {
       chat_id: 2001,
       file_path: "pome_lab/wave.webp",
-    }))) as { sticker: { file_id: string } };
+    }))) as { message_id: number; sticker: { file_id: string } };
     expect(sent.sticker.file_id).toMatch(/^file_/);
+    const stickerDownload = JSON.parse(resultText(await call(app, aliceToken, "download_media", {
+      chat_id: 2001,
+      message_id: sent.message_id,
+    }))) as { content_base64: string };
+    const stickerBytes = Buffer.from(stickerDownload.content_base64, "base64");
+    expect(stickerBytes.subarray(0, 4).toString()).toBe("RIFF");
+    expect(stickerBytes.includes(Buffer.from("WEBP"))).toBe(true);
     expect((await call(app, aliceToken, "send_sticker", {
       chat_id: 2001,
       file_path: "unknown/sticker.webp",
