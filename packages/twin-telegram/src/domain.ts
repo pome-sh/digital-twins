@@ -25,6 +25,7 @@ import {
   parseSlowMode,
   parseUntilDate,
   requireChatPermissions,
+  requireSupportedIndependentChatPermissions,
   presentParticipant,
   requireAdminTitle,
   requireChatAbout,
@@ -688,6 +689,21 @@ export class TelegramDomain {
   ): { ok: true } {
     const row = this.requireVisibleMessage(actor, args.chat_id, args.message_id);
     const person = this.personFor(actor);
+    const own = row.from_id === person.id;
+    if (own) {
+      if (actor.kind === "bot" && this.now() - row.date >= BOT_DELETE_WINDOW_SEC) {
+        telegramFail(400, 400, "Bad Request: message can't be deleted");
+      }
+      this.hardDelete(args.chat_id, args.message_id);
+      delta({ before: { chat_id: args.chat_id, message_id: args.message_id }, after: null });
+      return { ok: true };
+    }
+    if (this.chat(args.chat_id).type !== "private") {
+      this.requireAdminRight(actor, args.chat_id, "can_delete_messages");
+      this.hardDelete(args.chat_id, args.message_id);
+      delta({ before: { chat_id: args.chat_id, message_id: args.message_id }, after: null });
+      return { ok: true };
+    }
     if (actor.kind === "bot") {
       if (this.now() - row.date >= BOT_DELETE_WINDOW_SEC) {
         telegramFail(400, 400, "Bad Request: message can't be deleted");
@@ -696,12 +712,7 @@ export class TelegramDomain {
       delta({ before: { chat_id: args.chat_id, message_id: args.message_id }, after: null });
       return { ok: true };
     }
-    if (row.from_id === person.id || args.revoke) {
-      if (row.from_id !== person.id) telegramFail(400, 400, "Bad Request: message can't be deleted");
-      this.hardDelete(args.chat_id, args.message_id);
-      delta({ before: { chat_id: args.chat_id, message_id: args.message_id }, after: null });
-      return { ok: true };
-    }
+    if (args.revoke) telegramFail(400, 400, "Bad Request: message can't be deleted");
     this.db
       .prepare("INSERT OR IGNORE INTO message_hides (account, chat_id, message_id) VALUES (?, ?, ?)")
       .run(actor.account, args.chat_id, args.message_id);
@@ -1175,7 +1186,7 @@ export class TelegramDomain {
   }
 
   private botSeesFileInMemberChat(botId: number, fileId: string): boolean {
-    return Boolean(
+    const inMessage = Boolean(
       this.db.prepare(
         `SELECT 1 AS ok FROM messages m JOIN chat_members cm ON cm.chat_id = m.chat_id
          WHERE cm.user_id = ? AND ? IN (
@@ -1186,6 +1197,13 @@ export class TelegramDomain {
            json_extract(m.media_json, '$.audio.file_id'),
            json_extract(m.media_json, '$.photo[0].file_id')
          )`,
+      ).get(botId, fileId),
+    );
+    if (inMessage) return true;
+    return Boolean(
+      this.db.prepare(
+        `SELECT 1 AS ok FROM chats c JOIN chat_members cm ON cm.chat_id = c.id
+         WHERE cm.user_id = ? AND c.photo_file_id = ?`,
       ).get(botId, fileId),
     );
   }
@@ -1413,7 +1431,9 @@ export class TelegramDomain {
     if (target.status === "creator") telegramFail(400, 400, "Bad Request: can't promote the chat creator");
     if (!target.isMember) telegramFail(400, 400, "Bad Request: user not found");
     const actorRights = actorSnap.status === "creator" ? FULL_ADMIN_RIGHTS : actorSnap.rights ?? DEFAULT_PROMOTE_RIGHTS;
-    const rights = parseAdminRights(args.rights, target.rights ?? DEFAULT_PROMOTE_RIGHTS);
+    const rights = args.rights === undefined || args.rights === null
+      ? { ...DEFAULT_PROMOTE_RIGHTS }
+      : parseAdminRights(args.rights, ZERO_ADMIN_RIGHTS);
     if (!rightsSubset(rights, actorRights)) telegramFail(400, 400, "Bad Request: can't grant rights the actor lacks");
     if (noAdminRights(rights)) return this.demoteChatMember(actor, { chat_id: args.chat_id, user_id: args.user_id }, delta);
     this.db.prepare(
@@ -1521,13 +1541,14 @@ export class TelegramDomain {
 
   restrictChatMember(
     actor: Actor,
-    args: { chat_id: number; user_id: number | string; permissions?: unknown; until_date?: unknown },
+    args: { chat_id: number; user_id: number | string; permissions?: unknown; until_date?: unknown; use_independent_chat_permissions?: unknown },
     delta: DeltaHook = NOOP,
   ): { ok: true } {
     const actorSnap = this.requireAdminRight(actor, args.chat_id, "can_restrict_members");
     const target = this.targetMember(args.chat_id, args.user_id);
     this.assertModerationTarget(actorSnap, target, "restrict");
     if (!target.isMember) telegramFail(400, 400, "Bad Request: user not found");
+    requireSupportedIndependentChatPermissions(args.use_independent_chat_permissions);
     const permissions = requireChatPermissions(args.permissions);
     const until = parseUntilDate(args.until_date, this.now());
     if (allPermissionsAllowed(permissions)) {
@@ -1555,10 +1576,11 @@ export class TelegramDomain {
 
   setChatPermissions(
     actor: Actor,
-    args: { chat_id: number; permissions?: unknown; until_date?: unknown },
+    args: { chat_id: number; permissions?: unknown; until_date?: unknown; use_independent_chat_permissions?: unknown },
     delta: DeltaHook = NOOP,
   ): { ok: true } {
     const actorSnap = this.requireAdminRight(actor, args.chat_id, "can_restrict_members");
+    requireSupportedIndependentChatPermissions(args.use_independent_chat_permissions);
     const permissions = requireChatPermissions(args.permissions);
     const until = parseUntilDate(args.until_date, this.now());
     const before = this.defaultPermissions(args.chat_id);

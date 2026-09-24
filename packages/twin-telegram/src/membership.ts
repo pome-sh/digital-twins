@@ -232,7 +232,7 @@ export function parseAdminRights(input: unknown, fallback: AdminRights = DEFAULT
   const next = { ...fallback };
   for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
     const mapped = ADMIN_ALIASES[key];
-    if (!mapped) continue;
+    if (!mapped) telegramFail(400, 400, `Bad Request: unknown right ${key}`);
     if (typeof value !== "boolean") telegramFail(400, 400, `Bad Request: ${key} must be a boolean`);
     next[mapped] = value;
   }
@@ -259,6 +259,15 @@ export function rightsSubset(granted: AdminRights, actor: AdminRights): boolean 
 export function requireChatPermissions(input: unknown): ChatPermissions {
   if (input === undefined || input === null) telegramFail(400, 400, "Bad Request: permissions is required");
   return parseChatPermissions(input);
+}
+
+// Permissions are stored as independent flags. Telegram's implied-permission
+// mode (use_independent_chat_permissions=false) is not implemented, so an
+// explicit unsupported value is rejected instead of being ignored.
+export function requireSupportedIndependentChatPermissions(value: unknown): void {
+  if (value === undefined || value === null || value === "") return;
+  if (value === true) return;
+  telegramFail(400, 400, "Bad Request: use_independent_chat_permissions must be true");
 }
 
 export function allPermissionsAllowed(permissions: ChatPermissions): boolean {

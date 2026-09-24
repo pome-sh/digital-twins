@@ -135,6 +135,42 @@ describe("Telegram MCP membership projection", () => {
     expect(JSON.parse(resultText(await call(app, aliceToken, "get_recent_actions", { chat_id: created.id }))).length).toBeGreaterThan(0);
   });
 
+  it("grants only can_invite_users from a partial promote_admin rights object", async () => {
+    const app = createTelegramTwinApp({ seed: defaultSeedState() });
+    expect(JSON.parse(resultText(await call(app, aliceToken, "promote_admin", {
+      group_id: -1001234567890,
+      user_id: 2002,
+      rights: { can_invite_users: true },
+    })))).toEqual({ ok: true });
+    const member = await bot(app, "getChatMember", { chat_id: -1001234567890, user_id: 2002 });
+    expect(member.body.result).toEqual({
+      status: "administrator",
+      user: { id: 2002, is_bot: false, first_name: "Bob", username: "bob" },
+      can_be_edited: true,
+      is_anonymous: false,
+      can_manage_chat: false,
+      can_delete_messages: false,
+      can_manage_video_chats: false,
+      can_restrict_members: false,
+      can_promote_members: false,
+      can_change_info: false,
+      can_invite_users: true,
+      can_post_stories: false,
+      can_edit_stories: false,
+      can_delete_stories: false,
+      can_post_messages: false,
+      can_edit_messages: false,
+      can_pin_messages: false,
+      can_manage_topics: false,
+    });
+    const unknown = await call(app, aliceToken, "promote_admin", {
+      group_id: -1001234567890,
+      user_id: 1100001,
+      rights: { can_invite_users: true, can_fly: true },
+    });
+    expect(unknown.result.isError).toBe(true);
+  });
+
   it("grants only delete_messages from a partial edit_admin_rights payload", async () => {
     const app = createTelegramTwinApp({ seed: defaultSeedState() });
     expect(JSON.parse(resultText(await call(app, aliceToken, "edit_admin_rights", {

@@ -11,7 +11,7 @@ Staged Bot API conversation, interaction, media, and group membership over the s
 | getMe / getChat | hot | semantic | Seeded bot identity and member-visible chats |
 | sendMessage | hot | semantic | Text, optional reply, inline keyboard, or reply keyboard |
 | editMessageText / editMessageReplyMarkup | hot | bounded | Author only; callback-data inline and text reply keyboards only |
-| deleteMessage / deleteMessages | hot | semantic | Bot: fixed 48h window; batch applies in order |
+| deleteMessage / deleteMessages | hot | semantic | Bot own messages: fixed 48h window; group delete-others requires current `can_delete_messages` or creator; batch applies in order |
 | forwardMessage / copyMessage | hot | semantic | Forward keeps attribution; copy is independent |
 | getUpdates | hot | semantic | SQLite queue, 24h retention, offsets, one waiter per bot |
 | setWebhook / deleteWebhook / getWebhookInfo | hot | bounded | Durable local-fixture outbox; no network egress |
@@ -22,11 +22,11 @@ Staged Bot API conversation, interaction, media, and group membership over the s
 | sendPhoto / sendDocument / sendVideo / sendAudio / sendVoice | hot | bounded | Bot-scoped SQLite media handles; multipart upload or owned `file_id`; no URL or host-file fetch |
 | sendMediaGroup | hot | bounded | 2–10 owned media references, atomic message creation and album id; multipart attachments total at most 64 MiB |
 | editMessageCaption | hot | bounded | Author-only media captions, maximum 1024 UTF-16 code units |
-| getFile / `/file/bot<TOKEN>/...` | hot | bounded | Opaque, expiring handle; owner-scope or a member chat that references the file_id; byte download only, not a filesystem path |
+| getFile / `/file/bot<TOKEN>/...` | hot | bounded | Opaque, expiring handle; owner-scope or a member chat that references the file_id on a message or `chats.photo_file_id`; byte download only, not a filesystem path |
 | sendChatAction | warm | bounded | Validates membership and the staged Bot API action set; no transient update |
 | getChatAdministrators / getChatMemberCount / getChatMember | hot | bounded | Creator, admin rights, member restrictions, left, and kicked are distinct |
-| setChatTitle / setChatDescription / setChatPermissions | hot | bounded | Default chat permissions are not per-member restrictions |
-| banChatMember / unbanChatMember / restrictChatMember / promoteChatMember / leaveChat | hot | bounded | Ban, unban, leave, invite, and remove are different transitions |
+| setChatTitle / setChatDescription / setChatPermissions | hot | bounded | Default chat permissions are not per-member restrictions. `use_independent_chat_permissions` must be omitted or true |
+| banChatMember / unbanChatMember / restrictChatMember / promoteChatMember / leaveChat | hot | bounded | Ban, unban, leave, invite, and remove are different transitions. A supplied promote rights object starts from zero; omitted rights keep the default promote set |
 
 ## MCP
 
@@ -91,3 +91,6 @@ inline callback. Callback waiting remains an internal domain facility.
 20. An actor cannot grant admin rights they themselves lack. The creator is not a demote, ban, or restrict target.
 21. Restriction expiry and slow mode compare against the injected twin clock, not wall time.
 22. MCP chat photos resolve through the fixture catalog or an owned opaque `file_id`. The twin does not read the host filesystem or fetch a URL. Bot API `setChatPhoto` and `deleteChatPhoto` stay outside the HTTP subset.
+23. Group or supergroup deletion of someone else's message requires the actor's current `can_delete_messages` admin right or creator status. Ordinary members cannot delete others. The 48h bot window applies only to the bot's own messages.
+24. `promoteChatMember` / `promote_admin` treat a supplied rights object as a zero baseline: omitted flags are false. Unrecognized rights keys are rejected. Omitting the rights object entirely still grants `DEFAULT_PROMOTE_RIGHTS`.
+25. `use_independent_chat_permissions` is accepted only when omitted or true. Implied-permission mode (`false`) is rejected rather than ignored.

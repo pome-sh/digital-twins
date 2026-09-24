@@ -24,7 +24,7 @@
     {"name": "getChat", "heat": "hot", "fidelity": "semantic", "justification": "Chat lookup."},
     {"name": "sendMessage", "heat": "hot", "fidelity": "semantic", "justification": "Bot send."},
     {"name": "editMessageText", "heat": "hot", "fidelity": "semantic", "justification": "Author edit."},
-    {"name": "deleteMessage", "heat": "hot", "fidelity": "semantic", "justification": "48h bot delete."},
+    {"name": "deleteMessage", "heat": "hot", "fidelity": "semantic", "justification": "Own-message 48h bot window; group delete-others needs can_delete_messages."},
     {"name": "deleteMessages", "heat": "hot", "fidelity": "semantic", "justification": "Batch delete."},
     {"name": "forwardMessage", "heat": "hot", "fidelity": "semantic", "justification": "Forward."},
     {"name": "copyMessage", "heat": "hot", "fidelity": "semantic", "justification": "Copy without attribution."},
@@ -43,10 +43,10 @@
     {"name": "sendPhoto/sendDocument/sendVideo/sendAudio/sendVoice", "heat": "hot", "fidelity": "bounded", "justification": "HTTP-only bot-scoped SQLite media upload/reference subset."},
     {"name": "sendMediaGroup", "heat": "hot", "fidelity": "bounded", "justification": "Atomic 2-10 item album subset."},
     {"name": "editMessageCaption", "heat": "hot", "fidelity": "bounded", "justification": "Author-only UTF-16 bounded media captions."},
-    {"name": "getFile/file download", "heat": "hot", "fidelity": "bounded", "justification": "Opaque expiring bot-scoped byte handles."},
+    {"name": "getFile/file download", "heat": "hot", "fidelity": "bounded", "justification": "Opaque expiring handles; member chat messages or chats.photo_file_id."},
     {"name": "sendChatAction", "heat": "warm", "fidelity": "bounded", "justification": "Membership and action validation only."},
     {"name": "getChatAdministrators/getChatMemberCount/getChatMember", "heat": "hot", "fidelity": "bounded", "justification": "Creator, administrator, member, restricted, left, and kicked are distinct."},
-    {"name": "setChatTitle/setChatDescription/setChatPermissions", "heat": "hot", "fidelity": "bounded", "justification": "Default chat permissions are not per-member restrictions. HTTP setChatPhoto/deleteChatPhoto stay unimplemented."},
-    {"name": "banChatMember/unbanChatMember/restrictChatMember/promoteChatMember/leaveChat", "heat": "hot", "fidelity": "bounded", "justification": "Ban, unban, leave, invite, and remove remain different transitions. An actor cannot grant rights they lack."}
+    {"name": "setChatTitle/setChatDescription/setChatPermissions", "heat": "hot", "fidelity": "bounded", "justification": "Default chat permissions are not per-member restrictions. use_independent_chat_permissions must be omitted or true. HTTP setChatPhoto/deleteChatPhoto stay unimplemented."},
+    {"name": "banChatMember/unbanChatMember/restrictChatMember/promoteChatMember/leaveChat", "heat": "hot", "fidelity": "bounded", "justification": "Ban, unban, leave, invite, and remove remain different transitions. An actor cannot grant rights they lack. Supplied promote rights start from zero."}
   ]
 }

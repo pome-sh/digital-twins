@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { openTelegramTwinDatabase } from "../src/db.js";
 import { TelegramDomain } from "../src/domain.js";
 import { resolveCatalogFile, resolveChatPhoto, type CatalogFile } from "../src/media-catalog.js";
-import { FULL_CHAT_PERMISSIONS } from "../src/membership.js";
+import { DEFAULT_PROMOTE_RIGHTS, FULL_CHAT_PERMISSIONS, ZERO_ADMIN_RIGHTS } from "../src/membership.js";
 import { defaultSeedState, SYNTHETIC_BOT_TOKEN } from "../src/seed.js";
 import { createTelegramTwinApp } from "../src/twin.js";
 
@@ -194,6 +194,90 @@ describe("Telegram membership domain", () => {
     const { domain } = fresh();
     expect(() => domain.setChatPermissions(ALICE, { chat_id: GROUP })).toThrow(/permissions/);
     expect(() => domain.restrictChatMember(ALICE, { chat_id: GROUP, user_id: 2002 })).toThrow(/permissions/);
+  });
+
+  it("requires can_delete_messages to hard-delete another member's group message", () => {
+    const { domain } = fresh();
+    const other = domain.sendMessage(ALICE, { chat_id: GROUP, text: "alice" });
+    const own = domain.sendMessage(BOT, { chat_id: GROUP, text: "mine" });
+    expect(domain.deleteMessage(BOT, { chat_id: GROUP, message_id: own.message_id as number })).toEqual({ ok: true });
+    expect(() => domain.deleteMessage(BOB, { chat_id: GROUP, message_id: other.message_id as number })).toThrow(/rights/);
+    expect(() => domain.deleteMessage(BOT, { chat_id: GROUP, message_id: other.message_id as number })).toThrow(/rights/);
+
+    domain.promoteChatMember(ALICE, { chat_id: GROUP, user_id: 1100001, rights: { can_delete_messages: true } });
+    expect(domain.deleteMessage(BOT, { chat_id: GROUP, message_id: other.message_id as number })).toEqual({ ok: true });
+
+    const again = domain.sendMessage(ALICE, { chat_id: GROUP, text: "again" });
+    domain.promoteChatMember(ALICE, { chat_id: GROUP, user_id: 1100001, rights: { can_invite_users: true } });
+    expect(() => domain.deleteMessage(BOT, { chat_id: GROUP, message_id: again.message_id as number })).toThrow(/rights/);
+
+    domain.promoteChatMember(ALICE, { chat_id: GROUP, user_id: 2002, rights: { can_delete_messages: true } });
+    expect(domain.deleteMessage(BOB, { chat_id: GROUP, message_id: again.message_id as number })).toEqual({ ok: true });
+    expect(domain.getHistory("alice", GROUP).map((message) => message.text)).toEqual([]);
+  });
+
+  it("treats a supplied promote rights object as a zero baseline", () => {
+    const { domain } = fresh();
+    domain.promoteChatMember(ALICE, { chat_id: GROUP, user_id: 2002, rights: { can_invite_users: true } });
+    expect(domain.getChatMember(ALICE, { chat_id: GROUP, user_id: 2002 })).toEqual({
+      status: "administrator",
+      user: { id: 2002, is_bot: false, first_name: "Bob", username: "bob" },
+      can_be_edited: true,
+      ...ZERO_ADMIN_RIGHTS,
+      can_invite_users: true,
+    });
+    domain.demoteChatMember(ALICE, { chat_id: GROUP, user_id: 2002 });
+    domain.promoteChatMember(ALICE, { chat_id: GROUP, user_id: 2002 });
+    expect(domain.getChatMember(ALICE, { chat_id: GROUP, user_id: 2002 })).toEqual({
+      status: "administrator",
+      user: { id: 2002, is_bot: false, first_name: "Bob", username: "bob" },
+      can_be_edited: true,
+      ...DEFAULT_PROMOTE_RIGHTS,
+    });
+    expect(() => domain.promoteChatMember(ALICE, {
+      chat_id: GROUP,
+      user_id: 1100001,
+      rights: { can_invite_users: true, can_fly: true },
+    })).toThrow(/unknown right/);
+  });
+
+  it("lets a member bot getFile a user-set group chat photo and denies a foreign chat", () => {
+    const { domain } = fresh();
+    domain.editChatPhoto(ALICE, {
+      chat_id: GROUP,
+      media: { bytes: Buffer.from("group-photo"), filename: "photo.webp", mimeType: "image/webp" },
+    });
+    const fileId = (domain.getChat(BOT, GROUP).photo as { small_file_id: string }).small_file_id;
+    const file = domain.getFile(BOT, fileId);
+    expect(domain.downloadFile(BOT, file.file_path as string).content.equals(Buffer.from("group-photo"))).toBe(true);
+
+    const secret = domain.createGroup("alice", { title: "Secret", user_ids: [] });
+    domain.editChatPhoto(ALICE, {
+      chat_id: secret.id as number,
+      media: { bytes: Buffer.from("secret-photo"), filename: "secret.webp", mimeType: "image/webp" },
+    });
+    const secretId = (domain.getChat(ALICE, secret.id as number).photo as { small_file_id: string }).small_file_id;
+    expect(() => domain.getFile(BOT, secretId)).toThrow(/file not found/);
+  });
+
+  it("rejects use_independent_chat_permissions when it is not true", () => {
+    const { domain } = fresh();
+    expect(domain.setChatPermissions(ALICE, {
+      chat_id: GROUP,
+      permissions: { can_send_messages: true },
+      use_independent_chat_permissions: true,
+    })).toEqual({ ok: true });
+    expect(() => domain.setChatPermissions(ALICE, {
+      chat_id: GROUP,
+      permissions: { can_send_messages: true },
+      use_independent_chat_permissions: false,
+    })).toThrow(/use_independent_chat_permissions/);
+    expect(() => domain.restrictChatMember(ALICE, {
+      chat_id: GROUP,
+      user_id: 2002,
+      permissions: { can_send_messages: false },
+      use_independent_chat_permissions: false,
+    })).toThrow(/use_independent_chat_permissions/);
   });
 
   it("backfills creator_id on existing file-backed chats the same way seed assigns a creator", () => {
