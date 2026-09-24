@@ -72,7 +72,7 @@
   },
   "dependencies": {
     "@octokit/openapi-types": "^29.0.1",
-    "hono": "^4.13.8",
+    "hono": "^4.13.9",
     "stripe": "22.6.2"
   },
   "peerDependencies": {
@@ -85,13 +85,13 @@
     "@pome-sh/twin-linear": "*",
     "@pome-sh/twin-slack": "*",
     "@pome-sh/twin-stripe": "*",
-    "@types/node": "^26.6.1",
+    "@types/node": "^26.6.2",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^5.0.1",
     "zod": "^4.6.5"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=24.21.0"
   }
 }

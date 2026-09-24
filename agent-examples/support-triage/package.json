@@ -11,15 +11,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.273"
+    "@anthropic-ai/claude-agent-sdk": "^0.3.281"
   },
   "devDependencies": {
-    "@types/node": "^25.9.7",
-    "tsx": "^4.23.13",
+    "@types/node": "^25.9.8",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^5.0.1"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=24.21.0"
   }
 }

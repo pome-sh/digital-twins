@@ -9,21 +9,21 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.54",
-    "@ai-sdk/google": "^4.0.72",
-    "@ai-sdk/openai": "^4.0.67",
-    "ai": "^7.0.102",
+    "@ai-sdk/anthropic": "^4.0.62",
+    "@ai-sdk/google": "^4.0.79",
+    "@ai-sdk/openai": "^4.0.74",
+    "ai": "^7.0.113",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@types/node": "^25.9.7",
-    "tsx": "^4.23.13",
+    "@types/node": "^25.9.8",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=24.21.0"
   },
   "overrides": {
-    "undici": "^8.10.2"
+    "undici": "^8.11.2"
   }
 }
