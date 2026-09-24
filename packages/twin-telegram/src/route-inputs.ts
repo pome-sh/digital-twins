@@ -31,6 +31,7 @@ const sendBody = {
   chat_id: z.coerce.number().int(),
   text: z.string(),
   reply_to_message_id: z.coerce.number().int().optional(),
+  message_thread_id: z.coerce.number().int().optional(),
   reply_markup: jsonValue.optional(),
 };
 
@@ -386,6 +387,60 @@ export const POST_PROMOTE_CHAT_MEMBER = declareInputs({
 export const POST_LEAVE_CHAT = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/leaveChat", pathParams: credParam, body: chatIdBody, bodyEncoding: "form",
 });
+const inviteLinkBody = {
+  chat_id: z.coerce.number().int(),
+  name: z.string().optional(),
+  expire_date: z.coerce.number().int().optional(),
+  member_limit: z.coerce.number().int().optional(),
+  creates_join_request: formBoolean.optional(),
+};
+export const POST_CREATE_CHAT_INVITE_LINK = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/createChatInviteLink", pathParams: credParam,
+  body: inviteLinkBody, bodyEncoding: "form",
+});
+export const POST_EDIT_CHAT_INVITE_LINK = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/editChatInviteLink", pathParams: credParam,
+  body: { ...inviteLinkBody, invite_link: z.string().min(1) }, bodyEncoding: "form",
+});
+export const POST_REVOKE_CHAT_INVITE_LINK = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/revokeChatInviteLink", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), invite_link: z.string().min(1) }, bodyEncoding: "form",
+});
+export const POST_APPROVE_CHAT_JOIN_REQUEST = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/approveChatJoinRequest", pathParams: credParam,
+  body: userIdBody, bodyEncoding: "form",
+});
+export const POST_DECLINE_CHAT_JOIN_REQUEST = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/declineChatJoinRequest", pathParams: credParam,
+  body: userIdBody, bodyEncoding: "form",
+});
+const topicBody = {
+  chat_id: z.coerce.number().int(),
+  name: z.string(),
+  icon_color: z.coerce.number().int().optional(),
+  icon_custom_emoji_id: z.string().optional(),
+};
+export const POST_CREATE_FORUM_TOPIC = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/createForumTopic", pathParams: credParam,
+  body: topicBody, bodyEncoding: "form",
+});
+export const POST_EDIT_FORUM_TOPIC = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/editForumTopic", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), message_thread_id: z.coerce.number().int(), name: z.string().optional(), icon_custom_emoji_id: z.string().optional() },
+  bodyEncoding: "form",
+});
+export const POST_CLOSE_FORUM_TOPIC = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/closeForumTopic", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), message_thread_id: z.coerce.number().int() }, bodyEncoding: "form",
+});
+export const POST_REOPEN_FORUM_TOPIC = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/reopenForumTopic", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), message_thread_id: z.coerce.number().int() }, bodyEncoding: "form",
+});
+export const POST_DELETE_FORUM_TOPIC = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/deleteForumTopic", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), message_thread_id: z.coerce.number().int() }, bodyEncoding: "form",
+});
 
 /** Every Bot API surface mounted by routes.ts. Telegram is not yet in the global artifact lane. */
 export const TELEGRAM_ROUTE_INPUTS: readonly RouteInputDeclaration[] = [
@@ -437,4 +492,14 @@ export const TELEGRAM_ROUTE_INPUTS: readonly RouteInputDeclaration[] = [
   POST_RESTRICT_CHAT_MEMBER,
   POST_PROMOTE_CHAT_MEMBER,
   POST_LEAVE_CHAT,
+  POST_CREATE_CHAT_INVITE_LINK,
+  POST_EDIT_CHAT_INVITE_LINK,
+  POST_REVOKE_CHAT_INVITE_LINK,
+  POST_APPROVE_CHAT_JOIN_REQUEST,
+  POST_DECLINE_CHAT_JOIN_REQUEST,
+  POST_CREATE_FORUM_TOPIC,
+  POST_EDIT_FORUM_TOPIC,
+  POST_CLOSE_FORUM_TOPIC,
+  POST_REOPEN_FORUM_TOPIC,
+  POST_DELETE_FORUM_TOPIC,
 ];

@@ -10,6 +10,6 @@ commit `45cce7e3dbf50655645f48d5f78d8a84aec6aa8f`. The capture imports the sourc
 registration and schemas offline; it does not use Telegram credentials or call Telegram. This twin
 projects account lookup, the source-compatible interaction rows (pins, regular polls,
 standard emoji reactions, and inline callback inspection/press), the six media source rows,
-and the membership/moderation source rows over the existing SQLite store. Reply keyboards and callback answer/wait do not have source MCP
+the membership/moderation source rows, and the invite, channel, and forum source rows over the existing SQLite store. Reply keyboards and callback answer/wait do not have source MCP
 registrations, so they remain HTTP-only. Every omitted source operation is recorded in this
 package fixture's provenance.

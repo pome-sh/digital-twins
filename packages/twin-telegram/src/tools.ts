@@ -333,7 +333,6 @@ const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
         topic_id?: number | null;
         schedule_date?: string | number | null;
       } & SourceAccount;
-      if (input.topic_id !== undefined && input.topic_id !== null) telegramFail(400, 400, "Bad Request: forum topics are unsupported");
       if (input.schedule_date !== undefined && input.schedule_date !== null) telegramFail(400, 400, "Bad Request: scheduled sends are unsupported");
       if (Array.isArray(input.file_path)) telegramFail(400, 400, "Bad Request: media groups are unsupported");
       const account = requireSourceAccount(input, ctx);
@@ -342,6 +341,7 @@ const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
         kind: "document",
         media: catalogMedia(resolveCatalogFile(input.file_path, "document")),
         caption: input.caption ?? undefined,
+        message_thread_id: input.topic_id ?? undefined,
       }, ctx.reportDelta);
       return sourceResult(result);
     },
@@ -357,12 +357,12 @@ const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
     mutation: true,
     handler: (domain, args, ctx) => {
       const input = args as { chat_id: SourceChatId; file_path: string; topic_id?: number | null } & SourceAccount;
-      if (input.topic_id !== undefined && input.topic_id !== null) telegramFail(400, 400, "Bad Request: forum topics are unsupported");
       const account = requireSourceAccount(input, ctx);
       const result = domain.sendMedia({ kind: "user", account }, {
         chat_id: numericChatId(input.chat_id),
         kind: "voice",
         media: catalogMedia(resolveCatalogFile(input.file_path, "voice")),
+        message_thread_id: input.topic_id ?? undefined,
       }, ctx.reportDelta);
       return sourceResult(result);
     },
@@ -378,12 +378,12 @@ const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
     mutation: true,
     handler: (domain, args, ctx) => {
       const input = args as { chat_id: SourceChatId; file_path: string; topic_id?: number | null } & SourceAccount;
-      if (input.topic_id !== undefined && input.topic_id !== null) telegramFail(400, 400, "Bad Request: forum topics are unsupported");
       const account = requireSourceAccount(input, ctx);
       const result = domain.sendMedia({ kind: "user", account }, {
         chat_id: numericChatId(input.chat_id),
         kind: "sticker",
         media: catalogMedia(resolveCatalogFile(input.file_path, "sticker")),
+        message_thread_id: input.topic_id ?? undefined,
       }, ctx.reportDelta);
       return sourceResult(result);
     },
@@ -717,6 +717,125 @@ const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
     handler: (domain, args, ctx) => {
       const input = args as { chat_id: SourceChatId } & SourceAccount;
       return sourceResult(domain.getRecentActions(requireSourceAccount(input, ctx), { chat_id: numericChatId(input.chat_id) }));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  subscribe_public_channel: {
+    schema: z.looseObject({ channel: chatIdSchema, account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { channel: SourceChatId } & SourceAccount;
+      return sourceResult(domain.subscribePublicChannel(requireSourceAccount(input, ctx), { channel: input.channel }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  list_topics: {
+    schema: z.looseObject({
+      chat_id: z.number().int(),
+      limit: z.number().int().optional(),
+      offset_topic: z.number().int().optional(),
+      search_query: z.string().nullable().optional(),
+      account: accountSchema,
+    }),
+    mutation: false,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: number; limit?: number; offset_topic?: number; search_query?: string | null } & SourceAccount;
+      return sourceResult(domain.listTopics(requireSourceAccount(input, ctx), input));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  enable_forum_topics: {
+    schema: z.looseObject({ chat_id: chatIdSchema, tabs: z.boolean().optional(), account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; tabs?: boolean } & SourceAccount;
+      return sourceResult(domain.enableForumTopics(requireSourceAccount(input, ctx), {
+        chat_id: domain.resolveChatRef(input.chat_id),
+        tabs: input.tabs,
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  create_forum_topic: {
+    schema: z.looseObject({
+      chat_id: chatIdSchema,
+      title: z.string(),
+      icon_color: z.number().int().nullable().optional(),
+      icon_emoji_id: z.number().int().nullable().optional(),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; title: string; icon_color?: number | null; icon_emoji_id?: number | null } & SourceAccount;
+      return sourceResult(domain.createForumTopic({ kind: "user", account: requireSourceAccount(input, ctx) }, {
+        chat_id: domain.resolveChatRef(input.chat_id),
+        title: input.title,
+        icon_color: input.icon_color,
+        icon_emoji_id: input.icon_emoji_id,
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  search_public_chats: {
+    schema: z.looseObject({ query: z.string(), limit: z.number().int().optional(), account: accountSchema }),
+    mutation: false,
+    handler: (domain, args, ctx) => {
+      const input = args as { query: string; limit?: number } & SourceAccount;
+      return sourceResult(domain.searchPublicChats(requireSourceAccount(input, ctx), input));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  create_channel: {
+    schema: z.looseObject({
+      title: z.string(),
+      about: z.string().optional(),
+      megagroup: z.boolean().optional(),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { title: string; about?: string; megagroup?: boolean } & SourceAccount;
+      return sourceResult(domain.createChannel(requireSourceAccount(input, ctx), input, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  get_invite_link: {
+    schema: z.looseObject({ chat_id: chatIdSchema, account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId } & SourceAccount;
+      return sourceResult(domain.getInviteLink(requireSourceAccount(input, ctx), {
+        chat_id: domain.resolveChatRef(input.chat_id),
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  join_chat_by_link: {
+    schema: z.looseObject({ link: z.string(), account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { link: string } & SourceAccount;
+      return sourceResult(domain.joinChatByLink(requireSourceAccount(input, ctx), input, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  export_chat_invite: {
+    schema: z.looseObject({ chat_id: chatIdSchema, account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId } & SourceAccount;
+      return sourceResult(domain.exportChatInvite(requireSourceAccount(input, ctx), {
+        chat_id: domain.resolveChatRef(input.chat_id),
+      }, ctx.reportDelta));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  import_chat_invite: {
+    schema: z.looseObject({ hash: z.string(), account: accountSchema }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { hash: string } & SourceAccount;
+      return sourceResult(domain.importChatInvite(requireSourceAccount(input, ctx), input, ctx.reportDelta));
     },
     contentText: (output) => (output as SourceResult).result,
   },

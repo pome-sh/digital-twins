@@ -25,6 +25,9 @@ export type ChatRow = {
   title: string | null;
   description?: string | null;
   photo_file_id?: string | null;
+  username?: string | null;
+  is_forum?: number | null;
+  is_public?: number | null;
   permissions_json?: string | null;
   permissions_until?: number | null;
   slow_mode_seconds?: number | null;
@@ -43,6 +46,7 @@ export type MessageRow = {
   forward_from_chat_id?: number | null;
   reply_markup_json?: string | null;
   media_json?: string | null;
+  message_thread_id?: number | null;
 };
 
 export function serializeUser(row: UserRow): Record<string, unknown> {
@@ -59,6 +63,8 @@ export function serializeChat(row: ChatRow, extras: Record<string, unknown> = {}
     id: row.id,
     type: row.type,
     ...(row.title ? { title: row.title } : {}),
+    ...(row.username ? { username: row.username } : {}),
+    ...(row.is_forum ? { is_forum: true } : {}),
     ...extras,
   };
 }
@@ -93,5 +99,6 @@ export function serializeMessage(
       ? { forward_from: { id: row.forward_from_id }, forward_from_chat_id: row.forward_from_chat_id }
       : {}),
     ...(row.reply_markup_json ? { reply_markup: serializeReplyMarkup(row.reply_markup_json) } : {}),
+    ...(row.message_thread_id ? { message_thread_id: row.message_thread_id } : {}),
   };
 }

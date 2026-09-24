@@ -188,7 +188,7 @@ describe("Telegram MCP membership projection", () => {
     });
   });
 
-  it("lists the previous 18 tools plus these 19 membership tools", async () => {
+  it("lists the previous membership tools plus the invite, channel, and forum rows", async () => {
     const app = createTelegramTwinApp({ seed: defaultSeedState() });
     const response = await app.request(`/s/${sid}/mcp`, {
       method: "POST",
@@ -197,6 +197,6 @@ describe("Telegram MCP membership projection", () => {
     });
     const body = (await response.json()) as { result: { tools: Array<{ name: string }> } };
     expect(body.result.tools.map((tool) => tool.name)).toEqual(telegramMcpToolFixture.toolNames);
-    expect(telegramMcpToolFixture.toolNames).toHaveLength(37);
+    expect(telegramMcpToolFixture.toolNames).toHaveLength(47);
   });
 });
