@@ -48,6 +48,15 @@ describe("seed", () => {
     expect(parseSeed(defaultSeedState()).users).toHaveLength(2);
   });
 
+  it("refuses a username on a private chat and a numeric-only chat username", () => {
+    const privateNamed = defaultSeedState();
+    privateNamed.chats[0]!.username = "alicechat";
+    expect(() => parseSeed(privateNamed)).toThrow(/username is only valid/);
+    const numeric = defaultSeedState();
+    numeric.chats.push({ id: -1003000000099, type: "channel", title: "Numbers", username: "12345", members: [2001] });
+    expect(() => parseSeed(numeric)).toThrow(/numeric-only/);
+  });
+
   it("leaves existing rows when the domain is opened without a seed", () => {
     const db = openTelegramTwinDatabase(":memory:");
     const first = new TelegramDomain(db);

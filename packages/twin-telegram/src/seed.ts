@@ -19,8 +19,10 @@ const botSchema = z.strictObject({
 
 const chatSchema = z.strictObject({
   id: z.number().int(),
-  type: z.enum(["private", "group", "supergroup"]),
+  type: z.enum(["private", "group", "supergroup", "channel"]),
   title: z.string().optional(),
+  username: z.string().min(1).optional(),
+  is_forum: z.boolean().optional(),
   members: z.array(z.number().int()).min(1),
 });
 
@@ -57,9 +59,24 @@ export const seedSchema = z
       }
     }
     const chatIds = new Set(state.chats.map((chat) => chat.id));
+    const usernames = new Set<string>();
     for (const chat of state.chats) {
       for (const member of chat.members) {
         if (!ids.has(member)) ctx.addIssue({ code: "custom", message: `unknown member ${member}` });
+      }
+      if (chat.username) {
+        if (chat.type !== "supergroup" && chat.type !== "channel") {
+          ctx.addIssue({ code: "custom", message: `username is only valid on supergroup or channel chat ${chat.id}` });
+        }
+        if (/^\d+$/.test(chat.username)) {
+          ctx.addIssue({ code: "custom", message: `username ${chat.username} must not be numeric-only` });
+        }
+        const key = chat.username.toLowerCase();
+        if (usernames.has(key)) ctx.addIssue({ code: "custom", message: `duplicate username ${chat.username}` });
+        usernames.add(key);
+      }
+      if (chat.is_forum && chat.type !== "supergroup") {
+        ctx.addIssue({ code: "custom", message: `forum chat ${chat.id} must be a supergroup` });
       }
     }
     const messageKeys = new Set<string>();

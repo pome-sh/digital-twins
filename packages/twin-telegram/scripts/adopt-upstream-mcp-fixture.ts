@@ -67,10 +67,17 @@ const EXPOSED = [
   "get_admins",
   "get_banned_users",
   "get_recent_actions",
+  "subscribe_public_channel",
+  "list_topics",
+  "enable_forum_topics",
+  "create_forum_topic",
+  "search_public_chats",
+  "create_channel",
+  "get_invite_link",
+  "join_chat_by_link",
+  "export_chat_invite",
+  "import_chat_invite",
 ] as const;
-
-const MEMBERSHIP_SLICE_RULING =
-  "Not modeled by the twin's current user-MCP membership slice; this fixture serves group create/invite/leave, participant and admin reads, title/about/photo edits, promote/demote/ban/unban_user/remove, default permissions, slow mode, edit_admin_rights, get_banned_users, and the admin log. Channels and invite-link joins stay dropped.";
 
 /** Source registrations deliberately not exposed by this twin, with a ruling per name. */
 const DROPPED: Record<string, string> = {
@@ -92,13 +99,10 @@ const DROPPED: Record<string, string> = {
   "list_contact_aliases": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
   "delete_contact_alias": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
   "get_chats": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
-  "subscribe_public_channel": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
-  "list_topics": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
-  "enable_forum_topics": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
-  "create_forum_topic": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
+
   "list_chats": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
   "get_chat": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
-  "search_public_chats": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
+
   "resolve_username": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
   "get_full_chat": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
   "mute_chat": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
@@ -134,11 +138,6 @@ const DROPPED: Record<string, string> = {
   "save_draft": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
   "get_drafts": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
   "clear_draft": "Not modeled by the twin's current user-MCP interaction slice; this fixture serves only its account, pin, regular-poll, standard-emoji-reaction, and inline-callback source rows.",
-  "create_channel": MEMBERSHIP_SLICE_RULING,
-  "get_invite_link": MEMBERSHIP_SLICE_RULING,
-  "join_chat_by_link": MEMBERSHIP_SLICE_RULING,
-  "export_chat_invite": MEMBERSHIP_SLICE_RULING,
-  "import_chat_invite": MEMBERSHIP_SLICE_RULING,
   "send_album": "Not modeled by the twin's current user-MCP media slice; albums, host uploads, GIFs, and photo-browser rows stay dropped. This fixture serves get_media_info, download_media, send_file, send_voice, send_sticker, and get_sticker_sets over the existing SQLite media store.",
   "upload_file": "Not modeled by the twin's current user-MCP media slice; albums, host uploads, GIFs, and photo-browser rows stay dropped. This fixture serves get_media_info, download_media, send_file, send_voice, send_sticker, and get_sticker_sets over the existing SQLite media store.",
   "get_gif_search": "Not modeled by the twin's current user-MCP media slice; albums, host uploads, GIFs, and photo-browser rows stay dropped. This fixture serves get_media_info, download_media, send_file, send_voice, send_sticker, and get_sticker_sets over the existing SQLite media store.",
@@ -225,7 +224,7 @@ const meta = {
   liveToolCount: tools.length,
   liveToolOrder: tools.map((tool) => tool.name),
   configuration: {
-    derivation: "Subtract-only projection of the approved oss-source capture. Account lookup, interaction rows, media rows over the existing SQLite store, and the membership/moderation rows (create_group through get_recent_actions) are carried verbatim; every other registration is named in projection.dropped.",
+    derivation: "Subtract-only projection of the approved oss-source capture. Account lookup, interaction rows, media rows over the existing SQLite store, membership/moderation rows, and the invite/channel/forum source rows are carried verbatim; every other registration is named in projection.dropped.",
     sourceConfiguration: upstreamMeta.configuration,
   },
   projection,

@@ -2,7 +2,7 @@
 
 Last verified: 2026-09-24.
 
-Staged Bot API conversation, interaction, media, and group membership over the shared SQLite store. Not a Bot API or Tolboy-equivalence claim.
+Staged Bot API conversation, interaction, media, group membership, invites, channels, and forum topics over the shared SQLite store. Not a Bot API or Tolboy-equivalence claim.
 
 ## Methods
 
@@ -27,6 +27,9 @@ Staged Bot API conversation, interaction, media, and group membership over the s
 | getChatAdministrators / getChatMemberCount / getChatMember | hot | bounded | Creator, admin rights, member restrictions, left, and kicked are distinct |
 | setChatTitle / setChatDescription / setChatPermissions | hot | bounded | Default chat permissions are not per-member restrictions. `use_independent_chat_permissions` must be omitted or true |
 | banChatMember / unbanChatMember / restrictChatMember / promoteChatMember / leaveChat | hot | bounded | Ban, unban, leave, invite, and remove are different transitions. A supplied promote rights object starts from zero; omitted rights keep the default promote set |
+| createChatInviteLink / editChatInviteLink / revokeChatInviteLink | hot | bounded | Tokens bind to chat and creator, with expiry, use limit, and join-request approval. Expiry uses the injected clock |
+| approveChatJoinRequest / declineChatJoinRequest | hot | bounded | A pending request is not membership. Approve admits; decline does not |
+| createForumTopic / editForumTopic / closeForumTopic / reopenForumTopic / deleteForumTopic | hot | bounded | Close is not delete. Thread associations stay on messages after close or delete |
 
 ## MCP
 
@@ -57,8 +60,11 @@ This twin serves a subtract-only projection of that listing:
 | promote_admin / demote_admin / edit_admin_rights / get_admins | bounded | Admin rights are distinct from member restrictions. An actor cannot grant a right they lack. |
 | ban_user / unban_user / remove_user / get_banned_users | bounded | Ban, unban, and remove are different transitions. |
 | set_default_chat_permissions / toggle_slow_mode / get_recent_actions | bounded | Default permissions and slow mode use the injected clock. The admin log is permission-filtered. |
+| create_channel / subscribe_public_channel / search_public_chats | bounded | Public search covers only the seeded public catalog. Channel posts need creator status or `can_post_messages`. |
+| get_invite_link / export_chat_invite / import_chat_invite / join_chat_by_link | bounded | A bot-created invite can admit a user through MCP, including join-request approval. Arbitrary external links are refused. |
+| list_topics / enable_forum_topics / create_forum_topic | bounded | Forum topics on a supergroup. Close and delete stay HTTP-only because the source listing has no those names. |
 
-The remaining 91 source registrations are deliberately absent because this change does not add
+The remaining 81 source registrations are deliberately absent because this change does not add
 unready handlers. Each omission is named in
 [`fixtures/mcp-tools-list.meta.json`](fixtures/mcp-tools-list.meta.json)'s `projection.dropped` map,
 and the projection gate fails if the source adds or retires a tool without an explicit ruling.
@@ -94,3 +100,7 @@ inline callback. Callback waiting remains an internal domain facility.
 23. Group or supergroup deletion of someone else's message requires the actor's current `can_delete_messages` admin right or creator status. Ordinary members cannot delete others. The 48h bot window applies only to the bot's own messages.
 24. `promoteChatMember` / `promote_admin` treat a supplied rights object as a zero baseline: omitted flags are false. Unrecognized rights keys are rejected. Omitting the rights object entirely still grants `DEFAULT_PROMOTE_RIGHTS`.
 25. `use_independent_chat_permissions` is accepted only when omitted or true. Implied-permission mode (`false`) is rejected rather than ignored.
+26. Public chat search never leaves the seeded catalog. The twin does not crawl Telegram or fetch invite URLs.
+27. Invite tokens bind to chat and creator. Expiry compares against the injected twin clock. A use limit and a join-request flag cannot both be set.
+28. Topic close is not delete. Messages keep their `message_thread_id` after close or delete.
+29. Channel members cannot post unless they are the creator or an administrator with `can_post_messages`.

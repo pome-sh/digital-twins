@@ -24,12 +24,17 @@ CREATE TABLE IF NOT EXISTS chats (
   title TEXT,
   description TEXT,
   photo_file_id TEXT,
+  username TEXT,
+  is_forum INTEGER NOT NULL DEFAULT 0,
+  is_public INTEGER NOT NULL DEFAULT 0,
   permissions_json TEXT,
   permissions_until INTEGER NOT NULL DEFAULT 0,
   slow_mode_seconds INTEGER NOT NULL DEFAULT 0,
   creator_id INTEGER,
   next_message_id INTEGER NOT NULL DEFAULT 1,
-  next_admin_log_id INTEGER NOT NULL DEFAULT 1
+  next_admin_log_id INTEGER NOT NULL DEFAULT 1,
+  next_invite_id INTEGER NOT NULL DEFAULT 1,
+  next_topic_id INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS chat_members (
@@ -77,7 +82,44 @@ CREATE TABLE IF NOT EXISTS messages (
   forward_from_chat_id INTEGER,
   reply_markup_json TEXT,
   media_json TEXT,
+  message_thread_id INTEGER,
   PRIMARY KEY (chat_id, message_id)
+);
+
+-- Invite tokens are bound to chat and creator. Expiry uses the injected clock.
+CREATE TABLE IF NOT EXISTS chat_invite_links (
+  token TEXT PRIMARY KEY,
+  chat_id INTEGER NOT NULL,
+  creator_id INTEGER NOT NULL,
+  name TEXT,
+  expire_date INTEGER NOT NULL DEFAULT 0,
+  member_limit INTEGER NOT NULL DEFAULT 0,
+  creates_join_request INTEGER NOT NULL DEFAULT 0,
+  is_primary INTEGER NOT NULL DEFAULT 0,
+  is_revoked INTEGER NOT NULL DEFAULT 0,
+  usage_count INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS chat_join_requests (
+  chat_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  token TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (chat_id, user_id)
+);
+
+-- Close is not delete: thread associations stay on messages after close.
+CREATE TABLE IF NOT EXISTS forum_topics (
+  chat_id INTEGER NOT NULL,
+  topic_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  icon_color INTEGER,
+  icon_emoji_id TEXT,
+  is_closed INTEGER NOT NULL DEFAULT 0,
+  created_by_id INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (chat_id, topic_id)
 );
 
 -- Media bytes are deliberately stored in SQLite, never read from a host path.
@@ -221,6 +263,9 @@ DELETE FROM pinned_messages;
 DELETE FROM read_cursors;
 DELETE FROM message_hides;
 DELETE FROM messages;
+DELETE FROM forum_topics;
+DELETE FROM chat_join_requests;
+DELETE FROM chat_invite_links;
 DELETE FROM chat_admin_log;
 DELETE FROM chat_bans;
 DELETE FROM chat_members;
@@ -250,6 +295,12 @@ export function migrate(db: TelegramTwinDatabase): void {
     ["chats", "slow_mode_seconds", "INTEGER NOT NULL DEFAULT 0"],
     ["chats", "creator_id", "INTEGER"],
     ["chats", "next_admin_log_id", "INTEGER NOT NULL DEFAULT 1"],
+    ["chats", "username", "TEXT"],
+    ["chats", "is_forum", "INTEGER NOT NULL DEFAULT 0"],
+    ["chats", "is_public", "INTEGER NOT NULL DEFAULT 0"],
+    ["chats", "next_invite_id", "INTEGER NOT NULL DEFAULT 1"],
+    ["chats", "next_topic_id", "INTEGER NOT NULL DEFAULT 1"],
+    ["messages", "message_thread_id", "INTEGER"],
     ["chat_members", "status", "TEXT NOT NULL DEFAULT 'member'"],
     ["chat_members", "admin_rights_json", "TEXT"],
     ["chat_members", "restrictions_json", "TEXT"],
