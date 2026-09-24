@@ -78,7 +78,10 @@ describe("Telegram MCP media projection", () => {
     }))) as { file_id: string; content_base64: string };
     expect(downloaded.file_id).toBe(info.file_id);
     expect(Buffer.from(downloaded.content_base64, "base64").equals(bytes)).toBe(true);
-    expect(JSON.stringify(recorder.events())).not.toContain(SYNTHETIC_BOT_TOKEN);
+    const tape = JSON.stringify(recorder.events());
+    expect(tape).not.toContain(downloaded.content_base64);
+    expect(tape).not.toContain("bot-x-owned-bytes");
+    expect(tape).not.toContain(SYNTHETIC_BOT_TOKEN);
   });
 
   it("refuses private media, foreign accounts, and unsafe file references", async () => {
@@ -151,6 +154,7 @@ describe("Telegram MCP media projection", () => {
     }))) as { content_base64: string };
     const voiceBytes = Buffer.from(voiceDownload.content_base64, "base64");
     expect(voiceBytes.subarray(0, 4).toString()).toBe("OggS");
+    expect(voiceBytes.includes(Buffer.from("OpusHead"))).toBe(true);
 
     const updates = await app.request(`/bot${SYNTHETIC_BOT_TOKEN}/getUpdates`, {
       method: "POST",
@@ -211,7 +215,18 @@ describe("Telegram MCP media projection", () => {
     }))) as { content_base64: string };
     const stickerBytes = Buffer.from(stickerDownload.content_base64, "base64");
     expect(stickerBytes.subarray(0, 4).toString()).toBe("RIFF");
-    expect(stickerBytes.includes(Buffer.from("WEBP"))).toBe(true);
+    expect(stickerBytes.subarray(8, 12).toString()).toBe("WEBP");
+    const okSent = JSON.parse(resultText(await call(app, aliceToken, "send_sticker", {
+      chat_id: 2001,
+      file_path: "pome_lab/ok.webp",
+    }))) as { message_id: number; sticker: { file_id: string } };
+    const okDownload = JSON.parse(resultText(await call(app, aliceToken, "download_media", {
+      chat_id: 2001,
+      message_id: okSent.message_id,
+    }))) as { content_base64: string };
+    const okBytes = Buffer.from(okDownload.content_base64, "base64");
+    expect(okBytes.subarray(0, 4).toString()).toBe("RIFF");
+    expect(okBytes.subarray(8, 12).toString()).toBe("WEBP");
     expect((await call(app, aliceToken, "send_sticker", {
       chat_id: 2001,
       file_path: "unknown/sticker.webp",

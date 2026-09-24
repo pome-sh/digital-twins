@@ -23,24 +23,14 @@ export type CatalogStickerSet = {
   stickers: CatalogFile[];
 };
 
-function oggVoiceBytes(): Buffer {
-  // Minimal Ogg page: capture tests only require the OggS signature.
-  const header = Buffer.alloc(27);
-  header.write("OggS", 0);
-  header[5] = 0x02;
-  header[26] = 1;
-  return Buffer.concat([header, Buffer.from([0x09]), Buffer.from("pomevoice")]);
-}
-
-function riffWebpBytes(tag: string): Buffer {
-  const payload = Buffer.from(tag);
-  const bytes = Buffer.alloc(12 + payload.length);
-  bytes.write("RIFF", 0);
-  bytes.writeUInt32LE(4 + payload.length, 4);
-  bytes.write("WEBP", 8);
-  payload.copy(bytes, 12);
-  return bytes;
-}
+// Verified decode: ffprobe Opus, Pillow WEBP 2x2. Do not replace with
+// signature-only placeholders — downloaded bytes must actually parse.
+const VOICE_OGG = Buffer.from(
+  "T2dnUwACAAAAAAAAAABFfWCbAAAAAIQWg24BE09wdXNIZWFkAQE4AYC7AAAAAABPZ2dTAAAAAAAAAAAAAEV9YJsBAAAA06V8TgE+T3B1c1RhZ3MNAAAATGF2ZjYyLjEyLjEwMgEAAAAdAAAAZW5jb2Rlcj1MYXZjNjIuMjguMTAyIGxpYm9wdXNPZ2dTAASYCgAAAAAAAEV9YJsCAAAAhT4ungMDAwP4//74//74//4=",
+  "base64",
+);
+const WAVE_WEBP = Buffer.from("UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoCAAIAAUAmJaQAA3AA/vz0AAA=", "base64");
+const OK_WEBP = Buffer.from("UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoCAAIAAUAmJaQAA3AA/v02aAA=", "base64");
 
 const SAMPLE_FILE: CatalogFile = {
   path: "sample.txt",
@@ -55,7 +45,7 @@ const SAMPLE_VOICE: CatalogFile = {
   kind: "voice",
   filename: "voice.ogg",
   mimeType: "audio/ogg",
-  bytes: oggVoiceBytes(),
+  bytes: VOICE_OGG,
 };
 
 const WAVE_STICKER: CatalogFile = {
@@ -63,7 +53,7 @@ const WAVE_STICKER: CatalogFile = {
   kind: "sticker",
   filename: "wave.webp",
   mimeType: "image/webp",
-  bytes: riffWebpBytes("wave"),
+  bytes: WAVE_WEBP,
   emoji: "👋",
 };
 
@@ -72,7 +62,7 @@ const OK_STICKER: CatalogFile = {
   kind: "sticker",
   filename: "ok.webp",
   mimeType: "image/webp",
-  bytes: riffWebpBytes("ok"),
+  bytes: OK_WEBP,
   emoji: "👍",
 };
 

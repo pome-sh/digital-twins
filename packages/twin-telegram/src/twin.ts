@@ -10,6 +10,7 @@ import { TwinError } from "./errors.js";
 import { extractTelegramPathToken, telegramPathIdentity } from "./path-token.js";
 import { registerTelegramRoutes } from "./routes.js";
 import { defaultSeedState, parseSeed, type TelegramSeed } from "./seed.js";
+import { projectTelegramRecording } from "./recording.js";
 import { telegramTools } from "./tools.js";
 import { telegramError } from "./serializers.js";
 import { unsupportedEnvelope } from "./unsupported-envelope.js";
@@ -110,6 +111,7 @@ export function telegramTwinDefinition(
     },
     // The served MCP listing is derived 1:1 from the source-backed fixture.
     tools: telegramTools,
+    recordingProjection: projectTelegramRecording,
     healthz: () => ({}),
     unsupported: () => unsupportedEnvelope,
     errorEnvelope: telegramErrorEnvelope,

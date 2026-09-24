@@ -46,7 +46,7 @@ This twin serves a subtract-only projection of that listing:
 | create_poll | bounded | User-created regular text polls (2–10 string options); source quiz and close-date forms remain unsupported. |
 | send_reaction / remove_reaction / get_message_reactions | bounded | Session-bound one-standard-emoji reactions; `big` animation remains unsupported. |
 | list_inline_buttons / press_inline_button | bounded | Observes and presses HTTP-created callback-data inline buttons, creating the same durable, expiring callback query as the Bot API workflow. |
-| get_media_info / download_media | bounded | A chat member reads metadata and bytes for a visible media message. Download returns those bytes in the source `{ result: string }` envelope and does not write a host path. A non-null `file_path` is refused. |
+| get_media_info / download_media | bounded | A chat member reads metadata and bytes for a visible media message. Download returns those bytes in the source `{ result: string }` envelope and does not write a host path. A non-null `file_path` is refused. The tape stores download digests, not bytes. |
 | send_file / send_voice | bounded | User sends from the in-memory fixture catalog or an owned opaque `file_id` of the matching kind. URLs, host paths, traversal, `file_unique_id`, albums, topics, and scheduled sends are refused. |
 | send_sticker / get_sticker_sets | bounded | Fixture sticker catalog only. Unknown sticker paths are refused. Bot API `sendSticker` stays out of the HTTP subset. |
 
@@ -78,3 +78,4 @@ inline callback. Callback waiting remains an internal domain facility.
 15. Media expires after 24 hours of twin time and is removed on seed/reset. Download paths are opaque `media/file_…` handles rather than paths beneath any host storage root.
 16. The source MCP contract has no reply-keyboard or callback-answer/wait registration. Those interaction operations stay HTTP-only rather than being invented in the projection.
 17. MCP `download_media` is membership-visible: a chat member may read bytes from a message they can see. Bot API `getFile` grants the same bytes when the bot owns the file or is a member of a chat that references that `file_id`. Bot Y cannot reuse bot X's `file_id` from a chat Y is not in.
+18. The recorded tape stores MCP download digests (`{ sha256, size }`), not the downloaded bytes.
