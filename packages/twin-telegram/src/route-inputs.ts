@@ -118,27 +118,27 @@ export const POST_EDIT_MESSAGE_CAPTION = declareInputs({
 
 export const POST_SEND_PHOTO = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendPhoto", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), photo: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+  body: { chat_id: z.coerce.number().int(), photo: mediaValue, caption: z.string().optional(), message_thread_id: z.coerce.number().int().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_DOCUMENT = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendDocument", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), document: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+  body: { chat_id: z.coerce.number().int(), document: mediaValue, caption: z.string().optional(), message_thread_id: z.coerce.number().int().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_VIDEO = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendVideo", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), video: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+  body: { chat_id: z.coerce.number().int(), video: mediaValue, caption: z.string().optional(), message_thread_id: z.coerce.number().int().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_AUDIO = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendAudio", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), audio: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+  body: { chat_id: z.coerce.number().int(), audio: mediaValue, caption: z.string().optional(), message_thread_id: z.coerce.number().int().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_VOICE = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendVoice", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), voice: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+  body: { chat_id: z.coerce.number().int(), voice: mediaValue, caption: z.string().optional(), message_thread_id: z.coerce.number().int().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_MEDIA_GROUP = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendMediaGroup", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), media: mediaGroup },
+  body: { chat_id: z.coerce.number().int(), media: mediaGroup, message_thread_id: z.coerce.number().int().optional() },
   bodyEncoding: "form",
   maxBodyBytes: MAX_MEDIA_GROUP_MULTIPART_REQUEST_BYTES,
   multipartAttachmentsFrom: "media",
@@ -200,7 +200,7 @@ export const POST_SEND_POLL = declareInputs({
   method: "POST",
   path: "/:cred{bot[^/]+}/sendPoll",
   pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), question: z.string().min(1).max(MAX_POLL_QUESTION_LENGTH), options: z.preprocess((value) => { if (typeof value !== "string") return value; try { return JSON.parse(value); } catch { return value; } }, z.array(z.string().min(1).max(MAX_POLL_OPTION_LENGTH)).min(MIN_POLL_OPTIONS).max(MAX_POLL_OPTIONS)), is_anonymous: formBoolean.optional(), allows_multiple_answers: formBoolean.optional(), allow_paid_broadcast: z.never().optional(), business_connection_id: z.never().optional(), message_effect_id: z.never().optional(), type: z.never().optional(), correct_option_id: z.never().optional(), explanation: z.never().optional() },
+  body: { chat_id: z.coerce.number().int(), question: z.string().min(1).max(MAX_POLL_QUESTION_LENGTH), options: z.preprocess((value) => { if (typeof value !== "string") return value; try { return JSON.parse(value); } catch { return value; } }, z.array(z.string().min(1).max(MAX_POLL_OPTION_LENGTH)).min(MIN_POLL_OPTIONS).max(MAX_POLL_OPTIONS)), is_anonymous: formBoolean.optional(), allows_multiple_answers: formBoolean.optional(), message_thread_id: z.coerce.number().int().optional(), allow_paid_broadcast: z.never().optional(), business_connection_id: z.never().optional(), message_effect_id: z.never().optional(), type: z.never().optional(), correct_option_id: z.never().optional(), explanation: z.never().optional() },
   bodyEncoding: "form",
 });
 

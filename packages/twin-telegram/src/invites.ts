@@ -29,7 +29,7 @@ export type ForumTopicRow = {
   topic_id: number;
   title: string;
   icon_color: number | null;
-  icon_emoji_id: number | null;
+  icon_emoji_id: string | null;
   is_closed: number;
   created_by_id: number;
   created_at: number;
@@ -74,6 +74,28 @@ export function requireTopicTitle(title: string): string {
     telegramFail(400, 400, `Bad Request: topic title must be 1-${MAX_TOPIC_TITLE} characters`);
   }
   return title;
+}
+
+export function requireCustomEmojiId(value: string | null | undefined): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (!/^[0-9]+$/.test(value)) telegramFail(400, 400, "Bad Request: icon_custom_emoji_id is invalid");
+  return value;
+}
+
+export function requireExpireDate(value: number | undefined, now: number): number | undefined {
+  if (value === undefined) return undefined;
+  if (value < 0 || (value > 0 && value <= now)) telegramFail(400, 400, "Bad Request: expire_date is invalid");
+  return value;
+}
+
+export function mergeInviteOptions(row: InviteLinkRow, patch: InviteOptions): InviteOptions {
+  return {
+    name: patch.name !== undefined ? patch.name : row.name ?? undefined,
+    expire_date: patch.expire_date !== undefined ? patch.expire_date : row.expire_date,
+    member_limit: patch.member_limit !== undefined ? patch.member_limit : row.member_limit,
+    creates_join_request: patch.creates_join_request !== undefined ? patch.creates_join_request : row.creates_join_request === 1,
+  };
 }
 
 export function normalizeInviteOptions(input: InviteOptions): {
@@ -130,7 +152,7 @@ export function presentForumTopic(row: ForumTopicRow): Record<string, unknown> {
     message_thread_id: row.topic_id,
     name: row.title,
     ...(row.icon_color !== null ? { icon_color: row.icon_color } : {}),
-    ...(row.icon_emoji_id !== null ? { icon_custom_emoji_id: String(row.icon_emoji_id) } : {}),
+    ...(row.icon_emoji_id !== null ? { icon_custom_emoji_id: row.icon_emoji_id } : {}),
     is_closed: row.is_closed === 1,
   };
 }

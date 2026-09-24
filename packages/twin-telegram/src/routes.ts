@@ -160,7 +160,7 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
     mountDeclaredRoute(app, declaration, recorder.handle({ mutation: true, captureRequestBody: false }, async (c) => {
       const parsed = await declaration.parse(c.req);
       const media = await mediaInput((parsed.body as Record<string, unknown>)[field]);
-      const result = captureDelta((report) => domain.sendMedia(botActor(c), { chat_id: parsed.body.chat_id, kind, media, caption: parsed.body.caption }, report));
+      const result = captureDelta((report) => domain.sendMedia(botActor(c), { chat_id: parsed.body.chat_id, kind, media, caption: parsed.body.caption, message_thread_id: parsed.body.message_thread_id }, report));
       return { status: 200, body: telegramOk(result.value), delta: result.delta };
     }));
   };
@@ -183,7 +183,7 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
       if (!attachment || typeof attachment === "string") telegramFail(400, 400, "Bad Request: attachment not found");
       return { ...item, media: await mediaInput(attachment) };
     }));
-    const result = captureDelta((report) => domain.sendMediaGroup(botActor(c), { chat_id: parsed.body.chat_id, media }, report));
+    const result = captureDelta((report) => domain.sendMediaGroup(botActor(c), { chat_id: parsed.body.chat_id, media, message_thread_id: parsed.body.message_thread_id }, report));
     return { status: 200, body: telegramOk(result.value), delta: result.delta };
   }));
   mountDeclaredRoute(app, POST_GET_FILE, recorder.handle({ mutation: false }, async (c) => {
@@ -447,7 +447,7 @@ export function registerTelegramRoutes(app: Hono, { domain, recorder }: RouteCon
       chat_id: parsed.body.chat_id,
       title: parsed.body.name,
       icon_color: parsed.body.icon_color,
-      icon_emoji_id: parsed.body.icon_custom_emoji_id === undefined ? undefined : Number(parsed.body.icon_custom_emoji_id),
+      icon_emoji_id: parsed.body.icon_custom_emoji_id,
     }, report));
     return { status: 200, body: telegramOk(result.value), delta: result.delta };
   }));

@@ -67,6 +67,11 @@ describe("Telegram MCP invites, channels, and forum topics", () => {
     const app = createTelegramTwinApp({ seed: publicSeed(), recorder, runId: "telegram-mcp-invites" });
 
     await call(app, aliceToken, "remove_user", { chat_id: GROUP, user_id: 2002 });
+    await call(app, aliceToken, "promote_admin", {
+      group_id: GROUP,
+      user_id: 1100001,
+      rights: { can_invite_users: true },
+    });
     const created = await bot(app, "createChatInviteLink", { chat_id: GROUP, creates_join_request: true });
     expect(created.status).toBe(200);
     const invite = created.body.result as { invite_link: string };

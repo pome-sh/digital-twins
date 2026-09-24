@@ -65,6 +65,12 @@ export const seedSchema = z
         if (!ids.has(member)) ctx.addIssue({ code: "custom", message: `unknown member ${member}` });
       }
       if (chat.username) {
+        if (chat.type !== "supergroup" && chat.type !== "channel") {
+          ctx.addIssue({ code: "custom", message: `username is only valid on supergroup or channel chat ${chat.id}` });
+        }
+        if (/^\d+$/.test(chat.username)) {
+          ctx.addIssue({ code: "custom", message: `username ${chat.username} must not be numeric-only` });
+        }
         const key = chat.username.toLowerCase();
         if (usernames.has(key)) ctx.addIssue({ code: "custom", message: `duplicate username ${chat.username}` });
         usernames.add(key);

@@ -771,7 +771,7 @@ const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
         chat_id: domain.resolveChatRef(input.chat_id),
         title: input.title,
         icon_color: input.icon_color,
-        icon_emoji_id: input.icon_emoji_id,
+        icon_emoji_id: input.icon_emoji_id == null ? input.icon_emoji_id : String(input.icon_emoji_id),
       }, ctx.reportDelta));
     },
     contentText: (output) => (output as SourceResult).result,

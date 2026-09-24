@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS forum_topics (
   topic_id INTEGER NOT NULL,
   title TEXT NOT NULL,
   icon_color INTEGER,
-  icon_emoji_id INTEGER,
+  icon_emoji_id TEXT,
   is_closed INTEGER NOT NULL DEFAULT 0,
   created_by_id INTEGER NOT NULL,
   created_at INTEGER NOT NULL,

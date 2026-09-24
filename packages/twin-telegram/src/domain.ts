@@ -39,12 +39,15 @@ import {
 import {
   formatInviteLink,
   inviteFailure,
+  mergeInviteOptions,
   normalizeInviteOptions,
   parseInviteHash,
   parseInviteLink,
   presentForumTopic,
   presentInviteLink,
   presentListedTopic,
+  requireCustomEmojiId,
+  requireExpireDate,
   requireTopicTitle,
   type ForumTopicRow,
   type InviteLinkRow,
@@ -377,12 +380,13 @@ export class TelegramDomain {
 
   sendMediaGroup(
     actor: Actor,
-    args: { chat_id: number; media: Array<{ type: "photo" | "document" | "video" | "audio"; media: MediaReference; caption?: string }> },
+    args: { chat_id: number; media: Array<{ type: "photo" | "document" | "video" | "audio"; media: MediaReference; caption?: string }>; message_thread_id?: number },
     delta: DeltaHook = NOOP,
   ): Record<string, unknown>[] {
     const botId = this.botId(actor);
     const scopeId = this.mediaScope(actor);
     this.requireMember(actor, args.chat_id);
+    const threadId = this.requireOpenTopic(args.chat_id, args.message_thread_id);
     const sendKind = { photo: "photos", document: "documents", video: "videos", audio: "audios" } as const;
     for (const item of args.media) this.assertCanSend(actor, args.chat_id, sendKind[item.type]);
     if (args.media.length < 2 || args.media.length > 10) telegramFail(400, 400, "Bad Request: media group must include 2-10 items");
@@ -404,7 +408,7 @@ export class TelegramDomain {
     const mediaGroupId = `album:${botId}:${this.now()}:${args.chat_id}:${firstMessageId}`;
     const result = this.db.transaction(() => resolved.map((item) => {
       const file = this.persistMedia(botId, scopeId, item.resolved);
-      return this.insertMediaMessage(actor, args.chat_id, item.type, file, item.caption, mediaGroupId);
+      return this.insertMediaMessage(actor, args.chat_id, item.type, file, item.caption, mediaGroupId, threadId);
     }))();
     delta({ before: null, after: { chat_id: args.chat_id, media_group_id: mediaGroupId, count: result.length } });
     return result;
@@ -576,14 +580,14 @@ export class TelegramDomain {
       .map((reaction) => ({ user: serializeUser(this.personById(reaction.actor_id)), reaction: { type: "emoji", emoji: reaction.emoji } }));
   }
 
-  sendPoll(actor: Actor, args: { chat_id: number; question: string; options: string[]; is_anonymous?: boolean; allows_multiple_answers?: boolean }, delta: DeltaHook = NOOP): Record<string, unknown> {
+  sendPoll(actor: Actor, args: { chat_id: number; question: string; options: string[]; is_anonymous?: boolean; allows_multiple_answers?: boolean; message_thread_id?: number }, delta: DeltaHook = NOOP): Record<string, unknown> {
     const botId = this.botId(actor);
     this.requireMember(actor, args.chat_id);
     this.assertCanSend(actor, args.chat_id, "polls");
     validatePoll(args.question, args.options);
     const now = this.now();
     const messageDeltas: StateDelta[] = [];
-    const message = this.sendMessage(actor, { chat_id: args.chat_id, text: args.question }, (change) => messageDeltas.push(change));
+    const message = this.sendMessage(actor, { chat_id: args.chat_id, text: args.question, message_thread_id: args.message_thread_id }, (change) => messageDeltas.push(change));
     const messageId = message.message_id as number;
     const pollId = `poll:${args.chat_id}:${messageId}`;
     this.db.prepare("INSERT INTO polls (poll_id, chat_id, message_id, question, options_json, is_anonymous, allows_multiple_answers, created_by_bot_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
@@ -1413,11 +1417,11 @@ export class TelegramDomain {
   }
 
   searchPublicChats(_account: string, args: { query: string; limit?: number }): Record<string, unknown>[] {
-    const query = args.query.trim().toLowerCase();
+    const query = args.query.trim().toLowerCase().replace(/[%_]/g, "");
     if (!query) telegramFail(400, 400, "Bad Request: query is empty");
     const limit = args.limit ?? 20;
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) telegramFail(400, 400, "Bad Request: invalid limit");
-    const like = `%${query.replace(/[%_]/g, "")}%`;
+    const like = `%${query}%`;
     const rows = this.db.prepare(
       "SELECT id, type, title, description, photo_file_id, username, is_forum, is_public, permissions_json, permissions_until, slow_mode_seconds, creator_id FROM chats WHERE is_public = 1 AND username IS NOT NULL AND (LOWER(username) LIKE ? OR LOWER(COALESCE(title, '')) LIKE ?) ORDER BY id LIMIT ?",
     ).all(like, like, limit) as ChatRow[];
@@ -1431,7 +1435,7 @@ export class TelegramDomain {
   }
 
   getInviteLink(account: string, args: { chat_id: number }, delta: DeltaHook = NOOP): string {
-    this.requirePermission({ kind: "user", account }, args.chat_id, "can_invite_users", "can_invite_users");
+    this.requireInviteAccess({ kind: "user", account }, args.chat_id);
     const existing = this.primaryInvite(args.chat_id);
     if (existing) return formatInviteLink(existing.token);
     const created = this.createInviteRecord({ kind: "user", account }, args.chat_id, { isPrimary: true }, delta);
@@ -1444,6 +1448,7 @@ export class TelegramDomain {
   }
 
   createChatInviteLink(actor: Actor, args: { chat_id: number } & InviteOptions, delta: DeltaHook = NOOP): Record<string, unknown> {
+    this.requireAdminRight(actor, args.chat_id, "can_invite_users");
     return this.presentInvite(this.createInviteRecord(actor, args.chat_id, { options: args }, delta));
   }
 
@@ -1452,7 +1457,8 @@ export class TelegramDomain {
     const row = this.requireInviteInChat(args.chat_id, parseInviteLink(args.invite_link));
     this.requireInviteCreator(actor, args.chat_id, row);
     if (row.is_revoked) telegramFail(400, 400, "Bad Request: invite link is revoked");
-    const options = normalizeInviteOptions(args);
+    requireExpireDate(args.expire_date, this.now());
+    const options = normalizeInviteOptions(mergeInviteOptions(row, args));
     const before = { ...row };
     this.db.prepare(
       "UPDATE chat_invite_links SET name = ?, expire_date = ?, member_limit = ?, creates_join_request = ? WHERE token = ?",
@@ -1481,13 +1487,11 @@ export class TelegramDomain {
   }
 
   approveChatJoinRequest(actor: Actor, args: { chat_id: number; user_id: number }, delta: DeltaHook = NOOP): { ok: true } {
-    this.requirePermission(actor, args.chat_id, "can_invite_users", "can_invite_users");
+    this.requireAdminRight(actor, args.chat_id, "can_invite_users");
     const request = this.db.prepare("SELECT token, user_id FROM chat_join_requests WHERE chat_id = ? AND user_id = ?").get(args.chat_id, args.user_id) as { token: string; user_id: number } | undefined;
     if (!request) telegramFail(400, 400, "Bad Request: join request not found");
     const invite = this.inviteByToken(request.token);
     if (!invite) telegramFail(400, 400, "Bad Request: invite link is invalid");
-    const failure = inviteFailure(invite, this.now());
-    if (failure) telegramFail(400, 400, failure);
     const person = this.personById(request.user_id);
     this.expireMembership(args.chat_id, person.id);
     if (this.banRow(args.chat_id, person.id)) telegramFail(400, 400, "Bad Request: user is banned");
@@ -1506,7 +1510,7 @@ export class TelegramDomain {
   }
 
   declineChatJoinRequest(actor: Actor, args: { chat_id: number; user_id: number }, delta: DeltaHook = NOOP): { ok: true } {
-    this.requirePermission(actor, args.chat_id, "can_invite_users", "can_invite_users");
+    this.requireAdminRight(actor, args.chat_id, "can_invite_users");
     const request = this.db.prepare("SELECT user_id FROM chat_join_requests WHERE chat_id = ? AND user_id = ?").get(args.chat_id, args.user_id) as { user_id: number } | undefined;
     if (!request) telegramFail(400, 400, "Bad Request: join request not found");
     this.db.prepare("DELETE FROM chat_join_requests WHERE chat_id = ? AND user_id = ?").run(args.chat_id, args.user_id);
@@ -1537,8 +1541,9 @@ export class TelegramDomain {
     return { ok: true };
   }
 
-  createForumTopic(actor: Actor, args: { chat_id: number; title: string; icon_color?: number | null; icon_emoji_id?: number | null }, delta: DeltaHook = NOOP): Record<string, unknown> {
+  createForumTopic(actor: Actor, args: { chat_id: number; title: string; icon_color?: number | null; icon_emoji_id?: string | null }, delta: DeltaHook = NOOP): Record<string, unknown> {
     const title = requireTopicTitle(args.title);
+    const icon = requireCustomEmojiId(args.icon_emoji_id) ?? null;
     const snapshot = this.requirePermission(actor, args.chat_id, "can_manage_topics", "can_manage_topics");
     this.requireForum(args.chat_id);
     const topic = this.db.transaction(() => {
@@ -1546,7 +1551,7 @@ export class TelegramDomain {
       this.db.prepare("UPDATE chats SET next_topic_id = next_topic_id + 1 WHERE id = ?").run(args.chat_id);
       this.db.prepare(
         "INSERT INTO forum_topics (chat_id, topic_id, title, icon_color, icon_emoji_id, is_closed, created_by_id, created_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)",
-      ).run(args.chat_id, topicId, title, args.icon_color ?? null, args.icon_emoji_id ?? null, snapshot.person.id, this.now());
+      ).run(args.chat_id, topicId, title, args.icon_color ?? null, icon, snapshot.person.id, this.now());
       this.recordAdminLog(args.chat_id, snapshot.person.id, "create_topic", null, { topic_id: topicId, title });
       return this.topicRow(args.chat_id, topicId)!;
     })();
@@ -1579,10 +1584,7 @@ export class TelegramDomain {
     const title = args.name === undefined ? topic.title : requireTopicTitle(args.name);
     const icon = args.icon_custom_emoji_id === undefined
       ? topic.icon_emoji_id
-      : args.icon_custom_emoji_id === null || args.icon_custom_emoji_id === ""
-        ? null
-        : Number(args.icon_custom_emoji_id);
-    if (icon !== null && !Number.isInteger(icon)) telegramFail(400, 400, "Bad Request: icon_custom_emoji_id is invalid");
+      : requireCustomEmojiId(args.icon_custom_emoji_id) ?? null;
     this.db.prepare("UPDATE forum_topics SET title = ?, icon_emoji_id = ? WHERE chat_id = ? AND topic_id = ?").run(title, icon, args.chat_id, topic.topic_id);
     this.recordAdminLog(args.chat_id, this.personFor(actor).id, "edit_topic", null, { topic_id: topic.topic_id, title });
     delta({ before: { title: topic.title }, after: { title, topic_id: topic.topic_id } });
@@ -1600,6 +1602,7 @@ export class TelegramDomain {
   deleteForumTopic(actor: Actor, args: { chat_id: number; message_thread_id: number }, delta: DeltaHook = NOOP): { ok: true } {
     this.requirePermission(actor, args.chat_id, "can_manage_topics", "can_manage_topics");
     const topic = this.requireTopic(args.chat_id, args.message_thread_id);
+    if (topic.topic_id === 1) telegramFail(400, 400, "Bad Request: can't delete the General topic");
     this.db.prepare("DELETE FROM forum_topics WHERE chat_id = ? AND topic_id = ?").run(args.chat_id, topic.topic_id);
     this.recordAdminLog(args.chat_id, this.personFor(actor).id, "delete_topic", null, { topic_id: topic.topic_id });
     delta({ before: { topic_id: topic.topic_id, title: topic.title }, after: null });
@@ -2419,8 +2422,9 @@ export class TelegramDomain {
   }
 
   private requireOpenTopic(chatId: number, topicId: number | undefined): number | null {
-    if (topicId === undefined) return null;
-    const topic = this.requireTopic(chatId, topicId);
+    const resolved = topicId === undefined && this.chat(chatId).is_forum ? 1 : topicId;
+    if (resolved === undefined) return null;
+    const topic = this.requireTopic(chatId, resolved);
     if (topic.is_closed) telegramFail(400, 400, "Bad Request: topic is closed");
     return topic.topic_id;
   }
@@ -2448,6 +2452,11 @@ export class TelegramDomain {
     return row;
   }
 
+  private requireInviteAccess(actor: Actor, chatId: number): MembershipSnapshot {
+    if (this.chat(chatId).type === "channel") return this.requireAdminRight(actor, chatId, "can_invite_users");
+    return this.requirePermission(actor, chatId, "can_invite_users", "can_invite_users");
+  }
+
   private requireInviteCreator(actor: Actor, chatId: number, row: InviteLinkRow): void {
     const person = this.personFor(actor);
     const chat = this.chat(chatId);
@@ -2469,7 +2478,8 @@ export class TelegramDomain {
     args: { options?: InviteOptions; isPrimary?: boolean },
     delta: DeltaHook,
   ): InviteLinkRow {
-    const snapshot = this.requirePermission(actor, chatId, "can_invite_users", "can_invite_users");
+    const snapshot = this.requireInviteAccess(actor, chatId);
+    requireExpireDate(args.options?.expire_date, this.now());
     const options = normalizeInviteOptions(args.options ?? {});
     const created = this.db.transaction(() => {
       const inviteId = (this.db.prepare("SELECT next_invite_id AS next FROM chats WHERE id = ?").get(chatId) as { next: number }).next;

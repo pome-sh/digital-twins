@@ -152,6 +152,13 @@ describe("Telegram invites, channels, and forum topics", () => {
   it("closes, reopens, and deletes topics without dropping thread history on close", () => {
     const { domain } = fresh();
     domain.enableForumTopics("alice", { chat_id: GROUP });
+    expect(domain.sendMessage(ALICE, { chat_id: GROUP, text: "general" })).toMatchObject({
+      text: "general",
+      message_thread_id: 1,
+    });
+    expect(domain.closeForumTopic(ALICE, { chat_id: GROUP, message_thread_id: 1 })).toEqual({ ok: true });
+    expect(() => domain.sendMessage(ALICE, { chat_id: GROUP, text: "closed general" })).toThrow(/closed/);
+    expect(domain.reopenForumTopic(ALICE, { chat_id: GROUP, message_thread_id: 1 })).toEqual({ ok: true });
     const created = domain.createForumTopic(ALICE, { chat_id: GROUP, title: "Bugs" });
     expect(created).toMatchObject({ chat_id: GROUP, title: "Bugs" });
     const topicId = created.topic_id as number;
@@ -182,7 +189,9 @@ describe("Telegram invites, channels, and forum topics", () => {
 
   it("creates and uses invite links over HTTP", async () => {
     const recorder = createRecorderStore();
-    const app = createTelegramTwinApp({ seed: publicSeed(), recorder, runId: "telegram-invites-http" });
+    const { db, domain } = fresh();
+    domain.promoteChatMember(ALICE, { chat_id: GROUP, user_id: 1100001, rights: { can_invite_users: true } });
+    const app = createTelegramTwinApp({ db, recorder, runId: "telegram-invites-http" });
     const created = await bot(app, "createChatInviteLink", { chat_id: GROUP, name: "http-link" });
     expect(created).toMatchObject({
       status: 200,
@@ -191,5 +200,105 @@ describe("Telegram invites, channels, and forum topics", () => {
     const invite = created.body.result as { invite_link: string };
     expect(invite.invite_link.startsWith("https://t.me/+")).toBe(true);
     expect(JSON.stringify(recorder.events())).not.toContain(SYNTHETIC_BOT_TOKEN);
+  });
+
+  it("merges provided keys on editChatInviteLink so a rename keeps other fields", () => {
+    let now = 1_700_000_000;
+    const { domain } = fresh(() => now);
+    const created = domain.createChatInviteLink(ALICE, {
+      chat_id: GROUP,
+      name: "orig",
+      expire_date: now + 3600,
+      member_limit: 5,
+    });
+    const edited = domain.editChatInviteLink(ALICE, {
+      chat_id: GROUP,
+      invite_link: created.invite_link as string,
+      name: "renamed",
+    });
+    expect(edited).toMatchObject({
+      name: "renamed",
+      expire_date: now + 3600,
+      member_limit: 5,
+      creates_join_request: false,
+    });
+  });
+
+  it("requires can_invite_users admin right to create and decide join requests", () => {
+    const { domain } = fresh();
+    expect(() => domain.createChatInviteLink(BOB, { chat_id: GROUP })).toThrow(/rights/);
+    expect(() => domain.createChatInviteLink(BOT, { chat_id: GROUP })).toThrow(/rights/);
+    domain.removeUser(ALICE, { chat_id: GROUP, user_id: 2002 });
+
+    const approval = domain.createChatInviteLink(ALICE, { chat_id: GROUP, creates_join_request: true });
+    domain.joinChatByLink("bob", { link: approval.invite_link as string });
+    expect(() => domain.approveChatJoinRequest(BOT, { chat_id: GROUP, user_id: 2002 })).toThrow(/rights/);
+    expect(() => domain.declineChatJoinRequest(BOT, { chat_id: GROUP, user_id: 2002 })).toThrow(/rights/);
+
+    domain.promoteChatMember(ALICE, { chat_id: GROUP, user_id: 1100001, rights: { can_invite_users: true } });
+    expect(domain.approveChatJoinRequest(BOT, { chat_id: GROUP, user_id: 2002 })).toEqual({ ok: true });
+    expect(domain.getChatMember(ALICE, { chat_id: GROUP, user_id: 2002 })).toMatchObject({ status: "member" });
+  });
+
+  it("approves a pending request after the invite expires or is revoked", () => {
+    let now = 1_700_000_000;
+    const { domain } = fresh(() => now);
+    domain.removeUser(ALICE, { chat_id: GROUP, user_id: 2002 });
+
+    const expiring = domain.createChatInviteLink(ALICE, {
+      chat_id: GROUP,
+      expire_date: now + 30,
+      creates_join_request: true,
+    });
+    domain.joinChatByLink("bob", { link: expiring.invite_link as string });
+    now += 30;
+    expect(() => domain.joinChatByLink("bob", { link: expiring.invite_link as string })).toThrow(/expired/);
+    expect(domain.approveChatJoinRequest(ALICE, { chat_id: GROUP, user_id: 2002 })).toEqual({ ok: true });
+    expect(domain.getChatMember(ALICE, { chat_id: GROUP, user_id: 2002 })).toMatchObject({ status: "member" });
+
+    domain.leaveChat(BOB, { chat_id: GROUP });
+    const revocable = domain.createChatInviteLink(ALICE, { chat_id: GROUP, creates_join_request: true });
+    domain.joinChatByLink("bob", { link: revocable.invite_link as string });
+    domain.revokeChatInviteLink(ALICE, { chat_id: GROUP, invite_link: revocable.invite_link as string });
+    expect(() => domain.joinChatByLink("bob", { link: revocable.invite_link as string })).toThrow(/revoked/);
+    expect(domain.approveChatJoinRequest(ALICE, { chat_id: GROUP, user_id: 2002 })).toEqual({ ok: true });
+  });
+
+  it("still refuses a missing invite, a ban, and already-members on approve", () => {
+    const { db, domain } = fresh();
+    domain.removeUser(ALICE, { chat_id: GROUP, user_id: 2002 });
+
+    const missing = domain.createChatInviteLink(ALICE, { chat_id: GROUP, creates_join_request: true });
+    domain.joinChatByLink("bob", { link: missing.invite_link as string });
+    db.prepare("DELETE FROM chat_invite_links").run();
+    expect(() => domain.approveChatJoinRequest(ALICE, { chat_id: GROUP, user_id: 2002 })).toThrow(/invalid/);
+
+    const banned = domain.createChatInviteLink(ALICE, { chat_id: GROUP, creates_join_request: true });
+    db.prepare("DELETE FROM chat_join_requests").run();
+    domain.joinChatByLink("bob", { link: banned.invite_link as string });
+    domain.banChatMember(ALICE, { chat_id: GROUP, user_id: 2002 });
+    expect(() => domain.approveChatJoinRequest(ALICE, { chat_id: GROUP, user_id: 2002 })).toThrow(/banned/);
+    domain.unbanChatMember(ALICE, { chat_id: GROUP, user_id: 2002, only_if_banned: true });
+    db.prepare("DELETE FROM chat_join_requests").run();
+
+    const already = domain.createChatInviteLink(ALICE, { chat_id: GROUP, creates_join_request: true });
+    domain.joinChatByLink("bob", { link: already.invite_link as string });
+    domain.inviteToGroup("alice", { group_id: GROUP, user_ids: [2002] });
+    expect(domain.approveChatJoinRequest(ALICE, { chat_id: GROUP, user_id: 2002 })).toEqual({ ok: true });
+    expect(domain.getChatMember(ALICE, { chat_id: GROUP, user_id: 2002 })).toMatchObject({ status: "member" });
+  });
+
+  it("refuses a wildcard-only public chat search", () => {
+    const { domain } = fresh();
+    expect(() => domain.searchPublicChats("bob", { query: "%" })).toThrow(/empty/);
+    expect(() => domain.searchPublicChats("bob", { query: "_" })).toThrow(/empty/);
+    expect(() => domain.searchPublicChats("bob", { query: " %_ " })).toThrow(/empty/);
+  });
+
+  it("cannot delete the General topic", () => {
+    const { domain } = fresh();
+    domain.enableForumTopics("alice", { chat_id: GROUP });
+    expect(() => domain.deleteForumTopic(ALICE, { chat_id: GROUP, message_thread_id: 1 })).toThrow(/General/);
+    expect(domain.listTopics("alice", { chat_id: GROUP }).some((row) => row.topic_id === 1)).toBe(true);
   });
 });
