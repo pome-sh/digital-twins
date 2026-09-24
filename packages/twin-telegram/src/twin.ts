@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { z, ZodError } from "zod";
+import { z } from "zod";
 import { defineTwin, type TwinDefinition } from "@pome-sh/sdk";
 import { RequestBodyTooLargeError } from "@pome-sh/sdk/route-inputs";
 import { createApp, type RecorderStore } from "@pome-sh/sdk/server";
@@ -10,24 +10,38 @@ import { TwinError } from "./errors.js";
 import { extractTelegramPathToken, telegramPathIdentity } from "./path-token.js";
 import { registerTelegramRoutes } from "./routes.js";
 import { defaultSeedState, parseSeed, type TelegramSeed } from "./seed.js";
+import { projectTelegramRecording } from "./recording.js";
 import { telegramTools } from "./tools.js";
 import { telegramError } from "./serializers.js";
 import { unsupportedEnvelope } from "./unsupported-envelope.js";
 import { isLoopbackWebhookUrl, telegramUpdateRuntime, type TelegramWebhookDelivery } from "./updates.js";
 
 function zodIssues(err: unknown): Array<{ path: ReadonlyArray<PropertyKey>; message: string }> | undefined {
-  if (err instanceof ZodError) return err.issues;
+  if (err instanceof z.ZodError) return err.issues;
   if (err instanceof Error && err.name === "ZodError" && Array.isArray((err as { issues?: unknown }).issues)) {
-    return (err as unknown as ZodError).issues;
+    return (err as unknown as z.ZodError).issues;
   }
   return undefined;
 }
 
+function isTelegramTwinError(err: unknown): err is TwinError {
+  if (err instanceof TwinError) return true;
+  return err instanceof Error
+    && typeof (err as TwinError).status === "number"
+    && typeof (err as TwinError).errorCode === "number"
+    && typeof (err as TwinError).description === "string";
+}
+
 function telegramErrorEnvelope(err: unknown): { status: number; body: unknown } {
-  if (err instanceof RequestBodyTooLargeError) {
+  // The named SDK export is missing under some vitest CJS interops. Do not
+  // `instanceof` an undefined constructor; that turns every domain 400 into 500.
+  if (
+    (typeof RequestBodyTooLargeError === "function" && err instanceof RequestBodyTooLargeError)
+    || (err instanceof Error && err.message === "Request Entity Too Large" && "maxBodyBytes" in err)
+  ) {
     return { status: 413, body: telegramError(413, "Request Entity Too Large") };
   }
-  if (err instanceof TwinError) {
+  if (isTelegramTwinError(err)) {
     return { status: err.status, body: telegramError(err.errorCode, err.description) };
   }
   const issues = zodIssues(err);
@@ -97,6 +111,7 @@ export function telegramTwinDefinition(
     },
     // The served MCP listing is derived 1:1 from the source-backed fixture.
     tools: telegramTools,
+    recordingProjection: projectTelegramRecording,
     healthz: () => ({}),
     unsupported: () => unsupportedEnvelope,
     errorEnvelope: telegramErrorEnvelope,

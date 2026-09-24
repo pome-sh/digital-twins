@@ -41,6 +41,39 @@ describe("HTTP media foundation domain", () => {
     expect(() => domain.sendMedia({ kind: "bot", botId: 1100002 }, { chat_id: 2001, kind: "photo", media: ownedId })).toThrow(/file not found/);
   });
 
+  it("lets a receiving bot getFile user-sent media and keeps a foreign bot out", () => {
+    const { domain } = domainAt();
+    const state = defaultSeedState();
+    state.bots.push({ id: 1100002, token: "1100002:BBHBBBBBBBBBBBBBBBBBBBBB", first_name: "Y", username: "y_bot" });
+    state.chats[1]!.members.push(1100002);
+    domain.seed(state);
+    const bytes = Buffer.from("pome-telegram-fixture-file\n");
+    const sent = domain.sendMedia({ kind: "user", account: "alice" }, {
+      chat_id: 2001,
+      kind: "document",
+      media: { bytes, filename: "sample.txt", mimeType: "text/plain" },
+    });
+    const fileId = (sent.document as { file_id: string }).file_id;
+    const file = domain.getFile(BOT, fileId);
+    expect(domain.downloadFile(BOT, file.file_path as string).content.equals(bytes)).toBe(true);
+    expect(() => domain.getFile({ kind: "bot", botId: 1100002 }, fileId)).toThrow(/file not found/);
+  });
+
+  it("lets a second session of the owning bot getFile when the file is in a member chat", () => {
+    const { domain } = domainAt();
+    const owner = { kind: "bot" as const, botId: 1100001, sid: "session-a" };
+    const otherSession = { kind: "bot" as const, botId: 1100001, sid: "session-b" };
+    const bytes = Buffer.from("same-bot-other-scope\n");
+    const sent = domain.sendMedia(owner, {
+      chat_id: 2001,
+      kind: "document",
+      media: { bytes, filename: "shared.txt", mimeType: "text/plain" },
+    });
+    const fileId = (sent.document as { file_id: string }).file_id;
+    const file = domain.getFile(otherSession, fileId);
+    expect(domain.downloadFile(otherSession, file.file_path as string).content.equals(bytes)).toBe(true);
+  });
+
   it("uses the latest upload metadata for repeated bytes", () => {
     const { domain } = domainAt();
     const bytes = Buffer.from("same content");
@@ -218,7 +251,7 @@ describe("HTTP media foundation", () => {
     expect(recorder.events().at(-1)?.request_body).toBeNull();
   });
 
-  it("downloads raw bytes with MIME type only in the owning session and records redacted metadata", async () => {
+  it("downloads raw bytes with MIME type and records redacted metadata", async () => {
     const recorder = createRecorderStore();
     const app = createTelegramTwinApp({ seed: defaultSeedState(), recorder, runId: "telegram-download" });
     const bytes = Buffer.from("download-canary-bytes");
@@ -240,7 +273,8 @@ describe("HTTP media foundation", () => {
     expect(Buffer.from(await download.arrayBuffer())).toEqual(bytes);
 
     const otherSession = await app.request(`/s/other/file/bot${SYNTHETIC_BOT_TOKEN}/${fileBody.result.file_path}`);
-    expect(otherSession.status).toBe(404);
+    expect(otherSession.status).toBe(200);
+    expect(Buffer.from(await otherSession.arrayBuffer())).toEqual(bytes);
 
     const event = recorder.events().find((candidate) => candidate.path.startsWith("/s/owner/file/"))!;
     const expectedMetadata = {

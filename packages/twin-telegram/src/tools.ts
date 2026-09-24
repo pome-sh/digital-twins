@@ -7,6 +7,7 @@ import rawListing from "../fixtures/mcp-tools-list.raw.json" with { type: "json"
 import metaListing from "../fixtures/mcp-tools-list.meta.json" with { type: "json" };
 import type { TelegramDomain } from "./domain.js";
 import { telegramFail } from "./errors.js";
+import { listStickerSets, resolveCatalogFile, type CatalogFile } from "./media-catalog.js";
 import { accountFrom } from "./tool-adapters.js";
 
 export const telegramMcpToolFixture = loadMcpToolFixture({ raw: rawListing, meta: metaListing });
@@ -281,6 +282,126 @@ const implementations: Record<string, McpToolImplementation<TelegramDomain>> = {
     },
     contentText: (output) => (output as SourceResult).result,
   },
+  get_media_info: {
+    schema: z.looseObject({ chat_id: chatIdSchema, message_id: z.number().int(), account: accountSchema }),
+    mutation: false,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; message_id: number } & SourceAccount;
+      return sourceResult(domain.getMediaInfo(requireSourceAccount(input, ctx), {
+        chat_id: numericChatId(input.chat_id),
+        message_id: input.message_id,
+      }));
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  download_media: {
+    schema: z.looseObject({
+      chat_id: chatIdSchema,
+      message_id: z.number().int(),
+      file_path: z.string().nullable().optional(),
+      account: accountSchema,
+    }),
+    mutation: false,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; message_id: number; file_path?: string | null } & SourceAccount;
+      if (input.file_path !== undefined && input.file_path !== null) {
+        telegramFail(400, 400, "Bad Request: destination file paths are unsupported");
+      }
+      const downloaded = domain.downloadVisibleMedia(requireSourceAccount(input, ctx), {
+        chat_id: numericChatId(input.chat_id),
+        message_id: input.message_id,
+      });
+      return sourceResult({ ...downloaded.info, content_base64: downloaded.content.toString("base64") });
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  send_file: {
+    schema: z.looseObject({
+      chat_id: chatIdSchema,
+      file_path: z.union([z.string(), z.array(z.string())]),
+      caption: z.string().nullable().optional(),
+      topic_id: z.number().int().nullable().optional(),
+      schedule_date: z.union([z.string(), z.number().int(), z.null()]).optional(),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as {
+        chat_id: SourceChatId;
+        file_path: string | string[];
+        caption?: string | null;
+        topic_id?: number | null;
+        schedule_date?: string | number | null;
+      } & SourceAccount;
+      if (input.topic_id !== undefined && input.topic_id !== null) telegramFail(400, 400, "Bad Request: forum topics are unsupported");
+      if (input.schedule_date !== undefined && input.schedule_date !== null) telegramFail(400, 400, "Bad Request: scheduled sends are unsupported");
+      if (Array.isArray(input.file_path)) telegramFail(400, 400, "Bad Request: media groups are unsupported");
+      const account = requireSourceAccount(input, ctx);
+      const result = domain.sendMedia({ kind: "user", account }, {
+        chat_id: numericChatId(input.chat_id),
+        kind: "document",
+        media: catalogMedia(resolveCatalogFile(input.file_path, "document")),
+        caption: input.caption ?? undefined,
+      }, ctx.reportDelta);
+      return sourceResult(result);
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  send_voice: {
+    schema: z.looseObject({
+      chat_id: chatIdSchema,
+      file_path: z.string(),
+      topic_id: z.number().int().nullable().optional(),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; file_path: string; topic_id?: number | null } & SourceAccount;
+      if (input.topic_id !== undefined && input.topic_id !== null) telegramFail(400, 400, "Bad Request: forum topics are unsupported");
+      const account = requireSourceAccount(input, ctx);
+      const result = domain.sendMedia({ kind: "user", account }, {
+        chat_id: numericChatId(input.chat_id),
+        kind: "voice",
+        media: catalogMedia(resolveCatalogFile(input.file_path, "voice")),
+      }, ctx.reportDelta);
+      return sourceResult(result);
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  send_sticker: {
+    schema: z.looseObject({
+      chat_id: chatIdSchema,
+      file_path: z.string(),
+      topic_id: z.number().int().nullable().optional(),
+      account: accountSchema,
+    }),
+    mutation: true,
+    handler: (domain, args, ctx) => {
+      const input = args as { chat_id: SourceChatId; file_path: string; topic_id?: number | null } & SourceAccount;
+      if (input.topic_id !== undefined && input.topic_id !== null) telegramFail(400, 400, "Bad Request: forum topics are unsupported");
+      const account = requireSourceAccount(input, ctx);
+      const result = domain.sendMedia({ kind: "user", account }, {
+        chat_id: numericChatId(input.chat_id),
+        kind: "sticker",
+        media: catalogMedia(resolveCatalogFile(input.file_path, "sticker")),
+      }, ctx.reportDelta);
+      return sourceResult(result);
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
+  get_sticker_sets: {
+    schema: z.looseObject({ account: accountSchema }),
+    mutation: false,
+    handler: (_domain, args, ctx) => {
+      requireSourceAccount(args as SourceAccount, ctx);
+      return sourceResult(listStickerSets());
+    },
+    contentText: (output) => (output as SourceResult).result,
+  },
 };
+
+function catalogMedia(source: CatalogFile | string): { bytes: Buffer; filename: string; mimeType: string } | string {
+  return typeof source === "string" ? source : { bytes: source.bytes, filename: source.filename, mimeType: source.mimeType };
+}
 
 export const telegramTools = deriveMcpToolTable(telegramMcpToolFixture, implementations);

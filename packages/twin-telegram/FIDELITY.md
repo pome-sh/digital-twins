@@ -2,7 +2,7 @@
 
 Last verified: 2026-09-21.
 
-Staged Bot API conversation, interaction, and **HTTP-only media foundation**. Not a Bot API or Tolboy-equivalence claim.
+Staged Bot API conversation, interaction, and media over the shared SQLite store. Not a Bot API or Tolboy-equivalence claim.
 
 ## Methods
 
@@ -22,7 +22,7 @@ Staged Bot API conversation, interaction, and **HTTP-only media foundation**. No
 | sendPhoto / sendDocument / sendVideo / sendAudio / sendVoice | hot | bounded | Bot-scoped SQLite media handles; multipart upload or owned `file_id`; no URL or host-file fetch |
 | sendMediaGroup | hot | bounded | 2–10 owned media references, atomic message creation and album id; multipart attachments total at most 64 MiB |
 | editMessageCaption | hot | bounded | Author-only media captions, maximum 1024 UTF-16 code units |
-| getFile / `/file/bot<TOKEN>/...` | hot | bounded | Opaque, expiring bot-scoped handle; byte download only, not a filesystem path |
+| getFile / `/file/bot<TOKEN>/...` | hot | bounded | Opaque, expiring handle; owner-scope or a member chat that references the file_id; byte download only, not a filesystem path |
 | sendChatAction | warm | bounded | Validates membership and the staged Bot API action set; no transient update |
 
 ## MCP
@@ -46,12 +46,14 @@ This twin serves a subtract-only projection of that listing:
 | create_poll | bounded | User-created regular text polls (2–10 string options); source quiz and close-date forms remain unsupported. |
 | send_reaction / remove_reaction / get_message_reactions | bounded | Session-bound one-standard-emoji reactions; `big` animation remains unsupported. |
 | list_inline_buttons / press_inline_button | bounded | Observes and presses HTTP-created callback-data inline buttons, creating the same durable, expiring callback query as the Bot API workflow. |
+| get_media_info / download_media | bounded | A chat member reads metadata and bytes for a visible media message. Download returns those bytes in the source `{ result: string }` envelope and does not write a host path. A non-null `file_path` is refused. The tape stores download digests, not bytes. |
+| send_file / send_voice | bounded | User sends from the in-memory fixture catalog or an owned opaque `file_id` of the matching kind. URLs, host paths, traversal, `file_unique_id`, albums, topics, and scheduled sends are refused. |
+| send_sticker / get_sticker_sets | bounded | Fixture sticker catalog only. Unknown sticker paths are refused. Bot API `sendSticker` stays out of the HTTP subset. |
 
-The remaining 116 source registrations are deliberately absent because this change does not add
+The remaining 110 source registrations are deliberately absent because this change does not add
 unready handlers. Each omission is named in
 [`fixtures/mcp-tools-list.meta.json`](fixtures/mcp-tools-list.meta.json)'s `projection.dropped` map,
-and the projection gate fails if the source adds or retires a tool without an explicit ruling. The
-HTTP-only media foundation still does not add an MCP media operation.
+and the projection gate fails if the source adds or retires a tool without an explicit ruling.
 
 The source registration has no tool to create or press reply keyboards, or to answer/wait for a
 callback query. Those behaviors remain HTTP-only; MCP can only inspect and press a source-registered
@@ -75,3 +77,5 @@ inline callback. Callback waiting remains an internal domain facility.
 14. Media content is bounded to 20 MiB per uploaded file and stored as SQLite bytes for its session. Multipart album attachments have a separate 64 MiB aggregate cap; each multipart request admits at most an additional 1 MiB of framing and is budgeted while streaming, even when `Content-Length` is absent. `file_unique_id`, URLs, filesystem paths, traversal, and attachment paths are not valid references.
 15. Media expires after 24 hours of twin time and is removed on seed/reset. Download paths are opaque `media/file_…` handles rather than paths beneath any host storage root.
 16. The source MCP contract has no reply-keyboard or callback-answer/wait registration. Those interaction operations stay HTTP-only rather than being invented in the projection.
+17. MCP `download_media` is membership-visible: a chat member may read bytes from a message they can see. Bot API `getFile` grants the same bytes when the bot owns the file or is a member of a chat that references that `file_id`. Bot Y cannot reuse bot X's `file_id` from a chat Y is not in.
+18. The recorded tape stores MCP download digests (`{ sha256, size }`), not the downloaded bytes.

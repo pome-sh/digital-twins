@@ -274,20 +274,37 @@ export class TelegramDomain {
 
   sendMedia(
     actor: Actor,
-    args: { chat_id: number; kind: "photo" | "document" | "video" | "audio" | "voice"; media: MediaReference; caption?: string },
+    args: { chat_id: number; kind: "photo" | "document" | "video" | "audio" | "voice" | "sticker"; media: MediaReference; caption?: string },
     delta: DeltaHook = NOOP,
   ): Record<string, unknown> {
-    const botId = this.botId(actor);
-    const scopeId = this.mediaScope(actor);
+    const { ownerId, scopeId } = this.mediaOwner(actor);
     this.requireMember(actor, args.chat_id);
     const caption = this.validateCaption(args.caption);
-    const media = this.resolveMedia(botId, scopeId, args.media);
+    const media = this.resolveMedia(ownerId, scopeId, args.media);
+    const emittedBotIds: number[] = [];
     const result = this.db.transaction(() => {
-      const file = this.persistMedia(botId, scopeId, media);
-      return this.insertMediaMessage(actor, args.chat_id, args.kind, file, caption);
+      const file = this.persistMedia(ownerId, scopeId, media);
+      const message = this.insertMediaMessage(actor, args.chat_id, args.kind, file, caption);
+      if (actor.kind === "user") {
+        emittedBotIds.push(...this.enqueueMessageUpdates(args.chat_id, message, message.date as number));
+      }
+      return message;
     })();
+    for (const botId of emittedBotIds) this.runtime.notify(botId);
     delta({ before: null, after: { chat_id: args.chat_id, message_id: result.message_id, media: args.kind } });
     return result;
+  }
+
+  getMediaInfo(account: string, args: { chat_id: number; message_id: number }): Record<string, unknown> {
+    return this.loadVisibleMedia(account, args).info;
+  }
+
+  downloadVisibleMedia(account: string, args: { chat_id: number; message_id: number }): {
+    info: Record<string, unknown>;
+    content: Buffer;
+  } {
+    const { info, file } = this.loadVisibleMedia(account, args);
+    return { info, content: Buffer.from(file.content) };
   }
 
   sendMediaGroup(
@@ -340,23 +357,21 @@ export class TelegramDomain {
   }
 
   getFile(actor: Actor, fileId: string): Record<string, unknown> {
-    const botId = this.botId(actor);
-    const scopeId = this.mediaScope(actor);
+    this.botId(actor);
     this.purgeExpiredMedia();
-    const row = this.db.prepare("SELECT * FROM media_files WHERE file_id = ? AND bot_id = ? AND scope_id = ?").get(fileId, botId, scopeId) as MediaFileRow | undefined;
+    const row = this.accessibleMediaFile(actor, fileId);
     if (!row) telegramFail(400, 400, "Bad Request: file not found");
     return { file_id: row.file_id, file_unique_id: row.file_unique_id, file_size: row.size, file_path: `media/${row.file_id}` };
   }
 
   downloadFile(actor: Actor, path: string): { content: Buffer; mimeType: string | null } {
-    const botId = this.botId(actor);
-    const scopeId = this.mediaScope(actor);
+    this.botId(actor);
     this.purgeExpiredMedia();
     // The only path accepted is the one getFile emitted. It is an opaque handle,
     // not a filesystem pathname; traversal, separators, and symlinks cannot escape SQLite.
     if (!/^media\/file_\d+_[a-f0-9]{8}_[a-f0-9]{32}$/.test(path)) telegramFail(400, 400, "Bad Request: file not found");
     const fileId = path.slice("media/".length);
-    const row = this.db.prepare("SELECT * FROM media_files WHERE file_id = ? AND bot_id = ? AND scope_id = ?").get(fileId, botId, scopeId) as MediaFileRow | undefined;
+    const row = this.accessibleMediaFile(actor, fileId);
     if (!row) telegramFail(404, 404, "Not Found");
     return { content: Buffer.from(row.content), mimeType: row.mime_type };
   }
@@ -1025,6 +1040,12 @@ export class TelegramDomain {
         "close_poll",
         "list_inline_buttons",
         "press_inline_button",
+        "get_media_info",
+        "download_media",
+        "send_file",
+        "send_voice",
+        "send_sticker",
+        "get_sticker_sets",
       ],
     };
   }
@@ -1085,7 +1106,72 @@ export class TelegramDomain {
     return row;
   }
 
-  private insertMediaMessage(actor: Actor, chatId: number, kind: "photo" | "document" | "video" | "audio" | "voice", file: MediaFileRow, caption: string, mediaGroupId?: string): Record<string, unknown> {
+  private loadVisibleMedia(account: string, args: { chat_id: number; message_id: number }): {
+    info: Record<string, unknown>;
+    file: MediaFileRow;
+  } {
+    const row = this.requireVisibleMessage({ kind: "user", account }, args.chat_id, args.message_id);
+    const parsed = this.mediaFromMessage(row);
+    const file = this.db.prepare("SELECT * FROM media_files WHERE file_id = ? AND expires_at > ?").get(parsed.file_id, this.now()) as MediaFileRow | undefined;
+    if (!file) telegramFail(400, 400, "Bad Request: file not found");
+    return {
+      info: {
+        chat_id: args.chat_id,
+        message_id: args.message_id,
+        kind: parsed.kind,
+        file_id: file.file_id,
+        file_unique_id: file.file_unique_id,
+        file_size: file.size,
+        ...(file.file_name ? { file_name: file.file_name } : {}),
+        ...(file.mime_type ? { mime_type: file.mime_type } : {}),
+      },
+      file,
+    };
+  }
+
+  private accessibleMediaFile(actor: Actor, fileId: string): MediaFileRow | undefined {
+    const botId = this.botId(actor);
+    const scopeId = this.mediaScope(actor);
+    const owned = this.db.prepare("SELECT * FROM media_files WHERE file_id = ? AND bot_id = ? AND scope_id = ?").get(fileId, botId, scopeId) as MediaFileRow | undefined;
+    if (owned) return owned;
+    const row = this.db.prepare("SELECT * FROM media_files WHERE file_id = ?").get(fileId) as MediaFileRow | undefined;
+    // After the actor's own scope misses, only a member chat that references the file_id grants access.
+    if (!row || !this.botSeesFileInMemberChat(botId, fileId)) return undefined;
+    return row;
+  }
+
+  private botSeesFileInMemberChat(botId: number, fileId: string): boolean {
+    return Boolean(
+      this.db.prepare(
+        `SELECT 1 AS ok FROM messages m JOIN chat_members cm ON cm.chat_id = m.chat_id
+         WHERE cm.user_id = ? AND ? IN (
+           json_extract(m.media_json, '$.document.file_id'),
+           json_extract(m.media_json, '$.voice.file_id'),
+           json_extract(m.media_json, '$.sticker.file_id'),
+           json_extract(m.media_json, '$.video.file_id'),
+           json_extract(m.media_json, '$.audio.file_id'),
+           json_extract(m.media_json, '$.photo[0].file_id')
+         )`,
+      ).get(botId, fileId),
+    );
+  }
+
+  private mediaFromMessage(row: MessageRow): { kind: string; file_id: string } {
+    if (!row.media_json) telegramFail(400, 400, "Bad Request: message has no media");
+    const media = JSON.parse(row.media_json) as Record<string, unknown>;
+    for (const kind of ["photo", "document", "video", "audio", "voice", "sticker"] as const) {
+      if (!(kind in media)) continue;
+      const value = media[kind];
+      const file = kind === "photo" && Array.isArray(value) ? value[0] : value;
+      if (!file || typeof file !== "object" || typeof (file as { file_id?: unknown }).file_id !== "string") {
+        telegramFail(400, 400, "Bad Request: message has no media");
+      }
+      return { kind, file_id: (file as { file_id: string }).file_id };
+    }
+    telegramFail(400, 400, "Bad Request: message has no media");
+  }
+
+  private insertMediaMessage(actor: Actor, chatId: number, kind: "photo" | "document" | "video" | "audio" | "voice" | "sticker", file: MediaFileRow, caption: string, mediaGroupId?: string): Record<string, unknown> {
     const from = this.personFor(actor);
     const messageId = (this.db.prepare("SELECT next_message_id AS next FROM chats WHERE id = ?").get(chatId) as { next: number }).next;
     const date = this.now();
@@ -1101,7 +1187,15 @@ export class TelegramDomain {
   }
 
   private mediaScope(actor: Actor): string {
-    return actor.kind === "bot" ? actor.sid ?? "local" : "local";
+    return actor.kind === "bot" ? actor.sid ?? "local" : `user:${actor.account}`;
+  }
+
+  private mediaOwner(actor: Actor): { ownerId: number; scopeId: string } {
+    if (actor.kind === "bot") {
+      this.personFor(actor);
+      return { ownerId: actor.botId, scopeId: this.mediaScope(actor) };
+    }
+    return { ownerId: this.personFor(actor).id, scopeId: this.mediaScope(actor) };
   }
 
   private botId(actor: Actor): number {
