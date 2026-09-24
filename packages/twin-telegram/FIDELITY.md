@@ -1,8 +1,8 @@
 # Telegram Twin Fidelity
 
-Last verified: 2026-09-21.
+Last verified: 2026-09-24.
 
-Staged Bot API conversation, interaction, and media over the shared SQLite store. Not a Bot API or Tolboy-equivalence claim.
+Staged Bot API conversation, interaction, media, and group membership over the shared SQLite store. Not a Bot API or Tolboy-equivalence claim.
 
 ## Methods
 
@@ -24,6 +24,9 @@ Staged Bot API conversation, interaction, and media over the shared SQLite store
 | editMessageCaption | hot | bounded | Author-only media captions, maximum 1024 UTF-16 code units |
 | getFile / `/file/bot<TOKEN>/...` | hot | bounded | Opaque, expiring handle; owner-scope or a member chat that references the file_id; byte download only, not a filesystem path |
 | sendChatAction | warm | bounded | Validates membership and the staged Bot API action set; no transient update |
+| getChatAdministrators / getChatMemberCount / getChatMember | hot | bounded | Creator, admin rights, member restrictions, left, and kicked are distinct |
+| setChatTitle / setChatDescription / setChatPermissions | hot | bounded | Default chat permissions are not per-member restrictions |
+| banChatMember / unbanChatMember / restrictChatMember / promoteChatMember / leaveChat | hot | bounded | Ban, unban, leave, invite, and remove are different transitions |
 
 ## MCP
 
@@ -49,8 +52,13 @@ This twin serves a subtract-only projection of that listing:
 | get_media_info / download_media | bounded | A chat member reads metadata and bytes for a visible media message. Download returns those bytes in the source `{ result: string }` envelope and does not write a host path. A non-null `file_path` is refused. The tape stores download digests, not bytes. |
 | send_file / send_voice | bounded | User sends from the in-memory fixture catalog or an owned opaque `file_id` of the matching kind. URLs, host paths, traversal, `file_unique_id`, albums, topics, and scheduled sends are refused. |
 | send_sticker / get_sticker_sets | bounded | Fixture sticker catalog only. Unknown sticker paths are refused. Bot API `sendSticker` stays out of the HTTP subset. |
+| create_group / invite_to_group / leave_chat / get_participants | bounded | Session-bound group create, invite, leave, and paginated member reads. |
+| edit_chat_title / edit_chat_about / edit_chat_photo / delete_chat_photo | bounded | Title, about, and fixture-catalog chat photos. Bot API `setChatPhoto` / `deleteChatPhoto` stay unimplemented. |
+| promote_admin / demote_admin / edit_admin_rights / get_admins | bounded | Admin rights are distinct from member restrictions. An actor cannot grant a right they lack. |
+| ban_user / unban_user / remove_user / get_banned_users | bounded | Ban, unban, and remove are different transitions. |
+| set_default_chat_permissions / toggle_slow_mode / get_recent_actions | bounded | Default permissions and slow mode use the injected clock. The admin log is permission-filtered. |
 
-The remaining 110 source registrations are deliberately absent because this change does not add
+The remaining 91 source registrations are deliberately absent because this change does not add
 unready handlers. Each omission is named in
 [`fixtures/mcp-tools-list.meta.json`](fixtures/mcp-tools-list.meta.json)'s `projection.dropped` map,
 and the projection gate fails if the source adds or retires a tool without an explicit ruling.
@@ -73,9 +81,13 @@ inline callback. Callback waiting remains an internal domain facility.
 10. Callback queries expire exactly at a deterministic 60 seconds.
 11. Polls are regular text polls only (2–10 options, 1–300 character question, 1–100 character options), with aggregate counts. Quiz, explanation, open-period, paid, and custom forms are rejected.
 12. Reactions support one non-empty standard emoji per actor/message. Custom emoji, paid reactions, and animation flags are rejected.
-13. User pin authority is limited to an authored message in a private chat; a Bot API bot is the authorized group actor in this staged slice.
+13. User pin authority in a private chat is limited to an authored message. In a group, pin uses the membership model: creator, `can_pin_messages` admin right, or the default/restriction pin permission.
 14. Media content is bounded to 20 MiB per uploaded file and stored as SQLite bytes for its session. Multipart album attachments have a separate 64 MiB aggregate cap; each multipart request admits at most an additional 1 MiB of framing and is budgeted while streaming, even when `Content-Length` is absent. `file_unique_id`, URLs, filesystem paths, traversal, and attachment paths are not valid references.
 15. Media expires after 24 hours of twin time and is removed on seed/reset. Download paths are opaque `media/file_…` handles rather than paths beneath any host storage root.
 16. The source MCP contract has no reply-keyboard or callback-answer/wait registration. Those interaction operations stay HTTP-only rather than being invented in the projection.
 17. MCP `download_media` is membership-visible: a chat member may read bytes from a message they can see. Bot API `getFile` grants the same bytes when the bot owns the file or is a member of a chat that references that `file_id`. Bot Y cannot reuse bot X's `file_id` from a chat Y is not in.
 18. The recorded tape stores MCP download digests (`{ sha256, size }`), not the downloaded bytes.
+19. Member restrictions, default chat permissions, and admin rights are separate records. Ban, unban, leave, invite, and remove do not collapse into one membership flag.
+20. An actor cannot grant admin rights they themselves lack. The creator is not a demote, ban, or restrict target.
+21. Restriction expiry and slow mode compare against the injected twin clock, not wall time.
+22. MCP chat photos resolve through the fixture catalog or an owned opaque `file_id`. The twin does not read the host filesystem or fetch a URL. Bot API `setChatPhoto` and `deleteChatPhoto` stay outside the HTTP subset.

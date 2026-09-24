@@ -22,13 +22,47 @@ CREATE TABLE IF NOT EXISTS chats (
   id INTEGER PRIMARY KEY,
   type TEXT NOT NULL,
   title TEXT,
-  next_message_id INTEGER NOT NULL DEFAULT 1
+  description TEXT,
+  photo_file_id TEXT,
+  permissions_json TEXT,
+  permissions_until INTEGER NOT NULL DEFAULT 0,
+  slow_mode_seconds INTEGER NOT NULL DEFAULT 0,
+  creator_id INTEGER,
+  next_message_id INTEGER NOT NULL DEFAULT 1,
+  next_admin_log_id INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS chat_members (
   chat_id INTEGER NOT NULL,
   user_id INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'member',
+  admin_rights_json TEXT,
+  restrictions_json TEXT,
+  until_date INTEGER NOT NULL DEFAULT 0,
+  custom_title TEXT,
+  is_anonymous INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (chat_id, user_id)
+);
+
+-- Banned users are not members. Unban does not restore membership.
+CREATE TABLE IF NOT EXISTS chat_bans (
+  chat_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  banned_by_id INTEGER NOT NULL,
+  until_date INTEGER NOT NULL DEFAULT 0,
+  banned_at INTEGER NOT NULL,
+  PRIMARY KEY (chat_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS chat_admin_log (
+  chat_id INTEGER NOT NULL,
+  event_id INTEGER NOT NULL,
+  actor_id INTEGER NOT NULL,
+  action TEXT NOT NULL,
+  target_id INTEGER,
+  payload_json TEXT,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (chat_id, event_id)
 );
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -187,6 +221,8 @@ DELETE FROM pinned_messages;
 DELETE FROM read_cursors;
 DELETE FROM message_hides;
 DELETE FROM messages;
+DELETE FROM chat_admin_log;
+DELETE FROM chat_bans;
 DELETE FROM chat_members;
 DELETE FROM chats;
 DELETE FROM users;
@@ -207,6 +243,19 @@ export function migrate(db: TelegramTwinDatabase): void {
     ["messages", "media_json", "TEXT"],
     ["media_files", "scope_id", "TEXT NOT NULL DEFAULT 'local'"],
     ["chats", "next_message_id", "INTEGER NOT NULL DEFAULT 1"],
+    ["chats", "description", "TEXT"],
+    ["chats", "photo_file_id", "TEXT"],
+    ["chats", "permissions_json", "TEXT"],
+    ["chats", "permissions_until", "INTEGER NOT NULL DEFAULT 0"],
+    ["chats", "slow_mode_seconds", "INTEGER NOT NULL DEFAULT 0"],
+    ["chats", "creator_id", "INTEGER"],
+    ["chats", "next_admin_log_id", "INTEGER NOT NULL DEFAULT 1"],
+    ["chat_members", "status", "TEXT NOT NULL DEFAULT 'member'"],
+    ["chat_members", "admin_rights_json", "TEXT"],
+    ["chat_members", "restrictions_json", "TEXT"],
+    ["chat_members", "until_date", "INTEGER NOT NULL DEFAULT 0"],
+    ["chat_members", "custom_title", "TEXT"],
+    ["chat_members", "is_anonymous", "INTEGER NOT NULL DEFAULT 0"],
   ] as const) {
     const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
     if (cols.some((col) => col.name === column)) continue;

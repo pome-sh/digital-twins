@@ -11,6 +11,28 @@ import {
   type MessageRow,
   type UserRow,
 } from "./serializers.js";
+import {
+  ADMIN_LOG_LIMIT,
+  DEFAULT_CHAT_PERMISSIONS,
+  DEFAULT_PROMOTE_RIGHTS,
+  FULL_ADMIN_RIGHTS,
+  ZERO_ADMIN_RIGHTS,
+  effectivePermissions,
+  noAdminRights,
+  parseAdminRights,
+  parseChatPermissions,
+  parseSlowMode,
+  parseUntilDate,
+  presentParticipant,
+  requireAdminTitle,
+  requireChatAbout,
+  requireChatTitle,
+  rightsSubset,
+  serializeChatMember,
+  type AdminRights,
+  type ChatPermissions,
+  type MemberStatus,
+} from "./membership.js";
 import { defaultSeedState, parseSeed, type TelegramSeed } from "./seed.js";
 import {
   MAX_WEBHOOK_BATCH,
@@ -135,13 +157,17 @@ export class TelegramDomain {
         );
       }
       for (const chat of state.chats) {
-        this.db.prepare("INSERT INTO chats (id, type, title, next_message_id) VALUES (?, ?, ?, 1)").run(
-          chat.id,
-          chat.type,
-          chat.title ?? null,
-        );
+        const creatorId = chat.type === "private"
+          ? null
+          : (chat.members.find((id) => state.users.some((user) => user.id === id)) ?? chat.members[0] ?? null);
+        this.db.prepare(
+          "INSERT INTO chats (id, type, title, description, photo_file_id, permissions_json, permissions_until, slow_mode_seconds, creator_id, next_message_id, next_admin_log_id) VALUES (?, ?, ?, NULL, NULL, ?, 0, 0, ?, 1, 1)",
+        ).run(chat.id, chat.type, chat.title ?? null, JSON.stringify(DEFAULT_CHAT_PERMISSIONS), creatorId);
         for (const member of chat.members) {
-          this.db.prepare("INSERT INTO chat_members (chat_id, user_id) VALUES (?, ?)").run(chat.id, member);
+          const status = creatorId === member ? "creator" : "member";
+          this.db.prepare(
+            "INSERT INTO chat_members (chat_id, user_id, status, admin_rights_json, restrictions_json, until_date, custom_title, is_anonymous) VALUES (?, ?, ?, NULL, NULL, 0, NULL, 0)",
+          ).run(chat.id, member, status);
         }
       }
       for (const message of state.messages) {
@@ -189,7 +215,7 @@ export class TelegramDomain {
 
   getChat(actor: Actor, chatId: number): Record<string, unknown> {
     this.requireMember(actor, chatId);
-    return serializeChat(this.chat(chatId));
+    return this.presentChat(this.chat(chatId));
   }
 
   sendMessage(
@@ -206,6 +232,7 @@ export class TelegramDomain {
   ): Record<string, unknown> {
     if (!args.text) telegramFail(400, 400, "Bad Request: message text is empty");
     this.requireMember(actor, args.chat_id);
+    this.assertCanSend(actor, args.chat_id, "messages");
     if (args.reply_to_message_id !== undefined) {
       this.requireVisibleMessage(actor, args.chat_id, args.reply_to_message_id);
     }
@@ -279,6 +306,7 @@ export class TelegramDomain {
   ): Record<string, unknown> {
     const { ownerId, scopeId } = this.mediaOwner(actor);
     this.requireMember(actor, args.chat_id);
+    this.assertCanSend(actor, args.chat_id, args.kind === "photo" ? "photos" : args.kind === "document" ? "documents" : args.kind === "video" ? "videos" : args.kind === "audio" ? "audios" : args.kind === "voice" ? "voice_notes" : "other_messages");
     const caption = this.validateCaption(args.caption);
     const media = this.resolveMedia(ownerId, scopeId, args.media);
     const emittedBotIds: number[] = [];
@@ -315,6 +343,7 @@ export class TelegramDomain {
     const botId = this.botId(actor);
     const scopeId = this.mediaScope(actor);
     this.requireMember(actor, args.chat_id);
+    this.assertCanSend(actor, args.chat_id, "photos");
     if (args.media.length < 2 || args.media.length > 10) telegramFail(400, 400, "Bad Request: media group must include 2-10 items");
     // Keep an explicit total even when an HTTP transport omits Content-Length.
     // Stored file references contribute no request bytes; every uploaded file is
@@ -394,10 +423,10 @@ export class TelegramDomain {
     const user = this.userByAccount(account);
     const chats = this.db
       .prepare(
-        "SELECT c.id, c.type, c.title FROM chats c JOIN chat_members m ON m.chat_id = c.id WHERE m.user_id = ? ORDER BY c.id",
+        "SELECT c.id, c.type, c.title, c.description, c.photo_file_id, c.permissions_json, c.permissions_until, c.slow_mode_seconds, c.creator_id FROM chats c JOIN chat_members m ON m.chat_id = c.id WHERE m.user_id = ? ORDER BY c.id",
       )
       .all(user.id) as ChatRow[];
-    return chats.map(serializeChat);
+    return chats.map((chat) => this.presentChat(chat));
   }
 
   getHistory(account: string, chatId: number): Record<string, unknown>[] {
@@ -509,6 +538,7 @@ export class TelegramDomain {
   sendPoll(actor: Actor, args: { chat_id: number; question: string; options: string[]; is_anonymous?: boolean; allows_multiple_answers?: boolean }, delta: DeltaHook = NOOP): Record<string, unknown> {
     const botId = this.botId(actor);
     this.requireMember(actor, args.chat_id);
+    this.assertCanSend(actor, args.chat_id, "polls");
     validatePoll(args.question, args.options);
     const now = this.now();
     const messageDeltas: StateDelta[] = [];
@@ -527,6 +557,7 @@ export class TelegramDomain {
   createPollForUser(account: string, args: { chat_id: number; question: string; options: string[]; is_anonymous?: boolean; allows_multiple_answers?: boolean }, delta: DeltaHook = NOOP): Record<string, unknown> {
     const actor: Actor = { kind: "user", account };
     this.requireMember(actor, args.chat_id);
+    this.assertCanSend(actor, args.chat_id, "polls");
     validatePoll(args.question, args.options);
     const messageDeltas: StateDelta[] = [];
     const message = this.sendMessage(actor, { chat_id: args.chat_id, text: args.question }, (change) => messageDeltas.push(change));
@@ -1247,6 +1278,330 @@ export class TelegramDomain {
     return true;
   }
 
+  createGroup(account: string, args: { title: string; user_ids: Array<number | string> }, delta: DeltaHook = NOOP): Record<string, unknown> {
+    const title = requireChatTitle(args.title);
+    const creator = this.personFor({ kind: "user", account });
+    const invitees = args.user_ids.map((ref) => this.resolvePersonRef(ref)).filter((person) => person.id !== creator.id);
+    const chatId = this.nextGroupId();
+    this.db.transaction(() => {
+      this.db.prepare(
+        "INSERT INTO chats (id, type, title, description, photo_file_id, permissions_json, permissions_until, slow_mode_seconds, creator_id, next_message_id, next_admin_log_id) VALUES (?, 'supergroup', ?, NULL, NULL, ?, 0, 0, ?, 1, 1)",
+      ).run(chatId, title, JSON.stringify(DEFAULT_CHAT_PERMISSIONS), creator.id);
+      this.insertMember(chatId, creator.id, "creator");
+      for (const person of invitees) this.insertMember(chatId, person.id, "member");
+      this.recordAdminLog(chatId, creator.id, "create_group", null, { title, user_ids: invitees.map((person) => person.id) });
+    })();
+    const chat = this.presentChat(this.chat(chatId));
+    delta({ before: null, after: { chat_id: chatId, title, members: [creator.id, ...invitees.map((person) => person.id)] } });
+    return chat;
+  }
+
+  inviteToGroup(account: string, args: { group_id: number; user_ids: Array<number | string> }, delta: DeltaHook = NOOP): Record<string, unknown> {
+    const actor = this.requirePermission({ kind: "user", account }, args.group_id, "can_invite_users", "can_invite_users");
+    const added: number[] = [];
+    this.db.transaction(() => {
+      for (const ref of args.user_ids) {
+        const person = this.resolvePersonRef(ref);
+        this.expireMembership(args.group_id, person.id);
+        if (this.banRow(args.group_id, person.id)) telegramFail(400, 400, "Bad Request: user is banned");
+        if (this.isMemberId(person.id, args.group_id)) continue;
+        this.insertMember(args.group_id, person.id, "member");
+        added.push(person.id);
+        this.recordAdminLog(args.group_id, actor.person.id, "invite", person.id, {});
+      }
+    })();
+    delta({ before: null, after: { chat_id: args.group_id, added } });
+    return { ok: true, added };
+  }
+
+  leaveChat(actor: Actor, args: { chat_id: number }, delta: DeltaHook = NOOP): { ok: true } {
+    this.requireGroup(args.chat_id);
+    const snapshot = this.membershipSnapshot(actor, args.chat_id);
+    if (!snapshot.isMember) telegramFail(400, 400, "Bad Request: chat not found");
+    if (snapshot.status === "creator" && this.memberCount(args.chat_id) > 1) {
+      telegramFail(400, 400, "Bad Request: creator can't leave the chat");
+    }
+    this.db.transaction(() => {
+      this.db.prepare("DELETE FROM chat_members WHERE chat_id = ? AND user_id = ?").run(args.chat_id, snapshot.person.id);
+      this.recordAdminLog(args.chat_id, snapshot.person.id, "leave", snapshot.person.id, {});
+    })();
+    delta({ before: { status: snapshot.status }, after: { status: "left", chat_id: args.chat_id, user_id: snapshot.person.id } });
+    return { ok: true };
+  }
+
+  getParticipants(account: string, args: { chat_id: number; page?: number; page_size?: number }): Record<string, unknown> {
+    this.requireMember({ kind: "user", account }, args.chat_id);
+    this.expireChatMemberships(args.chat_id);
+    const page = args.page ?? 1;
+    const pageSize = args.page_size ?? 200;
+    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 1000) {
+      telegramFail(400, 400, "Bad Request: invalid pagination");
+    }
+    const rows = this.memberRows(args.chat_id);
+    const start = (page - 1) * pageSize;
+    return {
+      page,
+      page_size: pageSize,
+      total: rows.length,
+      participants: rows.slice(start, start + pageSize).map((row) => presentParticipant(this.personById(row.user_id), this.memberStatus(row))),
+    };
+  }
+
+  setChatTitle(actor: Actor, args: { chat_id: number; title: string }, delta: DeltaHook = NOOP): { ok: true } {
+    const title = requireChatTitle(args.title);
+    const snapshot = this.requirePermission(actor, args.chat_id, "can_change_info", "can_change_info");
+    const before = this.chat(args.chat_id).title ?? null;
+    if (before !== title) {
+      this.db.prepare("UPDATE chats SET title = ? WHERE id = ?").run(title, args.chat_id);
+      this.recordAdminLog(args.chat_id, snapshot.person.id, "edit_title", null, { title });
+    }
+    delta({ before: { title: before }, after: { title } });
+    return { ok: true };
+  }
+
+  setChatDescription(actor: Actor, args: { chat_id: number; description: string }, delta: DeltaHook = NOOP): { ok: true } {
+    const description = requireChatAbout(args.description);
+    const snapshot = this.requirePermission(actor, args.chat_id, "can_change_info", "can_change_info");
+    const before = this.chat(args.chat_id).description ?? "";
+    if (before !== description) {
+      this.db.prepare("UPDATE chats SET description = ? WHERE id = ?").run(description, args.chat_id);
+      this.recordAdminLog(args.chat_id, snapshot.person.id, "edit_about", null, { about: description });
+    }
+    delta({ before: { description: before }, after: { description } });
+    return { ok: true };
+  }
+
+  editChatPhoto(actor: Actor, args: { chat_id: number; media: MediaReference }, delta: DeltaHook = NOOP): { ok: true } {
+    const snapshot = this.requirePermission(actor, args.chat_id, "can_change_info", "can_change_info");
+    const { ownerId, scopeId } = this.mediaOwner(actor);
+    const file = this.persistMedia(ownerId, scopeId, this.resolveMedia(ownerId, scopeId, args.media));
+    const before = this.chat(args.chat_id).photo_file_id ?? null;
+    this.db.prepare("UPDATE chats SET photo_file_id = ? WHERE id = ?").run(file.file_id, args.chat_id);
+    this.recordAdminLog(args.chat_id, snapshot.person.id, "edit_photo", null, { file_id: file.file_id });
+    delta({ before: { photo_file_id: before }, after: { photo_file_id: file.file_id } });
+    return { ok: true };
+  }
+
+  deleteChatPhoto(actor: Actor, args: { chat_id: number }, delta: DeltaHook = NOOP): { ok: true } {
+    const snapshot = this.requirePermission(actor, args.chat_id, "can_change_info", "can_change_info");
+    const before = this.chat(args.chat_id).photo_file_id ?? null;
+    if (before !== null) {
+      this.db.prepare("UPDATE chats SET photo_file_id = NULL WHERE id = ?").run(args.chat_id);
+      this.recordAdminLog(args.chat_id, snapshot.person.id, "delete_photo", null, {});
+    }
+    delta({ before: { photo_file_id: before }, after: { photo_file_id: null } });
+    return { ok: true };
+  }
+
+  promoteChatMember(
+    actor: Actor,
+    args: { chat_id: number; user_id: number | string; rights?: unknown },
+    delta: DeltaHook = NOOP,
+  ): { ok: true } {
+    const actorSnap = this.requireAdminRight(actor, args.chat_id, "can_promote_members");
+    const target = this.targetMember(args.chat_id, args.user_id);
+    if (target.status === "creator") telegramFail(400, 400, "Bad Request: can't promote the chat creator");
+    if (!target.isMember) telegramFail(400, 400, "Bad Request: user not found");
+    const actorRights = actorSnap.status === "creator" ? FULL_ADMIN_RIGHTS : actorSnap.rights ?? DEFAULT_PROMOTE_RIGHTS;
+    const rights = parseAdminRights(args.rights, target.rights ?? DEFAULT_PROMOTE_RIGHTS);
+    if (!rightsSubset(rights, actorRights)) telegramFail(400, 400, "Bad Request: can't grant rights the actor lacks");
+    if (noAdminRights(rights)) return this.demoteChatMember(actor, { chat_id: args.chat_id, user_id: args.user_id }, delta);
+    this.db.prepare(
+      "UPDATE chat_members SET status = 'administrator', admin_rights_json = ?, restrictions_json = NULL, until_date = 0, is_anonymous = ? WHERE chat_id = ? AND user_id = ?",
+    ).run(JSON.stringify(rights), rights.is_anonymous ? 1 : 0, args.chat_id, target.person.id);
+    this.recordAdminLog(args.chat_id, actorSnap.person.id, "promote", target.person.id, { rights });
+    delta({ before: { status: target.status, rights: target.rights }, after: { status: "administrator", rights } });
+    return { ok: true };
+  }
+
+  demoteChatMember(actor: Actor, args: { chat_id: number; user_id: number | string }, delta: DeltaHook = NOOP): { ok: true } {
+    const actorSnap = this.requireAdminRight(actor, args.chat_id, "can_promote_members");
+    const target = this.targetMember(args.chat_id, args.user_id);
+    if (target.status === "creator") telegramFail(400, 400, "Bad Request: can't demote the chat creator");
+    if (target.status === "administrator") {
+      this.db.prepare(
+        "UPDATE chat_members SET status = 'member', admin_rights_json = NULL, custom_title = NULL, is_anonymous = 0 WHERE chat_id = ? AND user_id = ?",
+      ).run(args.chat_id, target.person.id);
+      this.recordAdminLog(args.chat_id, actorSnap.person.id, "demote", target.person.id, {});
+    }
+    delta({ before: { status: target.status }, after: { status: target.status === "administrator" ? "member" : target.status } });
+    return { ok: true };
+  }
+
+  editAdminRights(
+    actor: Actor,
+    args: { chat_id: number; user_id: number | string; rank?: string; rights?: unknown },
+    delta: DeltaHook = NOOP,
+  ): { ok: true } {
+    const rank = requireAdminTitle(args.rank ?? "");
+    if (args.rights !== undefined && noAdminRights(parseAdminRights(args.rights, ZERO_ADMIN_RIGHTS))) {
+      const result = this.demoteChatMember(actor, { chat_id: args.chat_id, user_id: args.user_id }, delta);
+      if (rank) this.db.prepare("UPDATE chat_members SET custom_title = NULL WHERE chat_id = ? AND user_id = ?").run(args.chat_id, this.resolvePersonRef(args.user_id).id);
+      return result;
+    }
+    const result = this.promoteChatMember(actor, { chat_id: args.chat_id, user_id: args.user_id, rights: args.rights }, delta);
+    if (rank) {
+      this.db.prepare("UPDATE chat_members SET custom_title = ? WHERE chat_id = ? AND user_id = ?").run(rank, args.chat_id, this.resolvePersonRef(args.user_id).id);
+    }
+    return result;
+  }
+
+  banChatMember(actor: Actor, args: { chat_id: number; user_id: number | string; until_date?: unknown }, delta: DeltaHook = NOOP): { ok: true } {
+    const actorSnap = this.requireAdminRight(actor, args.chat_id, "can_restrict_members");
+    const target = this.targetMember(args.chat_id, args.user_id);
+    const until = parseUntilDate(args.until_date);
+    this.assertModerationTarget(actorSnap, target, "ban");
+    const already = this.banRow(args.chat_id, target.person.id);
+    if (!already || already.until_date !== until) {
+      this.db.transaction(() => {
+        this.db.prepare("DELETE FROM chat_members WHERE chat_id = ? AND user_id = ?").run(args.chat_id, target.person.id);
+        this.db.prepare(
+          "INSERT INTO chat_bans (chat_id, user_id, banned_by_id, until_date, banned_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(chat_id, user_id) DO UPDATE SET banned_by_id = excluded.banned_by_id, until_date = excluded.until_date, banned_at = excluded.banned_at",
+        ).run(args.chat_id, target.person.id, actorSnap.person.id, until, this.now());
+        this.recordAdminLog(args.chat_id, actorSnap.person.id, "ban", target.person.id, { until_date: until });
+      })();
+    }
+    delta({ before: { status: already ? "kicked" : target.status }, after: { status: "kicked", until_date: until } });
+    return { ok: true };
+  }
+
+  unbanChatMember(
+    actor: Actor,
+    args: { chat_id: number; user_id: number | string; only_if_banned?: boolean },
+    delta: DeltaHook = NOOP,
+  ): { ok: true } {
+    const actorSnap = this.requireAdminRight(actor, args.chat_id, "can_restrict_members");
+    const person = this.resolvePersonRef(args.user_id);
+    this.expireMembership(args.chat_id, person.id);
+    const banned = this.banRow(args.chat_id, person.id);
+    const member = this.isMemberId(person.id, args.chat_id);
+    this.db.transaction(() => {
+      if (banned) this.db.prepare("DELETE FROM chat_bans WHERE chat_id = ? AND user_id = ?").run(args.chat_id, person.id);
+      if (!args.only_if_banned && member) {
+        this.db.prepare("DELETE FROM chat_members WHERE chat_id = ? AND user_id = ?").run(args.chat_id, person.id);
+      }
+      if (banned || (!args.only_if_banned && member)) {
+        this.recordAdminLog(args.chat_id, actorSnap.person.id, "unban", person.id, { only_if_banned: Boolean(args.only_if_banned) });
+      }
+    })();
+    delta({ before: { banned: Boolean(banned), member }, after: { banned: false, member: args.only_if_banned ? member : false } });
+    return { ok: true };
+  }
+
+  removeUser(actor: Actor, args: { chat_id: number; user_id: number | string }, delta: DeltaHook = NOOP): { ok: true } {
+    const actorSnap = this.requireAdminRight(actor, args.chat_id, "can_restrict_members");
+    const target = this.targetMember(args.chat_id, args.user_id);
+    if (target.person.id === actorSnap.person.id) telegramFail(400, 400, "Bad Request: use leave_chat to leave");
+    if (this.banRow(args.chat_id, target.person.id)) {
+      delta({ before: { status: "kicked" }, after: { status: "kicked" } });
+      return { ok: true };
+    }
+    this.assertModerationTarget(actorSnap, target, "remove");
+    if (target.isMember) {
+      this.db.prepare("DELETE FROM chat_members WHERE chat_id = ? AND user_id = ?").run(args.chat_id, target.person.id);
+      this.recordAdminLog(args.chat_id, actorSnap.person.id, "remove", target.person.id, {});
+    }
+    delta({ before: { status: target.status }, after: { status: "left" } });
+    return { ok: true };
+  }
+
+  restrictChatMember(
+    actor: Actor,
+    args: { chat_id: number; user_id: number | string; permissions?: unknown; until_date?: unknown },
+    delta: DeltaHook = NOOP,
+  ): { ok: true } {
+    const actorSnap = this.requireAdminRight(actor, args.chat_id, "can_restrict_members");
+    const target = this.targetMember(args.chat_id, args.user_id);
+    this.assertModerationTarget(actorSnap, target, "restrict");
+    if (!target.isMember) telegramFail(400, 400, "Bad Request: user not found");
+    const permissions = parseChatPermissions(args.permissions);
+    const until = parseUntilDate(args.until_date);
+    this.db.prepare(
+      "UPDATE chat_members SET status = 'restricted', admin_rights_json = NULL, restrictions_json = ?, until_date = ? WHERE chat_id = ? AND user_id = ?",
+    ).run(JSON.stringify(permissions), until, args.chat_id, target.person.id);
+    this.recordAdminLog(args.chat_id, actorSnap.person.id, "restrict", target.person.id, { permissions, until_date: until });
+    delta({ before: { status: target.status }, after: { status: "restricted", permissions, until_date: until } });
+    return { ok: true };
+  }
+
+  setChatPermissions(
+    actor: Actor,
+    args: { chat_id: number; permissions?: unknown; until_date?: unknown },
+    delta: DeltaHook = NOOP,
+  ): { ok: true } {
+    const actorSnap = this.requireAdminRight(actor, args.chat_id, "can_restrict_members");
+    const permissions = parseChatPermissions(args.permissions);
+    const until = parseUntilDate(args.until_date);
+    const before = this.defaultPermissions(args.chat_id);
+    this.db.prepare("UPDATE chats SET permissions_json = ?, permissions_until = ? WHERE id = ?").run(
+      JSON.stringify(permissions),
+      until,
+      args.chat_id,
+    );
+    this.recordAdminLog(args.chat_id, actorSnap.person.id, "set_permissions", null, { permissions, until_date: until });
+    delta({ before: { permissions: before }, after: { permissions, until_date: until } });
+    return { ok: true };
+  }
+
+  toggleSlowMode(actor: Actor, args: { chat_id: number; seconds?: unknown }, delta: DeltaHook = NOOP): { ok: true } {
+    const seconds = parseSlowMode(args.seconds);
+    const chat = this.requireGroup(args.chat_id);
+    if (chat.type !== "supergroup") telegramFail(400, 400, "Bad Request: slow mode is only available in supergroups");
+    const actorSnap = this.requireAdminRight(actor, args.chat_id, "can_change_info");
+    const before = chat.slow_mode_seconds ?? 0;
+    if (before !== seconds) {
+      this.db.prepare("UPDATE chats SET slow_mode_seconds = ? WHERE id = ?").run(seconds, args.chat_id);
+      this.recordAdminLog(args.chat_id, actorSnap.person.id, "toggle_slow_mode", null, { seconds });
+    }
+    delta({ before: { seconds: before }, after: { seconds } });
+    return { ok: true };
+  }
+
+  getAdmins(account: string, args: { chat_id: number }): Record<string, unknown>[] {
+    this.requireMember({ kind: "user", account }, args.chat_id);
+    return this.listAdministrators(args.chat_id);
+  }
+
+  getBannedUsers(account: string, args: { chat_id: number }): Record<string, unknown>[] {
+    this.requireAdminRight({ kind: "user", account }, args.chat_id, "can_restrict_members");
+    this.expireChatMemberships(args.chat_id);
+    return (this.db.prepare("SELECT user_id, until_date FROM chat_bans WHERE chat_id = ? ORDER BY user_id").all(args.chat_id) as Array<{ user_id: number; until_date: number }>)
+      .map((row) => presentParticipant(this.personById(row.user_id), "kicked", { until_date: row.until_date }));
+  }
+
+  getRecentActions(account: string, args: { chat_id: number }): Record<string, unknown>[] {
+    const snapshot = this.requireAdminRight({ kind: "user", account }, args.chat_id, "can_manage_chat");
+    this.expireChatMemberships(args.chat_id);
+    const rows = this.db.prepare(
+      "SELECT event_id, actor_id, action, target_id, payload_json, created_at FROM chat_admin_log WHERE chat_id = ? ORDER BY event_id DESC LIMIT ?",
+    ).all(args.chat_id, ADMIN_LOG_LIMIT) as Array<{ event_id: number; actor_id: number; action: string; target_id: number | null; payload_json: string | null; created_at: number }>;
+    return rows.filter((row) => this.canSeeAdminAction(snapshot, row.action)).map((row) => ({
+      id: row.event_id,
+      action: row.action,
+      actor: serializeUser(this.personById(row.actor_id)),
+      ...(row.target_id ? { target: serializeUser(this.personById(row.target_id)) } : {}),
+      date: row.created_at,
+      ...(row.payload_json ? (JSON.parse(row.payload_json) as Record<string, unknown>) : {}),
+    }));
+  }
+
+  getChatAdministrators(actor: Actor, chatId: number): Record<string, unknown>[] {
+    this.requireMember(actor, chatId);
+    return this.listAdministrators(chatId);
+  }
+
+  getChatMemberCount(actor: Actor, chatId: number): number {
+    this.requireMember(actor, chatId);
+    this.expireChatMemberships(chatId);
+    return this.memberCount(chatId);
+  }
+
+  getChatMember(actor: Actor, args: { chat_id: number; user_id: number | string }): Record<string, unknown> {
+    this.requireMember(actor, args.chat_id);
+    const target = this.targetMember(args.chat_id, args.user_id);
+    return this.presentMember(target);
+  }
+
   private purgeExpiredUpdates(): void {
     this.db.prepare("DELETE FROM bot_updates WHERE created_at <= ?").run(this.now() - UPDATE_RETENTION_SEC);
   }
@@ -1296,7 +1651,11 @@ export class TelegramDomain {
   }
 
   private chat(id: number): ChatRow {
-    const row = this.db.prepare("SELECT id, type, title FROM chats WHERE id = ?").get(id) as ChatRow | undefined;
+    const row = this.db
+      .prepare(
+        "SELECT id, type, title, description, photo_file_id, permissions_json, permissions_until, slow_mode_seconds, creator_id FROM chats WHERE id = ?",
+      )
+      .get(id) as ChatRow | undefined;
     if (!row) telegramFail(400, 400, "Bad Request: chat not found");
     return row;
   }
@@ -1386,16 +1745,23 @@ export class TelegramDomain {
 
   private requirePinAuthority(actor: Actor, row: MessageRow): void {
     this.requireChatPinAuthority(actor, row.chat_id);
-    if (actor.kind === "user" && row.from_id !== this.personFor(actor).id) telegramFail(400, 400, "Bad Request: not enough rights to pin the message");
+    const chat = this.chat(row.chat_id);
+    if (chat.type === "private" && actor.kind === "user" && row.from_id !== this.personFor(actor).id) {
+      telegramFail(400, 400, "Bad Request: not enough rights to pin the message");
+    }
   }
 
   private requireChatPinAuthority(actor: Actor, chatId: number): void {
     const chat = this.chat(chatId);
-    if (chat.type !== "private" && actor.kind === "user") {
-      // The staged user surface has no administrator model. Users may manage
-      // their own pins only; bots represent the authorized Bot API actor.
+    if (chat.type === "private") return;
+    const snapshot = this.membershipSnapshot(actor, chatId);
+    if (snapshot.status === "creator") return;
+    if (snapshot.status === "administrator") {
+      if (snapshot.rights?.can_pin_messages) return;
       telegramFail(400, 400, "Bad Request: not enough rights to pin messages");
     }
+    if (snapshot.permissions.can_pin_messages) return;
+    telegramFail(400, 400, "Bad Request: not enough rights to pin messages");
   }
 
   private isBotId(id: number): boolean {
@@ -1440,4 +1806,282 @@ export class TelegramDomain {
     const poll = this.db.prepare("SELECT poll_id FROM polls WHERE chat_id = ? AND message_id = ?").get(row.chat_id, row.message_id) as { poll_id: string } | undefined;
     return poll ? { ...message, poll: this.presentPoll(poll.poll_id) } : message;
   }
+
+  private presentChat(row: ChatRow): Record<string, unknown> {
+    const permissions = this.defaultPermissions(row.id);
+    return serializeChat(row, {
+      permissions,
+      ...(row.photo_file_id
+        ? { photo: { small_file_id: row.photo_file_id, big_file_id: row.photo_file_id } }
+        : {}),
+    });
+  }
+
+  private requireGroup(chatId: number): ChatRow {
+    const chat = this.chat(chatId);
+    if (chat.type === "private") telegramFail(400, 400, "Bad Request: chat is not a group");
+    return chat;
+  }
+
+  private nextGroupId(): number {
+    const lowest = this.db.prepare("SELECT MIN(id) AS id FROM chats").get() as { id: number | null };
+    const floor = -1002000000000;
+    return Math.min(lowest.id ?? floor, floor) - 1;
+  }
+
+  private insertMember(chatId: number, userId: number, status: "creator" | "administrator" | "member"): void {
+    this.db.prepare(
+      "INSERT INTO chat_members (chat_id, user_id, status, admin_rights_json, restrictions_json, until_date, custom_title, is_anonymous) VALUES (?, ?, ?, ?, NULL, 0, NULL, 0)",
+    ).run(chatId, userId, status, status === "administrator" ? JSON.stringify(DEFAULT_PROMOTE_RIGHTS) : null);
+  }
+
+  private recordAdminLog(chatId: number, actorId: number, action: string, targetId: number | null, payload: Record<string, unknown>): void {
+    const next = (this.db.prepare("SELECT next_admin_log_id AS next FROM chats WHERE id = ?").get(chatId) as { next: number }).next;
+    this.db.prepare("UPDATE chats SET next_admin_log_id = next_admin_log_id + 1 WHERE id = ?").run(chatId);
+    this.db.prepare(
+      "INSERT INTO chat_admin_log (chat_id, event_id, actor_id, action, target_id, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    ).run(chatId, next, actorId, action, targetId, JSON.stringify(payload), this.now());
+  }
+
+  private memberRows(chatId: number): MemberRecord[] {
+    this.expireChatMemberships(chatId);
+    return this.db.prepare("SELECT * FROM chat_members WHERE chat_id = ? ORDER BY user_id").all(chatId) as MemberRecord[];
+  }
+
+  private memberCount(chatId: number): number {
+    return (this.db.prepare("SELECT COUNT(*) AS count FROM chat_members WHERE chat_id = ?").get(chatId) as { count: number }).count;
+  }
+
+  private memberStatus(row: MemberRecord): MemberStatus {
+    return row.status as MemberStatus;
+  }
+
+  private banRow(chatId: number, userId: number): { user_id: number; until_date: number } | undefined {
+    return this.db.prepare("SELECT user_id, until_date FROM chat_bans WHERE chat_id = ? AND user_id = ?").get(chatId, userId) as
+      | { user_id: number; until_date: number }
+      | undefined;
+  }
+
+  private expireMembership(chatId: number, userId: number): void {
+    const now = this.now();
+    const member = this.db.prepare("SELECT status, until_date FROM chat_members WHERE chat_id = ? AND user_id = ?").get(chatId, userId) as
+      | { status: string; until_date: number }
+      | undefined;
+    if (member?.status === "restricted" && member.until_date > 0 && member.until_date <= now) {
+      this.db.prepare(
+        "UPDATE chat_members SET status = 'member', restrictions_json = NULL, until_date = 0 WHERE chat_id = ? AND user_id = ?",
+      ).run(chatId, userId);
+    }
+    const banned = this.banRow(chatId, userId);
+    if (banned && banned.until_date > 0 && banned.until_date <= now) {
+      this.db.prepare("DELETE FROM chat_bans WHERE chat_id = ? AND user_id = ?").run(chatId, userId);
+    }
+    const chat = this.db.prepare("SELECT permissions_until FROM chats WHERE id = ?").get(chatId) as { permissions_until: number } | undefined;
+    if (chat && chat.permissions_until > 0 && chat.permissions_until <= now) {
+      this.db.prepare("UPDATE chats SET permissions_json = ?, permissions_until = 0 WHERE id = ?").run(
+        JSON.stringify(DEFAULT_CHAT_PERMISSIONS),
+        chatId,
+      );
+    }
+  }
+
+  private expireChatMemberships(chatId: number): void {
+    const members = this.db.prepare("SELECT user_id FROM chat_members WHERE chat_id = ?").all(chatId) as Array<{ user_id: number }>;
+    const banned = this.db.prepare("SELECT user_id FROM chat_bans WHERE chat_id = ?").all(chatId) as Array<{ user_id: number }>;
+    const seen = new Set<number>();
+    for (const row of [...members, ...banned]) {
+      if (seen.has(row.user_id)) continue;
+      seen.add(row.user_id);
+      this.expireMembership(chatId, row.user_id);
+    }
+    this.expireMembership(chatId, 0);
+  }
+
+  private defaultPermissions(chatId: number): ChatPermissions {
+    this.expireMembership(chatId, 0);
+    const row = this.db.prepare("SELECT permissions_json FROM chats WHERE id = ?").get(chatId) as { permissions_json: string | null } | undefined;
+    return parseChatPermissions(row?.permissions_json ? JSON.parse(row.permissions_json) : undefined);
+  }
+
+  private resolvePersonRef(ref: number | string): PersonRow {
+    if (typeof ref === "number" || /^-?\d+$/.test(String(ref))) {
+      const id = typeof ref === "number" ? ref : Number(ref);
+      const bot = this.db.prepare("SELECT id, first_name, username, 1 AS is_bot FROM bots WHERE id = ?").get(id) as PersonRow | undefined;
+      if (bot) return bot;
+      const user = this.db.prepare("SELECT id, first_name, username, 0 AS is_bot FROM users WHERE id = ?").get(id) as PersonRow | undefined;
+      if (!user) telegramFail(400, 400, "Bad Request: user not found");
+      return user;
+    }
+    const name = String(ref).replace(/^@/, "");
+    const user = this.db
+      .prepare("SELECT id, first_name, username, 0 AS is_bot FROM users WHERE username = ? OR account = ?")
+      .get(name, name) as PersonRow | undefined;
+    if (user) return user;
+    const bot = this.db.prepare("SELECT id, first_name, username, 1 AS is_bot FROM bots WHERE username = ?").get(name) as PersonRow | undefined;
+    if (!bot) telegramFail(400, 400, "Bad Request: user not found");
+    return bot;
+  }
+
+  private membershipSnapshot(actor: Actor, chatId: number): MembershipSnapshot {
+    const person = this.personFor(actor);
+    return this.targetMember(chatId, person.id);
+  }
+
+  private targetMember(chatId: number, ref: number | string): MembershipSnapshot {
+    this.chat(chatId);
+    const person = this.resolvePersonRef(ref);
+    this.expireMembership(chatId, person.id);
+    const row = this.db.prepare("SELECT * FROM chat_members WHERE chat_id = ? AND user_id = ?").get(chatId, person.id) as MemberRecord | undefined;
+    const banned = this.banRow(chatId, person.id);
+    if (banned) {
+      return {
+        person,
+        status: "kicked",
+        rights: null,
+        permissions: DEFAULT_CHAT_PERMISSIONS,
+        untilDate: banned.until_date,
+        customTitle: null,
+        isAnonymous: false,
+        isMember: false,
+      };
+    }
+    if (!row) {
+      return {
+        person,
+        status: "left",
+        rights: null,
+        permissions: DEFAULT_CHAT_PERMISSIONS,
+        untilDate: 0,
+        customTitle: null,
+        isAnonymous: false,
+        isMember: false,
+      };
+    }
+    const status = this.memberStatus(row);
+    const rights = status === "creator"
+      ? FULL_ADMIN_RIGHTS
+      : status === "administrator" && row.admin_rights_json
+        ? parseAdminRights(JSON.parse(row.admin_rights_json))
+        : null;
+    const restrictions = row.restrictions_json ? parseChatPermissions(JSON.parse(row.restrictions_json)) : null;
+    return {
+      person,
+      status,
+      rights,
+      permissions: effectivePermissions({ status, restrictions, defaults: this.defaultPermissions(chatId) }),
+      untilDate: row.until_date,
+      customTitle: row.custom_title,
+      isAnonymous: row.is_anonymous === 1,
+      isMember: true,
+    };
+  }
+
+  private presentMember(snapshot: MembershipSnapshot): Record<string, unknown> {
+    return serializeChatMember({
+      status: snapshot.status,
+      user: this.asUser(snapshot.person),
+      isAnonymous: snapshot.isAnonymous,
+      customTitle: snapshot.customTitle,
+      rights: snapshot.rights,
+      permissions: snapshot.permissions,
+      untilDate: snapshot.untilDate,
+      isMember: snapshot.isMember,
+    });
+  }
+
+  private listAdministrators(chatId: number): Record<string, unknown>[] {
+    return this.memberRows(chatId)
+      .filter((row) => row.status === "creator" || row.status === "administrator")
+      .map((row) => this.presentMember(this.targetMember(chatId, row.user_id)));
+  }
+
+  private requirePermission(
+    actor: Actor,
+    chatId: number,
+    permission: keyof ChatPermissions,
+    adminRight: keyof AdminRights,
+  ): MembershipSnapshot {
+    this.requireGroup(chatId);
+    const snapshot = this.membershipSnapshot(actor, chatId);
+    if (!snapshot.isMember) telegramFail(400, 400, "Bad Request: chat not found");
+    if (snapshot.status === "creator") return snapshot;
+    if (snapshot.status === "administrator" && snapshot.rights?.[adminRight]) return snapshot;
+    if ((snapshot.status === "member" || snapshot.status === "restricted") && snapshot.permissions[permission]) return snapshot;
+    telegramFail(400, 400, "Bad Request: not enough rights");
+  }
+
+  private requireAdminRight(actor: Actor, chatId: number, right: keyof AdminRights): MembershipSnapshot {
+    this.requireGroup(chatId);
+    const snapshot = this.membershipSnapshot(actor, chatId);
+    if (!snapshot.isMember) telegramFail(400, 400, "Bad Request: chat not found");
+    if (snapshot.status === "creator") return snapshot;
+    if (snapshot.status === "administrator" && snapshot.rights?.[right]) return snapshot;
+    telegramFail(400, 400, "Bad Request: not enough rights");
+  }
+
+  private assertModerationTarget(actor: MembershipSnapshot, target: MembershipSnapshot, action: "ban" | "remove" | "restrict"): void {
+    if (target.person.id === actor.person.id) telegramFail(400, 400, `Bad Request: can't ${action} self`);
+    if (target.status === "creator") telegramFail(400, 400, `Bad Request: can't ${action} the chat creator`);
+    if (target.status === "administrator" && actor.status !== "creator") {
+      telegramFail(400, 400, `Bad Request: can't ${action} another administrator`);
+    }
+  }
+
+  private assertCanSend(
+    actor: Actor,
+    chatId: number,
+    kind: "messages" | "photos" | "documents" | "videos" | "audios" | "voice_notes" | "other_messages" | "polls",
+  ): void {
+    const chat = this.chat(chatId);
+    if (chat.type === "private") return;
+    const snapshot = this.membershipSnapshot(actor, chatId);
+    if (snapshot.status === "creator" || snapshot.status === "administrator") return;
+    const permission = kind === "messages"
+      ? snapshot.permissions.can_send_messages
+      : kind === "photos"
+        ? snapshot.permissions.can_send_photos
+        : kind === "documents"
+          ? snapshot.permissions.can_send_documents
+          : kind === "videos"
+            ? snapshot.permissions.can_send_videos
+            : kind === "audios"
+              ? snapshot.permissions.can_send_audios
+              : kind === "voice_notes"
+                ? snapshot.permissions.can_send_voice_notes
+                : kind === "polls"
+                  ? snapshot.permissions.can_send_polls
+                  : snapshot.permissions.can_send_other_messages;
+    if (!permission) telegramFail(400, 400, "Bad Request: not enough rights to send");
+    const delay = chat.slow_mode_seconds ?? 0;
+    if (delay > 0 && kind === "messages") {
+      const last = this.db.prepare("SELECT MAX(date) AS date FROM messages WHERE chat_id = ? AND from_id = ?").get(chatId, snapshot.person.id) as { date: number | null };
+      if (last.date !== null && this.now() < last.date + delay) telegramFail(400, 400, "Bad Request: slow mode is active");
+    }
+  }
+
+  private canSeeAdminAction(snapshot: MembershipSnapshot, _action: string): boolean {
+    return snapshot.status === "creator" || snapshot.status === "administrator";
+  }
 }
+
+type MemberRecord = {
+  chat_id: number;
+  user_id: number;
+  status: string;
+  admin_rights_json: string | null;
+  restrictions_json: string | null;
+  until_date: number;
+  custom_title: string | null;
+  is_anonymous: number;
+};
+
+type MembershipSnapshot = {
+  person: PersonRow;
+  status: MemberStatus;
+  rights: AdminRights | null;
+  permissions: ChatPermissions;
+  untilDate: number;
+  customTitle: string | null;
+  isAnonymous: boolean;
+  isMember: boolean;
+};

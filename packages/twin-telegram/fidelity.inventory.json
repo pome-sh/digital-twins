@@ -1,8 +1,8 @@
 {
   "twin": "telegram",
   "package": "@pome-sh/twin-telegram",
-  "updated": "2026-09-23",
-  "notes": "T08 media over the existing HTTP SQLite store. MCP subtracts from the approved chigwell/telegram-mcp source-registration capture and now projects account, pin, regular-poll, standard-emoji-reaction, inline-callback, and the six media source rows. Album, host-upload, GIF, and photo-browser rows stay dropped. The source has no reply-keyboard or callback-answer/wait row, so those remain HTTP-only.",
+  "updated": "2026-09-24",
+  "notes": "T09 membership and moderation over the existing HTTP SQLite store. MCP subtracts from the approved chigwell/telegram-mcp source-registration capture and now projects the previous 18 rows plus 19 membership/moderation source rows. Bot API setChatPhoto/deleteChatPhoto stay unimplemented. Album, host-upload, GIF, photo-browser, channel, and invite-link rows stay dropped.",
   "tools": [
     {"name": "list_accounts", "heat": "hot", "fidelity": "bounded", "justification": "Source-schema projection of seeded account labels and first-name profiles; unavailable phone and status values use the source fallbacks N/A and unknown."},
     {"name": "get_me", "heat": "hot", "fidelity": "semantic", "justification": "Source-schema projection of the signed-in seeded user."},
@@ -12,7 +12,12 @@
     {"name": "list_inline_buttons/press_inline_button", "heat": "hot", "fidelity": "bounded", "justification": "Observes and presses HTTP-created callback-data inline buttons, with persisted deterministic callback expiry/reset behavior."},
     {"name": "get_media_info/download_media", "heat": "hot", "fidelity": "bounded", "justification": "Chat-member download of visible message bytes from the existing SQLite store; destination host paths are refused and bytes return in the source string envelope. The tape stores download digests, not bytes."},
     {"name": "send_file/send_voice", "heat": "hot", "fidelity": "bounded", "justification": "User sends from the in-memory fixture catalog or an owned opaque file_id into the shared conversation store; URLs, host paths, and file_unique_id are refused."},
-    {"name": "send_sticker/get_sticker_sets", "heat": "hot", "fidelity": "bounded", "justification": "Fixture sticker catalog only; unknown sticker paths are refused. HTTP sendSticker remains outside the Bot API subset."}
+    {"name": "send_sticker/get_sticker_sets", "heat": "hot", "fidelity": "bounded", "justification": "Fixture sticker catalog only; unknown sticker paths are refused. HTTP sendSticker remains outside the Bot API subset."},
+    {"name": "create_group/invite_to_group/leave_chat/get_participants", "heat": "hot", "fidelity": "bounded", "justification": "Session-bound group create, invite, leave, and paginated participant reads over persisted membership."},
+    {"name": "edit_chat_title/edit_chat_about/edit_chat_photo/delete_chat_photo", "heat": "hot", "fidelity": "bounded", "justification": "Title, about, and fixture-catalog or owned file_id chat photos. HTTP setChatPhoto/deleteChatPhoto stay unimplemented."},
+    {"name": "promote_admin/demote_admin/edit_admin_rights/get_admins", "heat": "hot", "fidelity": "bounded", "justification": "Admin rights are distinct from member restrictions; an actor cannot grant a right they lack."},
+    {"name": "ban_user/unban_user/remove_user/get_banned_users", "heat": "hot", "fidelity": "bounded", "justification": "Ban, unban, and remove are different transitions."},
+    {"name": "set_default_chat_permissions/toggle_slow_mode/get_recent_actions", "heat": "hot", "fidelity": "bounded", "justification": "Default permissions and slow mode use the injected clock; the admin log is permission-filtered."}
   ],
   "http": [
     {"name": "getMe", "heat": "hot", "fidelity": "semantic", "justification": "Bot identity."},
@@ -39,6 +44,9 @@
     {"name": "sendMediaGroup", "heat": "hot", "fidelity": "bounded", "justification": "Atomic 2-10 item album subset."},
     {"name": "editMessageCaption", "heat": "hot", "fidelity": "bounded", "justification": "Author-only UTF-16 bounded media captions."},
     {"name": "getFile/file download", "heat": "hot", "fidelity": "bounded", "justification": "Opaque expiring bot-scoped byte handles."},
-    {"name": "sendChatAction", "heat": "warm", "fidelity": "bounded", "justification": "Membership and action validation only."}
+    {"name": "sendChatAction", "heat": "warm", "fidelity": "bounded", "justification": "Membership and action validation only."},
+    {"name": "getChatAdministrators/getChatMemberCount/getChatMember", "heat": "hot", "fidelity": "bounded", "justification": "Creator, administrator, member, restricted, left, and kicked are distinct."},
+    {"name": "setChatTitle/setChatDescription/setChatPermissions", "heat": "hot", "fidelity": "bounded", "justification": "Default chat permissions are not per-member restrictions. HTTP setChatPhoto/deleteChatPhoto stay unimplemented."},
+    {"name": "banChatMember/unbanChatMember/restrictChatMember/promoteChatMember/leaveChat", "heat": "hot", "fidelity": "bounded", "justification": "Ban, unban, leave, invite, and remove remain different transitions. An actor cannot grant rights they lack."}
   ]
 }

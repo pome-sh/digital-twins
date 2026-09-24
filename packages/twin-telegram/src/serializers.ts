@@ -23,6 +23,12 @@ export type ChatRow = {
   id: number;
   type: string;
   title: string | null;
+  description?: string | null;
+  photo_file_id?: string | null;
+  permissions_json?: string | null;
+  permissions_until?: number | null;
+  slow_mode_seconds?: number | null;
+  creator_id?: number | null;
 };
 
 export type MessageRow = {
@@ -48,11 +54,14 @@ export function serializeUser(row: UserRow): Record<string, unknown> {
   };
 }
 
-export function serializeChat(row: ChatRow): Record<string, unknown> {
+export function serializeChat(row: ChatRow, extras: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: row.id,
     type: row.type,
     ...(row.title ? { title: row.title } : {}),
+    ...(row.description ? { description: row.description } : {}),
+    ...(row.slow_mode_seconds ? { slow_mode_delay: row.slow_mode_seconds } : {}),
+    ...extras,
   };
 }
 

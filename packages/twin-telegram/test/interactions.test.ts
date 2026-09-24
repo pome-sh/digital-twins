@@ -73,8 +73,9 @@ describe("interaction state", () => {
     domain.pinChatMessage({ kind: "user", account: "alice" }, { chat_id: 2001, message_id: alice.message_id as number });
     expect(domain.getPinnedMessages("alice", { chat_id: 2001 })).toHaveLength(1);
     domain.sendMessage({ kind: "user", account: "bob" }, { chat_id: GROUP, text: "bob" });
-    expect(() => domain.pinChatMessage({ kind: "user", account: "alice" }, { chat_id: GROUP, message_id: 1 })).toThrow(/rights/);
-    domain.pinChatMessage(BOT, { chat_id: GROUP, message_id: 1 });
+    expect(() => domain.pinChatMessage({ kind: "user", account: "bob" }, { chat_id: GROUP, message_id: 1 })).toThrow(/rights/);
+    expect(() => domain.pinChatMessage(BOT, { chat_id: GROUP, message_id: 1 })).toThrow(/rights/);
+    domain.pinChatMessage({ kind: "user", account: "alice" }, { chat_id: GROUP, message_id: 1 });
     expect(domain.getPinnedMessages("alice", { chat_id: GROUP })).toHaveLength(1);
     expect(domain.getPinnedMessages("alice", { chat_id: 2001 })).toHaveLength(1);
   });

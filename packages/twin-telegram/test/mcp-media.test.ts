@@ -233,7 +233,7 @@ describe("Telegram MCP media projection", () => {
     })).result.isError).toBe(true);
   });
 
-  it("lists the previous twelve tools plus the six media source rows", async () => {
+  it("lists the previous media projection plus the membership source rows", async () => {
     const app = createTelegramTwinApp({ seed: defaultSeedState() });
     const response = await app.request(`/s/${sid}/mcp`, {
       method: "POST",
@@ -261,6 +261,25 @@ describe("Telegram MCP media projection", () => {
       "send_voice",
       "send_sticker",
       "get_sticker_sets",
+      "create_group",
+      "invite_to_group",
+      "leave_chat",
+      "get_participants",
+      "edit_chat_title",
+      "edit_chat_about",
+      "edit_chat_photo",
+      "delete_chat_photo",
+      "promote_admin",
+      "demote_admin",
+      "ban_user",
+      "unban_user",
+      "remove_user",
+      "set_default_chat_permissions",
+      "toggle_slow_mode",
+      "edit_admin_rights",
+      "get_admins",
+      "get_banned_users",
+      "get_recent_actions",
     ]);
   });
 });
