@@ -166,6 +166,20 @@ describe("Telegram membership domain", () => {
     expect(domain.sendMessage(BOB, { chat_id: GROUP, text: "restored" }).text).toBe("restored");
   });
 
+  it("does not change an administrator when restrictChatMember is a full allow", () => {
+    const { domain } = fresh();
+    domain.promoteChatMember(ALICE, { chat_id: GROUP, user_id: 2002, rights: { can_invite_users: true } });
+    expect(domain.getChatMember(ALICE, { chat_id: GROUP, user_id: 2002 })).toMatchObject({
+      status: "administrator",
+      can_invite_users: true,
+    });
+    domain.restrictChatMember(ALICE, { chat_id: GROUP, user_id: 2002, permissions: FULL_CHAT_PERMISSIONS });
+    expect(domain.getChatMember(ALICE, { chat_id: GROUP, user_id: 2002 })).toMatchObject({
+      status: "administrator",
+      can_invite_users: true,
+    });
+  });
+
   it("rejects non-photo chat catalog files and keeps photo.webp bytes distinct from stickers", () => {
     expect(() => resolveChatPhoto("pome_lab/wave.webp")).toThrow(/photo/);
     expect(() => resolveChatPhoto("sample.txt")).toThrow(/photo/);

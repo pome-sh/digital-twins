@@ -1531,11 +1531,18 @@ export class TelegramDomain {
     const permissions = requireChatPermissions(args.permissions);
     const until = parseUntilDate(args.until_date, this.now());
     if (allPermissionsAllowed(permissions)) {
-      this.db.prepare(
-        "UPDATE chat_members SET status = 'member', admin_rights_json = NULL, restrictions_json = NULL, until_date = 0 WHERE chat_id = ? AND user_id = ?",
-      ).run(args.chat_id, target.person.id);
+      // Full-allow is a restriction lift, not a demotion. Only a restricted row
+      // becomes a member; administrator/creator rights stay put.
+      if (target.status === "restricted") {
+        this.db.prepare(
+          "UPDATE chat_members SET status = 'member', restrictions_json = NULL, until_date = 0 WHERE chat_id = ? AND user_id = ?",
+        ).run(args.chat_id, target.person.id);
+      }
       this.recordAdminLog(args.chat_id, actorSnap.person.id, "restrict", target.person.id, { permissions, until_date: until });
-      delta({ before: { status: target.status }, after: { status: "member", permissions, until_date: until } });
+      delta({
+        before: { status: target.status },
+        after: { status: target.status === "restricted" ? "member" : target.status, permissions, until_date: until },
+      });
       return { ok: true };
     }
     this.db.prepare(
