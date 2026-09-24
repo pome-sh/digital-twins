@@ -1135,16 +1135,23 @@ export class TelegramDomain {
     const owned = this.db.prepare("SELECT * FROM media_files WHERE file_id = ? AND bot_id = ? AND scope_id = ?").get(fileId, botId, scopeId) as MediaFileRow | undefined;
     if (owned) return owned;
     const row = this.db.prepare("SELECT * FROM media_files WHERE file_id = ?").get(fileId) as MediaFileRow | undefined;
-    // A different session of the same bot keeps owner-scope isolation for files it stored.
-    if (!row || (row.bot_id === botId && row.scope_id !== scopeId)) return undefined;
-    if (!this.botSeesFileInMemberChat(botId, fileId)) return undefined;
+    // After the actor's own scope misses, only a member chat that references the file_id grants access.
+    if (!row || !this.botSeesFileInMemberChat(botId, fileId)) return undefined;
     return row;
   }
 
   private botSeesFileInMemberChat(botId: number, fileId: string): boolean {
     return Boolean(
       this.db.prepare(
-        `SELECT 1 AS ok FROM messages m JOIN chat_members cm ON cm.chat_id = m.chat_id WHERE cm.user_id = ? AND instr(m.media_json, '"file_id":"' || ? || '"') > 0`,
+        `SELECT 1 AS ok FROM messages m JOIN chat_members cm ON cm.chat_id = m.chat_id
+         WHERE cm.user_id = ? AND ? IN (
+           json_extract(m.media_json, '$.document.file_id'),
+           json_extract(m.media_json, '$.voice.file_id'),
+           json_extract(m.media_json, '$.sticker.file_id'),
+           json_extract(m.media_json, '$.video.file_id'),
+           json_extract(m.media_json, '$.audio.file_id'),
+           json_extract(m.media_json, '$.photo[0].file_id')
+         )`,
       ).get(botId, fileId),
     );
   }
