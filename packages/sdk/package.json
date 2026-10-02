@@ -62,7 +62,7 @@
   },
   "dependencies": {
     "@pome-sh/wire": "*",
-    "hono": "^4.13.8",
+    "hono": "^4.13.12",
     "zod": "^4.6.5"
   },
   "peerDependencies": {
@@ -75,8 +75,8 @@
   },
   "devDependencies": {
     "@hono/node-server": "^2.1.1",
-    "@types/node": "^26.6.1",
-    "tsx": "^4.23.13",
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^5.0.1"
   },
