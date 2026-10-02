@@ -4,6 +4,8 @@
 
 **No consumer-visible change.** Telegram's seed parser grew optional message dates and uniqueness checks. This package re-exports twin seed leaves; no check id or template moved.
 
+**No consumer-visible change.** Telegram's seed parser now refuses a username on a private or basic group chat and a numeric-only chat username. This package re-exports twin seed leaves; no check id or template moved.
+
 ## 0.4.4 — 2026-09-19
 
 **No consumer-visible change.** Source comments record why the check grammar is authored in `@pome-sh/sdk` and re-exported here (F-1589). Twins write declarations against that grammar; this package sits above the twins. No export, check id or template moved.

@@ -4,6 +4,8 @@
 
 **No consumer-visible change.** The standalone Telegram twin is not mounted. Source under `packages/twin-telegram/` moved; this package does not export a Telegram domain yet.
 
+**No consumer-visible change.** Telegram's seed parser now refuses a username on a private or basic group chat and a numeric-only chat username. This package does not export a Telegram domain yet.
+
 ## 0.4.2 — 2026-09-19
 
 **No consumer-visible change.** Comment-only headers on the bundled `@pome-sh/sdk/checks` grammar (F-1589). No export or behaviour change.

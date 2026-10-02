@@ -31,6 +31,7 @@ const sendBody = {
   chat_id: z.coerce.number().int(),
   text: z.string(),
   reply_to_message_id: z.coerce.number().int().optional(),
+  message_thread_id: z.coerce.number().int().optional(),
   reply_markup: jsonValue.optional(),
 };
 
@@ -117,27 +118,27 @@ export const POST_EDIT_MESSAGE_CAPTION = declareInputs({
 
 export const POST_SEND_PHOTO = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendPhoto", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), photo: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+  body: { chat_id: z.coerce.number().int(), photo: mediaValue, caption: z.string().optional(), message_thread_id: z.coerce.number().int().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_DOCUMENT = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendDocument", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), document: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+  body: { chat_id: z.coerce.number().int(), document: mediaValue, caption: z.string().optional(), message_thread_id: z.coerce.number().int().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_VIDEO = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendVideo", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), video: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+  body: { chat_id: z.coerce.number().int(), video: mediaValue, caption: z.string().optional(), message_thread_id: z.coerce.number().int().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_AUDIO = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendAudio", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), audio: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+  body: { chat_id: z.coerce.number().int(), audio: mediaValue, caption: z.string().optional(), message_thread_id: z.coerce.number().int().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_VOICE = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendVoice", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), voice: mediaValue, caption: z.string().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
+  body: { chat_id: z.coerce.number().int(), voice: mediaValue, caption: z.string().optional(), message_thread_id: z.coerce.number().int().optional() }, bodyEncoding: "form", maxBodyBytes: MAX_MEDIA_MULTIPART_REQUEST_BYTES,
 });
 export const POST_SEND_MEDIA_GROUP = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/sendMediaGroup", pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), media: mediaGroup },
+  body: { chat_id: z.coerce.number().int(), media: mediaGroup, message_thread_id: z.coerce.number().int().optional() },
   bodyEncoding: "form",
   maxBodyBytes: MAX_MEDIA_GROUP_MULTIPART_REQUEST_BYTES,
   multipartAttachmentsFrom: "media",
@@ -199,7 +200,7 @@ export const POST_SEND_POLL = declareInputs({
   method: "POST",
   path: "/:cred{bot[^/]+}/sendPoll",
   pathParams: credParam,
-  body: { chat_id: z.coerce.number().int(), question: z.string().min(1).max(MAX_POLL_QUESTION_LENGTH), options: z.preprocess((value) => { if (typeof value !== "string") return value; try { return JSON.parse(value); } catch { return value; } }, z.array(z.string().min(1).max(MAX_POLL_OPTION_LENGTH)).min(MIN_POLL_OPTIONS).max(MAX_POLL_OPTIONS)), is_anonymous: formBoolean.optional(), allows_multiple_answers: formBoolean.optional(), allow_paid_broadcast: z.never().optional(), business_connection_id: z.never().optional(), message_effect_id: z.never().optional(), type: z.never().optional(), correct_option_id: z.never().optional(), explanation: z.never().optional() },
+  body: { chat_id: z.coerce.number().int(), question: z.string().min(1).max(MAX_POLL_QUESTION_LENGTH), options: z.preprocess((value) => { if (typeof value !== "string") return value; try { return JSON.parse(value); } catch { return value; } }, z.array(z.string().min(1).max(MAX_POLL_OPTION_LENGTH)).min(MIN_POLL_OPTIONS).max(MAX_POLL_OPTIONS)), is_anonymous: formBoolean.optional(), allows_multiple_answers: formBoolean.optional(), message_thread_id: z.coerce.number().int().optional(), allow_paid_broadcast: z.never().optional(), business_connection_id: z.never().optional(), message_effect_id: z.never().optional(), type: z.never().optional(), correct_option_id: z.never().optional(), explanation: z.never().optional() },
   bodyEncoding: "form",
 });
 
@@ -386,6 +387,60 @@ export const POST_PROMOTE_CHAT_MEMBER = declareInputs({
 export const POST_LEAVE_CHAT = declareInputs({
   method: "POST", path: "/:cred{bot[^/]+}/leaveChat", pathParams: credParam, body: chatIdBody, bodyEncoding: "form",
 });
+const inviteLinkBody = {
+  chat_id: z.coerce.number().int(),
+  name: z.string().optional(),
+  expire_date: z.coerce.number().int().optional(),
+  member_limit: z.coerce.number().int().optional(),
+  creates_join_request: formBoolean.optional(),
+};
+export const POST_CREATE_CHAT_INVITE_LINK = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/createChatInviteLink", pathParams: credParam,
+  body: inviteLinkBody, bodyEncoding: "form",
+});
+export const POST_EDIT_CHAT_INVITE_LINK = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/editChatInviteLink", pathParams: credParam,
+  body: { ...inviteLinkBody, invite_link: z.string().min(1) }, bodyEncoding: "form",
+});
+export const POST_REVOKE_CHAT_INVITE_LINK = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/revokeChatInviteLink", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), invite_link: z.string().min(1) }, bodyEncoding: "form",
+});
+export const POST_APPROVE_CHAT_JOIN_REQUEST = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/approveChatJoinRequest", pathParams: credParam,
+  body: userIdBody, bodyEncoding: "form",
+});
+export const POST_DECLINE_CHAT_JOIN_REQUEST = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/declineChatJoinRequest", pathParams: credParam,
+  body: userIdBody, bodyEncoding: "form",
+});
+const topicBody = {
+  chat_id: z.coerce.number().int(),
+  name: z.string(),
+  icon_color: z.coerce.number().int().optional(),
+  icon_custom_emoji_id: z.string().optional(),
+};
+export const POST_CREATE_FORUM_TOPIC = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/createForumTopic", pathParams: credParam,
+  body: topicBody, bodyEncoding: "form",
+});
+export const POST_EDIT_FORUM_TOPIC = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/editForumTopic", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), message_thread_id: z.coerce.number().int(), name: z.string().optional(), icon_custom_emoji_id: z.string().optional() },
+  bodyEncoding: "form",
+});
+export const POST_CLOSE_FORUM_TOPIC = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/closeForumTopic", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), message_thread_id: z.coerce.number().int() }, bodyEncoding: "form",
+});
+export const POST_REOPEN_FORUM_TOPIC = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/reopenForumTopic", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), message_thread_id: z.coerce.number().int() }, bodyEncoding: "form",
+});
+export const POST_DELETE_FORUM_TOPIC = declareInputs({
+  method: "POST", path: "/:cred{bot[^/]+}/deleteForumTopic", pathParams: credParam,
+  body: { chat_id: z.coerce.number().int(), message_thread_id: z.coerce.number().int() }, bodyEncoding: "form",
+});
 
 /** Every Bot API surface mounted by routes.ts. Telegram is not yet in the global artifact lane. */
 export const TELEGRAM_ROUTE_INPUTS: readonly RouteInputDeclaration[] = [
@@ -437,4 +492,14 @@ export const TELEGRAM_ROUTE_INPUTS: readonly RouteInputDeclaration[] = [
   POST_RESTRICT_CHAT_MEMBER,
   POST_PROMOTE_CHAT_MEMBER,
   POST_LEAVE_CHAT,
+  POST_CREATE_CHAT_INVITE_LINK,
+  POST_EDIT_CHAT_INVITE_LINK,
+  POST_REVOKE_CHAT_INVITE_LINK,
+  POST_APPROVE_CHAT_JOIN_REQUEST,
+  POST_DECLINE_CHAT_JOIN_REQUEST,
+  POST_CREATE_FORUM_TOPIC,
+  POST_EDIT_FORUM_TOPIC,
+  POST_CLOSE_FORUM_TOPIC,
+  POST_REOPEN_FORUM_TOPIC,
+  POST_DELETE_FORUM_TOPIC,
 ];

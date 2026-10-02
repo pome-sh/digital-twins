@@ -2,7 +2,7 @@
   "twin": "telegram",
   "package": "@pome-sh/twin-telegram",
   "updated": "2026-09-24",
-  "notes": "T09 membership and moderation over the existing HTTP SQLite store. MCP subtracts from the approved chigwell/telegram-mcp source-registration capture and now projects the previous 18 rows plus 19 membership/moderation source rows. Bot API setChatPhoto/deleteChatPhoto stay unimplemented. Album, host-upload, GIF, photo-browser, channel, and invite-link rows stay dropped.",
+  "notes": "T10 invites, channels, and forum topics over the existing HTTP SQLite store. MCP subtracts from the approved chigwell/telegram-mcp source-registration capture and now projects the previous 37 rows plus 10 invite/channel/forum source rows. Bot API setChatPhoto/deleteChatPhoto stay unimplemented. Album, host-upload, GIF, and photo-browser rows stay dropped.",
   "tools": [
     {"name": "list_accounts", "heat": "hot", "fidelity": "bounded", "justification": "Source-schema projection of seeded account labels and first-name profiles; unavailable phone and status values use the source fallbacks N/A and unknown."},
     {"name": "get_me", "heat": "hot", "fidelity": "semantic", "justification": "Source-schema projection of the signed-in seeded user."},
@@ -17,7 +17,10 @@
     {"name": "edit_chat_title/edit_chat_about/edit_chat_photo/delete_chat_photo", "heat": "hot", "fidelity": "bounded", "justification": "Title, about, and fixture-catalog or owned file_id chat photos. HTTP setChatPhoto/deleteChatPhoto stay unimplemented."},
     {"name": "promote_admin/demote_admin/edit_admin_rights/get_admins", "heat": "hot", "fidelity": "bounded", "justification": "Admin rights are distinct from member restrictions; an actor cannot grant a right they lack."},
     {"name": "ban_user/unban_user/remove_user/get_banned_users", "heat": "hot", "fidelity": "bounded", "justification": "Ban, unban, and remove are different transitions."},
-    {"name": "set_default_chat_permissions/toggle_slow_mode/get_recent_actions", "heat": "hot", "fidelity": "bounded", "justification": "Default permissions and slow mode use the injected clock; the admin log is permission-filtered."}
+    {"name": "set_default_chat_permissions/toggle_slow_mode/get_recent_actions", "heat": "hot", "fidelity": "bounded", "justification": "Default permissions and slow mode use the injected clock; the admin log is permission-filtered."},
+    {"name": "create_channel/subscribe_public_channel/search_public_chats", "heat": "hot", "fidelity": "bounded", "justification": "Public search is the seeded catalog only. Channel posts need creator status or can_post_messages."},
+    {"name": "get_invite_link/export_chat_invite/import_chat_invite/join_chat_by_link", "heat": "hot", "fidelity": "bounded", "justification": "Invite tokens bind to chat and creator with expiry, use limit, and approval. External links are refused."},
+    {"name": "list_topics/enable_forum_topics/create_forum_topic", "heat": "hot", "fidelity": "bounded", "justification": "Forum topics on a supergroup. Close is not delete; thread associations remain."}
   ],
   "http": [
     {"name": "getMe", "heat": "hot", "fidelity": "semantic", "justification": "Bot identity."},
@@ -47,6 +50,9 @@
     {"name": "sendChatAction", "heat": "warm", "fidelity": "bounded", "justification": "Membership and action validation only."},
     {"name": "getChatAdministrators/getChatMemberCount/getChatMember", "heat": "hot", "fidelity": "bounded", "justification": "Creator, administrator, member, restricted, left, and kicked are distinct."},
     {"name": "setChatTitle/setChatDescription/setChatPermissions", "heat": "hot", "fidelity": "bounded", "justification": "Default chat permissions are not per-member restrictions. use_independent_chat_permissions must be omitted or true. HTTP setChatPhoto/deleteChatPhoto stay unimplemented."},
-    {"name": "banChatMember/unbanChatMember/restrictChatMember/promoteChatMember/leaveChat", "heat": "hot", "fidelity": "bounded", "justification": "Ban, unban, leave, invite, and remove remain different transitions. An actor cannot grant rights they lack. Supplied promote rights start from zero."}
+    {"name": "banChatMember/unbanChatMember/restrictChatMember/promoteChatMember/leaveChat", "heat": "hot", "fidelity": "bounded", "justification": "Ban, unban, leave, invite, and remove remain different transitions. An actor cannot grant rights they lack. Supplied promote rights start from zero."},
+    {"name": "createChatInviteLink/editChatInviteLink/revokeChatInviteLink", "heat": "hot", "fidelity": "bounded", "justification": "Tokens bind to chat and creator. Expiry uses the injected clock. Use limit and join-request cannot both be set."},
+    {"name": "approveChatJoinRequest/declineChatJoinRequest", "heat": "hot", "fidelity": "bounded", "justification": "A pending request is not membership."},
+    {"name": "createForumTopic/editForumTopic/closeForumTopic/reopenForumTopic/deleteForumTopic", "heat": "hot", "fidelity": "bounded", "justification": "Close is not delete. Messages keep their thread id after close or delete."}
   ]
 }

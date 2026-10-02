@@ -280,6 +280,16 @@ describe("Telegram MCP media projection", () => {
       "get_admins",
       "get_banned_users",
       "get_recent_actions",
+      "subscribe_public_channel",
+      "list_topics",
+      "enable_forum_topics",
+      "create_forum_topic",
+      "search_public_chats",
+      "create_channel",
+      "get_invite_link",
+      "join_chat_by_link",
+      "export_chat_invite",
+      "import_chat_invite",
     ]);
   });
 });
