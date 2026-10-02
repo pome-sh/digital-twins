@@ -264,7 +264,7 @@ describe("Telegram invites, channels, and forum topics", () => {
     expect(domain.approveChatJoinRequest(ALICE, { chat_id: GROUP, user_id: 2002 })).toEqual({ ok: true });
   });
 
-  it("still refuses a missing invite, a ban, and already-members on approve", () => {
+  it("refuses a missing invite, a ban, and a request cleared by admission", () => {
     const { db, domain } = fresh();
     domain.removeUser(ALICE, { chat_id: GROUP, user_id: 2002 });
 
@@ -284,15 +284,119 @@ describe("Telegram invites, channels, and forum topics", () => {
     const already = domain.createChatInviteLink(ALICE, { chat_id: GROUP, creates_join_request: true });
     domain.joinChatByLink("bob", { link: already.invite_link as string });
     domain.inviteToGroup("alice", { group_id: GROUP, user_ids: [2002] });
-    expect(domain.approveChatJoinRequest(ALICE, { chat_id: GROUP, user_id: 2002 })).toEqual({ ok: true });
+    expect(() => domain.approveChatJoinRequest(ALICE, { chat_id: GROUP, user_id: 2002 })).toThrow(/join request not found/);
     expect(domain.getChatMember(ALICE, { chat_id: GROUP, user_id: 2002 })).toMatchObject({ status: "member" });
   });
 
-  it("refuses a wildcard-only public chat search", () => {
+  it("searches underscores, percent signs, and backslashes literally", () => {
+    const seed = publicSeed();
+    seed.chats.push({ id: -1003000000003, type: "channel", title: "100% News \\ Archive", username: "my_channel", members: [2001] });
+    const { domain } = fresh(undefined, seed);
+    expect(domain.searchPublicChats("bob", { query: " MY_CHANNEL " })).toMatchObject([{ username: "my_channel" }]);
+    expect(domain.searchPublicChats("bob", { query: "_" })).toMatchObject([{ username: "my_channel" }]);
+    expect(domain.searchPublicChats("bob", { query: "%" })).toMatchObject([{ username: "my_channel" }]);
+    expect(domain.searchPublicChats("bob", { query: "\\" })).toMatchObject([{ username: "my_channel" }]);
+    expect(domain.searchPublicChats("bob", { query: "%_" })).toEqual([]);
+    expect(() => domain.searchPublicChats("bob", { query: "  " })).toThrow(/empty/);
+  });
+
+  it("issues independent invite secrets across identical state and reset", () => {
     const { domain } = fresh();
-    expect(() => domain.searchPublicChats("bob", { query: "%" })).toThrow(/empty/);
-    expect(() => domain.searchPublicChats("bob", { query: "_" })).toThrow(/empty/);
-    expect(() => domain.searchPublicChats("bob", { query: " %_ " })).toThrow(/empty/);
+    domain.removeUser(ALICE, { chat_id: GROUP, user_id: 2002 });
+    const link = domain.exportChatInvite("alice", { chat_id: GROUP });
+    expect(link).toMatch(/^https:\/\/t\.me\/\+[A-Za-z0-9_-]{32}$/);
+    const other = fresh().domain.exportChatInvite("alice", { chat_id: GROUP });
+    expect(other).not.toBe(link);
+    domain.seed(publicSeed());
+    domain.removeUser(ALICE, { chat_id: GROUP, user_id: 2002 });
+    const replacement = domain.exportChatInvite("alice", { chat_id: GROUP });
+    expect(replacement).not.toBe(link);
+    expect(() => domain.joinChatByLink("bob", { link })).toThrow(/invalid/);
+    expect(domain.joinChatByLink("bob", { link: replacement })).toMatchObject({ id: GROUP });
+  });
+
+  it.each(["invite", "public", "admin"] as const)("clears pending requests on %s admission", (source) => {
+    const { db, domain } = fresh();
+    const chatId = source === "public" ? PUBLIC_CHANNEL : GROUP;
+    if (chatId === GROUP) domain.removeUser(ALICE, { chat_id: chatId, user_id: 2002 });
+    const approval = domain.createChatInviteLink(ALICE, { chat_id: chatId, creates_join_request: true });
+    domain.joinChatByLink("bob", { link: approval.invite_link as string });
+    expect(domain.editChatInviteLink(ALICE, { chat_id: chatId, invite_link: approval.invite_link as string })).toMatchObject({ pending_join_request_count: 1 });
+    if (source === "invite") domain.joinChatByLink("bob", { link: domain.exportChatInvite("alice", { chat_id: chatId }) });
+    else if (source === "public") domain.subscribePublicChannel("bob", { channel: chatId });
+    else domain.inviteToGroup("alice", { group_id: chatId, user_ids: [2002] });
+    expect(db.prepare("SELECT * FROM chat_join_requests WHERE chat_id = ? AND user_id = ?").get(chatId, 2002)).toBeUndefined();
+    expect(domain.editChatInviteLink(ALICE, { chat_id: chatId, invite_link: approval.invite_link as string })).not.toHaveProperty("pending_join_request_count");
+    expect(() => domain.approveChatJoinRequest(ALICE, { chat_id: chatId, user_id: 2002 })).toThrow(/join request not found/);
+    expect(() => domain.declineChatJoinRequest(ALICE, { chat_id: chatId, user_id: 2002 })).toThrow(/join request not found/);
+    domain.leaveChat(BOB, { chat_id: chatId });
+    expect(domain.joinChatByLink("bob", { link: approval.invite_link as string })).toMatchObject({ pending: true });
+  });
+
+  it("inherits a reply's topic and validates it before saving a message", () => {
+    const { domain } = fresh();
+    domain.enableForumTopics("alice", { chat_id: GROUP });
+    const topicId = domain.createForumTopic(ALICE, { chat_id: GROUP, title: "Replies" }).topic_id as number;
+    const original = domain.sendMessage(ALICE, { chat_id: GROUP, text: "question", message_thread_id: topicId });
+    const replyTo = original.message_id as number;
+    domain.closeForumTopic(ALICE, { chat_id: GROUP, message_thread_id: 1 });
+    const reply = domain.sendMessage(BOT, { chat_id: GROUP, text: "answer", reply_to_message_id: replyTo });
+    expect(reply).toMatchObject({ message_thread_id: topicId, reply_to_message: { message_id: replyTo } });
+    expect(domain.sendMessage(BOT, { chat_id: GROUP, text: "explicit", reply_to_message_id: replyTo, message_thread_id: topicId })).toMatchObject({ message_thread_id: topicId });
+    domain.closeForumTopic(ALICE, { chat_id: GROUP, message_thread_id: topicId });
+    expect(() => domain.sendMessage(BOT, { chat_id: GROUP, text: "closed", reply_to_message_id: replyTo })).toThrow(/closed/);
+    domain.deleteForumTopic(ALICE, { chat_id: GROUP, message_thread_id: topicId });
+    expect(() => domain.sendMessage(BOT, { chat_id: GROUP, text: "deleted", reply_to_message_id: replyTo })).toThrow(/topic not found/);
+    expect(domain.getHistory("alice", GROUP)).toHaveLength(3);
+  });
+
+  it("exports message thread evidence after a topic is closed and deleted", () => {
+    const { domain } = fresh();
+    domain.enableForumTopics("alice", { chat_id: GROUP });
+    const topicId = domain.createForumTopic(ALICE, { chat_id: GROUP, title: "Evidence" }).topic_id as number;
+    const message = domain.sendMessage(ALICE, { chat_id: GROUP, text: "keep", message_thread_id: topicId });
+    const expected = expect.arrayContaining([expect.objectContaining({ chat_id: GROUP, message_id: message.message_id, message_thread_id: topicId })]);
+    domain.closeForumTopic(ALICE, { chat_id: GROUP, message_thread_id: topicId });
+    expect(domain.exportState().messages).toEqual(expected);
+    domain.deleteForumTopic(ALICE, { chat_id: GROUP, message_thread_id: topicId });
+    expect(domain.exportState().messages).toEqual(expected);
+  });
+
+  it("assigns seeded forum history to General", () => {
+    const seed = publicSeed();
+    seed.chats.find((chat) => chat.id === GROUP)!.is_forum = true;
+    seed.messages.push({ chat_id: GROUP, message_id: 50, from_id: 2001, text: "seeded" });
+    const { domain } = fresh(undefined, seed);
+    expect(domain.getHistory("alice", GROUP)).toEqual(expect.arrayContaining([expect.objectContaining({ message_id: 50, message_thread_id: 1 })]));
+    expect(domain.sendMessage(BOT, { chat_id: GROUP, text: "reply", reply_to_message_id: 50 })).toMatchObject({ message_thread_id: 1 });
+  });
+
+  it.each(["bot", "channel"] as const)("requires current admin rights to manage a %s invite", (kind) => {
+    const { domain } = fresh();
+    const actor = kind === "bot" ? BOT : BOB;
+    const userId = kind === "bot" ? 1100001 : 2002;
+    const chatId = kind === "bot" ? GROUP : PUBLIC_CHANNEL;
+    if (kind === "channel") domain.subscribePublicChannel("bob", { channel: chatId });
+    domain.promoteChatMember(ALICE, { chat_id: chatId, user_id: userId, rights: { can_invite_users: true } });
+    const invite = domain.createChatInviteLink(actor, { chat_id: chatId });
+    domain.demoteChatMember(ALICE, { chat_id: chatId, user_id: userId });
+    expect(() => domain.editChatInviteLink(actor, { chat_id: chatId, invite_link: invite.invite_link as string, name: "denied" })).toThrow(/rights/);
+    expect(() => domain.revokeChatInviteLink(actor, { chat_id: chatId, invite_link: invite.invite_link as string })).toThrow(/rights/);
+    domain.promoteChatMember(ALICE, { chat_id: chatId, user_id: userId, rights: { can_invite_users: true } });
+    expect(domain.editChatInviteLink(actor, { chat_id: chatId, invite_link: invite.invite_link as string, name: "allowed" })).toMatchObject({ name: "allowed" });
+    expect(domain.revokeChatInviteLink(actor, { chat_id: chatId, invite_link: invite.invite_link as string })).toMatchObject({ is_revoked: true });
+  });
+
+  it("routes HTTP replies into their topic without an explicit thread", async () => {
+    const { db, domain } = fresh();
+    domain.enableForumTopics("alice", { chat_id: GROUP });
+    const topicId = domain.createForumTopic(ALICE, { chat_id: GROUP, title: "HTTP replies" }).topic_id as number;
+    const original = domain.sendMessage(ALICE, { chat_id: GROUP, text: "question", message_thread_id: topicId });
+    const app = createTelegramTwinApp({ db });
+    expect(await bot(app, "sendMessage", { chat_id: GROUP, text: "answer", reply_to_message_id: original.message_id })).toMatchObject({
+      status: 200,
+      body: { ok: true, result: { message_thread_id: topicId, reply_to_message: { message_id: original.message_id } } },
+    });
   });
 
   it("cannot delete the General topic", () => {

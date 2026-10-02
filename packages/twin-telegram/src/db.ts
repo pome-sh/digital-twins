@@ -33,7 +33,6 @@ CREATE TABLE IF NOT EXISTS chats (
   creator_id INTEGER,
   next_message_id INTEGER NOT NULL DEFAULT 1,
   next_admin_log_id INTEGER NOT NULL DEFAULT 1,
-  next_invite_id INTEGER NOT NULL DEFAULT 1,
   next_topic_id INTEGER NOT NULL DEFAULT 1
 );
 
@@ -298,7 +297,6 @@ export function migrate(db: TelegramTwinDatabase): void {
     ["chats", "username", "TEXT"],
     ["chats", "is_forum", "INTEGER NOT NULL DEFAULT 0"],
     ["chats", "is_public", "INTEGER NOT NULL DEFAULT 0"],
-    ["chats", "next_invite_id", "INTEGER NOT NULL DEFAULT 1"],
     ["chats", "next_topic_id", "INTEGER NOT NULL DEFAULT 1"],
     ["messages", "message_thread_id", "INTEGER"],
     ["chat_members", "status", "TEXT NOT NULL DEFAULT 'member'"],

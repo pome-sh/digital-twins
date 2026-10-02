@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { StateDelta } from "@pome-sh/wire";
 import { resetDatabase, type TelegramTwinDatabase } from "./db.js";
 import { telegramFail } from "./errors.js";
@@ -183,7 +183,7 @@ export class TelegramDomain {
         const isForum = chat.is_forum === true ? 1 : 0;
         const isPublic = chat.username ? 1 : 0;
         this.db.prepare(
-          "INSERT INTO chats (id, type, title, description, photo_file_id, username, is_forum, is_public, permissions_json, permissions_until, slow_mode_seconds, creator_id, next_message_id, next_admin_log_id, next_invite_id, next_topic_id) VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?, 0, 0, ?, 1, 1, 1, ?)",
+          "INSERT INTO chats (id, type, title, description, photo_file_id, username, is_forum, is_public, permissions_json, permissions_until, slow_mode_seconds, creator_id, next_message_id, next_admin_log_id, next_topic_id) VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?, 0, 0, ?, 1, 1, ?)",
         ).run(
           chat.id,
           chat.type,
@@ -210,7 +210,7 @@ export class TelegramDomain {
       for (const message of state.messages) {
         this.db
           .prepare(
-            "INSERT INTO messages (chat_id, message_id, from_id, text, date, reply_to_message_id, edit_date, forward_from_id, forward_from_chat_id) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL)",
+            "INSERT INTO messages (chat_id, message_id, from_id, text, date, reply_to_message_id, edit_date, forward_from_id, forward_from_chat_id, message_thread_id) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?)",
           )
           .run(
             message.chat_id,
@@ -219,6 +219,7 @@ export class TelegramDomain {
             message.text,
             message.date ?? now,
             message.reply_to_message_id ?? null,
+            state.chats.find((chat) => chat.id === message.chat_id)?.is_forum ? 1 : null,
           );
         this.db
           .prepare(
@@ -271,10 +272,10 @@ export class TelegramDomain {
     if (!args.text) telegramFail(400, 400, "Bad Request: message text is empty");
     this.requireMember(actor, args.chat_id);
     this.assertCanSend(actor, args.chat_id, "messages");
-    const threadId = this.requireOpenTopic(args.chat_id, args.message_thread_id);
-    if (args.reply_to_message_id !== undefined) {
-      this.requireVisibleMessage(actor, args.chat_id, args.reply_to_message_id);
-    }
+    const reply = args.reply_to_message_id === undefined
+      ? undefined
+      : this.requireVisibleMessage(actor, args.chat_id, args.reply_to_message_id);
+    const threadId = this.requireOpenTopic(args.chat_id, args.message_thread_id ?? reply?.message_thread_id ?? undefined);
     const from = this.personFor(actor);
     const replyMarkup = args.reply_markup === undefined ? undefined : this.parseReplyMarkup(args.reply_markup);
     const date = this.now();
@@ -1141,7 +1142,7 @@ export class TelegramDomain {
       bots: this.db.prepare("SELECT id, first_name, username FROM bots").all(),
       users: this.db.prepare("SELECT id, account, first_name, username FROM users").all(),
       chats: this.db.prepare("SELECT id, type, title FROM chats").all(),
-      messages: this.db.prepare("SELECT chat_id, message_id, from_id, text, reply_to_message_id FROM messages").all(),
+      messages: this.db.prepare("SELECT chat_id, message_id, from_id, text, reply_to_message_id, message_thread_id FROM messages").all(),
     };
   }
 
@@ -1406,7 +1407,7 @@ export class TelegramDomain {
     const chatId = this.nextGroupId();
     this.db.transaction(() => {
       this.db.prepare(
-        "INSERT INTO chats (id, type, title, description, photo_file_id, username, is_forum, is_public, permissions_json, permissions_until, slow_mode_seconds, creator_id, next_message_id, next_admin_log_id, next_invite_id, next_topic_id) VALUES (?, ?, ?, ?, NULL, NULL, 0, 0, ?, 0, 0, ?, 1, 1, 1, 1)",
+        "INSERT INTO chats (id, type, title, description, photo_file_id, username, is_forum, is_public, permissions_json, permissions_until, slow_mode_seconds, creator_id, next_message_id, next_admin_log_id, next_topic_id) VALUES (?, ?, ?, ?, NULL, NULL, 0, 0, ?, 0, 0, ?, 1, 1, 1)",
       ).run(chatId, type, title, about || null, JSON.stringify(DEFAULT_CHAT_PERMISSIONS), creator.id);
       this.insertMember(chatId, creator.id, "creator");
       this.recordAdminLog(chatId, creator.id, "create_channel", null, { title, type });
@@ -1417,14 +1418,13 @@ export class TelegramDomain {
   }
 
   searchPublicChats(_account: string, args: { query: string; limit?: number }): Record<string, unknown>[] {
-    const query = args.query.trim().toLowerCase().replace(/[%_]/g, "");
+    const query = args.query.trim().toLowerCase();
     if (!query) telegramFail(400, 400, "Bad Request: query is empty");
     const limit = args.limit ?? 20;
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) telegramFail(400, 400, "Bad Request: invalid limit");
-    const like = `%${query}%`;
     const rows = this.db.prepare(
-      "SELECT id, type, title, description, photo_file_id, username, is_forum, is_public, permissions_json, permissions_until, slow_mode_seconds, creator_id FROM chats WHERE is_public = 1 AND username IS NOT NULL AND (LOWER(username) LIKE ? OR LOWER(COALESCE(title, '')) LIKE ?) ORDER BY id LIMIT ?",
-    ).all(like, like, limit) as ChatRow[];
+      "SELECT id, type, title, description, photo_file_id, username, is_forum, is_public, permissions_json, permissions_until, slow_mode_seconds, creator_id FROM chats WHERE is_public = 1 AND username IS NOT NULL AND (INSTR(LOWER(username), ?) > 0 OR INSTR(LOWER(COALESCE(title, '')), ?) > 0) ORDER BY id LIMIT ?",
+    ).all(query, query, limit) as ChatRow[];
     return rows.map((row) => this.presentPublicChat(row));
   }
 
@@ -1453,7 +1453,7 @@ export class TelegramDomain {
   }
 
   editChatInviteLink(actor: Actor, args: { chat_id: number; invite_link: string } & InviteOptions, delta: DeltaHook = NOOP): Record<string, unknown> {
-    this.requirePermission(actor, args.chat_id, "can_invite_users", "can_invite_users");
+    this.requireInviteAccess(actor, args.chat_id);
     const row = this.requireInviteInChat(args.chat_id, parseInviteLink(args.invite_link));
     this.requireInviteCreator(actor, args.chat_id, row);
     if (row.is_revoked) telegramFail(400, 400, "Bad Request: invite link is revoked");
@@ -1469,7 +1469,7 @@ export class TelegramDomain {
   }
 
   revokeChatInviteLink(actor: Actor, args: { chat_id: number; invite_link: string }, delta: DeltaHook = NOOP): Record<string, unknown> {
-    this.requirePermission(actor, args.chat_id, "can_invite_users", "can_invite_users");
+    this.requireInviteAccess(actor, args.chat_id);
     const row = this.requireInviteInChat(args.chat_id, parseInviteLink(args.invite_link));
     this.requireInviteCreator(actor, args.chat_id, row);
     this.db.prepare("UPDATE chat_invite_links SET is_revoked = 1 WHERE token = ?").run(row.token);
@@ -2163,6 +2163,7 @@ export class TelegramDomain {
     this.db.prepare(
       "INSERT INTO chat_members (chat_id, user_id, status, admin_rights_json, restrictions_json, until_date, custom_title, is_anonymous) VALUES (?, ?, ?, ?, NULL, 0, NULL, 0)",
     ).run(chatId, userId, status, status === "administrator" ? JSON.stringify(DEFAULT_PROMOTE_RIGHTS) : null);
+    this.db.prepare("DELETE FROM chat_join_requests WHERE chat_id = ? AND user_id = ?").run(chatId, userId);
   }
 
   private recordAdminLog(chatId: number, actorId: number, action: string, targetId: number | null, payload: Record<string, unknown>): void {
@@ -2453,7 +2454,7 @@ export class TelegramDomain {
   }
 
   private requireInviteAccess(actor: Actor, chatId: number): MembershipSnapshot {
-    if (this.chat(chatId).type === "channel") return this.requireAdminRight(actor, chatId, "can_invite_users");
+    if (actor.kind === "bot" || this.chat(chatId).type === "channel") return this.requireAdminRight(actor, chatId, "can_invite_users");
     return this.requirePermission(actor, chatId, "can_invite_users", "can_invite_users");
   }
 
@@ -2482,9 +2483,7 @@ export class TelegramDomain {
     requireExpireDate(args.options?.expire_date, this.now());
     const options = normalizeInviteOptions(args.options ?? {});
     const created = this.db.transaction(() => {
-      const inviteId = (this.db.prepare("SELECT next_invite_id AS next FROM chats WHERE id = ?").get(chatId) as { next: number }).next;
-      this.db.prepare("UPDATE chats SET next_invite_id = next_invite_id + 1 WHERE id = ?").run(chatId);
-      const token = createHash("sha256").update(`invite:${chatId}:${snapshot.person.id}:${inviteId}`).digest("base64url").slice(0, 16);
+      const token = randomBytes(24).toString("base64url");
       this.db.prepare(
         "INSERT INTO chat_invite_links (token, chat_id, creator_id, name, expire_date, member_limit, creates_join_request, is_primary, is_revoked, usage_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)",
       ).run(
