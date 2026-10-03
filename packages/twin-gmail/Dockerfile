@@ -1,5 +1,5 @@
 # Build context is the monorepo root so npm ci uses the committed workspace lock.
-FROM node:26-bookworm@sha256:219fc9da91e7f29a9f32290ff598cdf8886fd68f421ff515c8f93434da39a271 AS build
+FROM node:26.10.0-bookworm@sha256:2aaae6d91f99fee84cfc92da9b52c22a185752d247746052bbc3f961e44478c6 AS build
 WORKDIR /repo
 COPY package.json package-lock.json ./
 # `cli/` is a workspace member (its manifest is in the lockfile), so npm ci
@@ -18,7 +18,7 @@ RUN npm run build -w @pome-sh/twin-gmail
 RUN rm -rf node_modules packages/*/node_modules \
   && npm ci --omit=dev -w @pome-sh/twin-gmail
 
-FROM node:26-trixie-slim@sha256:715e55e4b84e4bb0ff48e49b398a848f08e55daed8eb6a0ea1839ae53bc57583 AS runtime
+FROM node:26.10.0-trixie-slim@sha256:ec7758ee051e457b468b32bde57b0879010b325bb9862718e9615225ce4aaae1 AS runtime
 WORKDIR /repo
 ENV NODE_ENV=production
 ENV GMAIL_TWIN_HOST=0.0.0.0
