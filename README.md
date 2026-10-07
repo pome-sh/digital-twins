@@ -2,10 +2,10 @@
 
 <img src="./assets/pome-logo.svg" alt="Pome" width="76" height="76" />
 
-<h1>
-  Pome<br />
+<h2>
+  Pome - <br />
   Test mode for your integrations, built for the way agents build.
-</h1>
+</h2>
 
 <p>
   Local, stateful twins of GitHub, Slack, Stripe, Gmail and Linear, over REST and MCP.<br />
@@ -258,22 +258,7 @@ Three things change, and nothing else in your code should:
 
 A green run on a twin says your integration behaves against the API as far as the fidelity record covers it. It does not say the vendor will behave the same tomorrow. Run one smoke test against the real API after the swap.
 
-## Why not mocks, why not Emulate
-
-| | Hand-written mocks | [Vercel Emulate](https://github.com/vercel-labs/emulate) | Pome twins |
-| --- | --- | --- | --- |
-| State that persists across calls | Whatever you wrote by hand | Yes | Yes |
-| A tape of every request your code made | Only if you wrote one | No | Yes |
-| Fidelity measured against the vendor and published | No | No | Yes, daily |
-| MCP surface for agents | No | No | Yes, 115 tools |
-
-The Emulate column comes from its README as of 2026-09-16. Emulate targets application code in a dev loop, and it is Apache-2.0 like this repo.
-
 ## Going further
-
-`pome` below is the same CLI. `npm install -g @pome-sh/cli` puts it on your PATH, or keep using `npx @pome-sh/cli@latest`.
-
-Everything above runs locally with no account. Hosted grading is optional. Nothing leaves your machine unless you use it, apart from the daily usage event (see [Telemetry](#telemetry)).
 
 - Your own world: `pome twin new-seed github --out seed.json`, edit it, then `pome twin start github --seed seed.json`. Several twins from one file: `pome twin new-seed github slack --out seed.json`, then `pome twin start github slack --seed seed.json`. See the [local twin guide](https://docs.pome.sh/run-a-twin).
 - Graded tasks, locally: `npx @pome-sh/cli@latest init` scaffolds a project. `pome run --local tasks/01-bug-happy-path.md` records a run. `pome inspect latest` reads it. A local run records evidence and does not score.
@@ -288,13 +273,11 @@ Everything above runs locally with no account. Hosted grading is optional. Nothi
 
 ## Repository layout
 
-`@pome-sh/cli` contains the CLI and the twin runtimes. Users do not install the twin packages separately.
-
-The shared runtime provides HTTP routing, bearer authentication, MCP dispatch, recording, and SQLite state. Each twin adds its provider-specific domain behavior.
+`@pome-sh/cli` contains the CLI and the twin runtimes. The shared runtime provides HTTP routing, bearer authentication, MCP dispatch, recording, and SQLite state. Each twin adds its provider-specific domain behavior.
 
 See [`packages/README.md`](./packages/README.md) for the package map. See [`CONTRACT.md`](./CONTRACT.md) for the twin runtime contract.
 
-Contributions are welcome, and the easiest first ones are seeds and showcases. The [good first issues](https://github.com/pome-sh/digital-twins/labels/good%20first%20issue) are the shortest way in, and [`CONTRIBUTING.md`](./CONTRIBUTING.md) says what a pull request needs.
+Contributions are welcome! See [good first issues](https://github.com/pome-sh/digital-twins/labels/good%20first%20issue) and [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 A new twin is a package that satisfies the runtime contract in [`CONTRACT.md`](./CONTRACT.md). A bug report is most useful with the tape attached (`pome twin tape --json`). A security problem goes to [`SECURITY.md`](./SECURITY.md), not to a public issue.
 
@@ -310,10 +293,4 @@ Turn it off with `POME_TELEMETRY=0`. The CLI also honours `DO_NOT_TRACK=1`. It s
 
 ## Status and license
 
-Pome is in beta. CLI behavior and dependencies can change before version 1.0.
-
-This repository uses the [Apache-2.0 license](./LICENSE).
-
-## Star history
-
-[![Star History Chart](https://api.star-history.com/svg?repos=pome-sh/digital-twins&type=Date)](https://star-history.com/#pome-sh/digital-twins&Date)
+[Apache-2.0 license](./LICENSE) © Pome AI
