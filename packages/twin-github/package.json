@@ -51,20 +51,20 @@
     "fidelity:parity": "tsx scripts/fidelity-parity.ts"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.1",
+    "@hono/node-server": "^2.1.4",
     "@pome-sh/sdk": "*",
     "@pome-sh/wire": "*",
-    "hono": "^4.13.12",
+    "hono": "^4.13.13",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.31.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@octokit/openapi-types": "^29.0.1",
-    "@types/node": "^26.6.4",
-    "@vitest/coverage-v8": "^5.0.1",
+    "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "^5.0.3",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.3"
   },
   "keywords": [
     "github",
@@ -85,6 +85,6 @@
   },
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=24"
+    "node": ">=24.21.0"
   }
 }

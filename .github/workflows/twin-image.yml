@@ -243,7 +243,7 @@ jobs:
       # attempt count, and the fatal last attempt.
       - name: Generate image SBOM (attempt 1 of 3)
         id: sbom_1
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         continue-on-error: true
         with:
           image: twin-${{ matrix.twin }}:scan
@@ -258,7 +258,7 @@ jobs:
       - name: Generate image SBOM (attempt 2 of 3)
         id: sbom_2
         if: ${{ steps.sbom_1.outcome == 'failure' }}
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         continue-on-error: true
         with:
           image: twin-${{ matrix.twin }}:scan
@@ -274,7 +274,7 @@ jobs:
       - name: Generate image SBOM (attempt 3 of 3)
         id: sbom_3
         if: ${{ steps.sbom_1.outcome == 'failure' && steps.sbom_2.outcome == 'failure' }}
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: twin-${{ matrix.twin }}:scan
           format: spdx-json
