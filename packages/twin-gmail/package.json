@@ -47,17 +47,17 @@
     "preview:drift": "tsx scripts/preview-drift.ts"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.1",
+    "@hono/node-server": "^2.1.4",
     "@pome-sh/sdk": "*",
-    "hono": "^4.13.12",
+    "hono": "^4.13.13",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@googleapis/gmail": "22.0.1",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.3"
   },
   "keywords": [
     "gmail",
@@ -78,6 +78,6 @@
   },
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=24"
+    "node": ">=24.21.0"
   }
 }

@@ -1,7 +1,7 @@
 # Build context is the monorepo root. This lets the image use the committed
 # workspace lockfile with npm ci instead of resolving dependencies from a
 # standalone package context.
-FROM node:24-bookworm@sha256:c35698d36238c69451c7e7a5951dd5c9b11c3e45884c918059c94c4a8be969b1 AS build
+FROM node:24.21.0-bookworm@sha256:9af606de2e947cfb3f276633b7c5130c4cd22365aa10f5a647b7675d5cfce0c0 AS build
 WORKDIR /repo
 COPY package.json package-lock.json ./
 # `cli/` is a workspace member (its manifest is in the lockfile), so npm ci
@@ -24,7 +24,7 @@ RUN npm run build -w @pome-sh/twin-slack
 RUN rm -rf node_modules packages/*/node_modules \
   && npm ci --omit=dev -w @pome-sh/twin-slack
 
-FROM node:24-trixie-slim@sha256:9022946fb57e6fb6a2503931470deba4b49db02bfc8f587f93007fd33ef54415 AS runtime
+FROM node:24.21.0-trixie-slim@sha256:173f125896c3b47ddf056734c7ea789d04595a6a08769a8f78e0df642781fb66 AS runtime
 WORKDIR /repo
 ENV NODE_ENV=production
 ENV SLACK_CLONE_HOST=0.0.0.0
